@@ -1,2 +1,2 @@
-# ADAS-Actuarial-Data-Analysis-System
-An actuarial data analysis system integrating an Excel VBA add-in, Python backend services, and a web-based UI to support triangle analysis, reserving workflows, and on-demand data aggregation.
+# Actuarial-Data & Analytics System (ADAS)
+An actuarial data analytics system that integrates an Excel VBA add-in, Python backend services (pandas, NumPy), and a modern web-based UI to support dataset analysis, reserving workflows, and on-demand data aggregation.
