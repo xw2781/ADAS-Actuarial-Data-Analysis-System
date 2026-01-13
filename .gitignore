@@ -9,8 +9,6 @@
 ~$*
 *.tmp
 
-# VBA export artifacts
-*.frx
 
 # -------- Python --------
 __pycache__/
