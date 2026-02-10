@@ -9,7 +9,7 @@ VENV_PYTHON = BASE_DIR / ".venv" / "Scripts" / "python.exe"
 REQ_FILE = BASE_DIR / "requirements.txt"
 
 ENTRY_PY = BASE_DIR / "main.py"
-ICON = r"E:\ADAS\library\icon\ADASV4.ico"
+ICON = r"E:\ADAS\core\ADAS Shell\ADAS Shell.ico"
 
 DIST_DIR = BASE_DIR / "dist"
 BUILD_DIR = BASE_DIR / "build"
@@ -24,7 +24,6 @@ try:
 except:
     pass
 
-shutil.rmtree(r"E:\ADAS\core\ADAS Agent\spec")
 
 def run(cmd, check=True):
     print("\n>>>", " ".join(map(str, cmd)))
@@ -66,9 +65,9 @@ def build_exe():
         "--noconfirm",   
         f"--icon={ICON}",
         "--add-data", f"{ICON};.",
-        "--noconsole",
+        # "--noconsole",
         "--clean",
-        "--name", "ADAS Agent",
+        "--name", "ADAS Shell",
         "--distpath", DIST_DIR,
         "--workpath", BUILD_DIR,
         ENTRY_PY,
@@ -85,7 +84,9 @@ def main():
     install_requirements()
     build_exe()
 
+    exe_path = DIST_DIR / "ADAS Shell.exe"
     print("\nBuild finished!")
+    print(f"EXE location: {exe_path}")
 
 
 if __name__ == "__main__":

@@ -1,11 +1,27 @@
 import os
 import sys
 import time
+import uuid
 import psutil
 import subprocess
 from pathlib import Path
+from datetime import datetime
 
-instance_path = r"E:\ADAS\core\ADAS Agent\instances"
+# Resolve ADAS root from __file__: main.py -> ADAS Master -> core -> ADAS
+_ADAS_ROOT = str(Path(__file__).resolve().parent.parent.parent)
+if _ADAS_ROOT not in sys.path:
+    sys.path.insert(0, _ADAS_ROOT)
+
+from core.utils import *
+
+agent_instance_path = get_config_value("root") + r"\core\ADAS Agent\instances"
+
+device_name = os.environ.get("COMPUTERNAME")
+ts = datetime.now().strftime("%y%m%d-%H%M%S-%f")[:-3]
+master_id = f'{device_name}@' + os.getlogin() + "@" + ts
+
+id_folder = r"E:\ADAS\core\ADAS Master\instances"
+id_path = id_folder + '\\' + master_id + '.txt'
 
 
 def kill_extra_python_processes():
@@ -33,10 +49,10 @@ def kill_extra_python_processes():
 
     return killed
 
-try:
-    kill_extra_python_processes()
-except Exception as e:
-    print(e)
+# try:
+#     kill_extra_python_processes()
+# except Exception as e:
+#     print(e)
 
 
 def read_txt(txt_file, retries=50, delay=0.02):
@@ -77,9 +93,7 @@ def read_txt(txt_file, retries=50, delay=0.02):
     return arg_dict
 
 
-def remove_old_instances():
-    FOLDER = instance_path
-    AGE_SECONDS = 5 * 60  # 5 minutes
+def remove_old_instances(FOLDER, AGE_SECONDS=60):
     now = time.time()
 
     for name in os.listdir(FOLDER):
@@ -114,8 +128,7 @@ def cmd(name):
             return False
         
 
-def file_counts():
-    FOLDER = instance_path
+def file_counts(FOLDER):
     file_count = sum(
         1 for name in os.listdir(FOLDER)
         if os.path.isfile(os.path.join(FOLDER, name))
@@ -123,31 +136,60 @@ def file_counts():
     return file_count
 
 
+def write_txt(txt_file, arg):
+    content = ''
+    for item in arg.items():
+        content += item[0] + ' = ' + item[1] + '\n'
+    with open(txt_file, "w") as file:
+        file.write(content)
+
+
+def safe_remove(file_path, attempts=5, delay=0.1):
+    """Attempt to remove a file with retries on permission error."""
+    for _ in range(attempts):
+        try:
+            tmp = f"{file_path}.{uuid.uuid4()}.deleting"
+            os.replace(file_path, tmp)  # atomic
+            os.remove(tmp)
+            return True
+        except PermissionError:
+            time.sleep(delay)
+
+    return False
+
+
+current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+write_txt(id_path, {'Server': master_id, 'Last seen': current_time})
+
+time.sleep(1)
+
 while True:
     try:
-        if cmd('KILL_ALL_MASTER'):
+        if not os.path.exists(id_path):
+            break
+        
+        if get_config_value('apps.master.kill_all'):
+            safe_remove(id_path)
             break
 
-        remove_old_instances()
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+        # Update Status
+        arg_1 = read_txt(id_path)
+        arg_1['Last seen'] = current_time
+        write_txt(id_path, arg_1)
 
-        if cmd('AUTO_CREATE_WORKERS') and file_counts() < cmd('MAX_WORKERS'):
-            num_workers_to_add = cmd('MAX_WORKERS') - file_counts()
+        remove_old_instances(agent_instance_path)
+        remove_old_instances(r"E:\ADAS\core\ADAS Master\instances")
+        remove_old_instances(r"E:\ADAS\requests", 5*60)
+      
+        while get_config_value('apps.master.auto_create_workers') \
+          and file_counts(agent_instance_path) < get_config_value('apps.master.max_workers'):
+            exe = Path(r"E:\ADAS\core\ADAS Agent\dist\ADAS Agent\ADAS Agent.exe")
+            subprocess.Popen([str(exe)], close_fds=True)
+            time.sleep(3)
 
-            for i in range(1, num_workers_to_add+1):
-                time.sleep(1)
-
-                exe = Path(r"E:\ADAS\core\ADAS Agent\dist\ADAS Agent\ADAS Agent.exe")
-
-                subprocess.Popen(
-                    [str(exe)],
-                    close_fds=True
-                )
-                
-        time.sleep(30)
-    except:
-        time.sleep(10)
-
-
-
-
-
+    except Exception as e:
+        print(e)
+        
+    time.sleep(15)

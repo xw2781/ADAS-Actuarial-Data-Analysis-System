@@ -1,30 +1,34 @@
 import os
 import re
+import csv
+import sys
 import time
 import uuid
-import csv
+import json
 import numpy as np
 import calendar
 import threading
 from pathlib import Path
 from threading import Lock
 from datetime import date, datetime
+
+# Resolve ADAS root from __file__: main.py -> ADAS Agent -> core -> ADAS
+_ADAS_ROOT = str(Path(__file__).resolve().parent.parent.parent)
+if _ADAS_ROOT not in sys.path:
+    sys.path.insert(0, _ADAS_ROOT)
+
 import pandas as pd
-from utils import File
-from io import BytesIO
-from concurrent.futures import ThreadPoolExecutor
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-
-
-MAX_WORKERS = 1
-EXECUTOR = ThreadPoolExecutor(max_workers=MAX_WORKERS)
+from core.utils import *
 
 debug_mode = 0
-team_profile_path = r"E:\ADAS\Team Profile\Actuarial_NJ.xlsm"
-command_path = r"E:\ADAS\core\ADAS Master\command.txt"
-robot_id = datetime.now().strftime(f"%y%m%d-%H%M%S") + f'NE7SASWPN02@' + os.getlogin()
-id_folder = r"E:\ADAS\core\ADAS Agent\instances"
+device_name = os.environ.get("COMPUTERNAME")
+project_map_path = rf"{PROJECT_ROOT}\projects\map.json"
+command_path = rf"{PROJECT_ROOT}\core\ADAS Master\command.txt"
+ts = datetime.now().strftime("%y%m%d-%H%M%S-%f")[:-3]
+robot_id =  f'{device_name}@' + os.getlogin() + "@" + ts
+id_folder = rf"{PROJECT_ROOT}\core\ADAS Agent\instances"
 id_path = id_folder + '\\' + robot_id + '.txt'
 
 
@@ -46,11 +50,23 @@ def remove_old_instances():
 
 
 def load_BASE_DICT():
-    with open(team_profile_path, "rb") as f:
-        bio = BytesIO(f.read())
-    with pd.ExcelFile(bio, engine="openpyxl") as xls:
-        BASE_DICT['Team Profile'] = pd.read_excel(xls, sheet_name='Virtual Projects', header=0, index_col=None).fillna('')
-        BASE_DICT['Team Profile - Version'] = datetime.now()
+    with open(project_map_path, mode="r", encoding="utf-8") as f:
+        project_mapping = json.load(f)
+
+    virtual_projects = project_mapping.get("Virtual Projects")
+    if virtual_projects is None:
+        raise KeyError("Missing 'Virtual Projects' in project mapping JSON.")
+
+    if isinstance(virtual_projects, dict) and "headers" in virtual_projects and "rows" in virtual_projects:
+        headers = virtual_projects.get("headers", [])
+        rows = virtual_projects.get("rows", [])
+        team_profile_df = pd.DataFrame(rows, columns=headers)
+    else:
+        # Fallback for list/dict-of-records JSON shapes.
+        team_profile_df = pd.DataFrame(virtual_projects)
+
+    BASE_DICT['Project Map'] = team_profile_df.fillna('')
+    BASE_DICT['Project Map - Version'] = datetime.now()
 
 
 def DLOOKUP(df, lookup_value, lookup_col, return_col):
@@ -71,15 +87,61 @@ def get_current_time():
     return formatted_date_time
 
 
-def load_to_VPS_DICT(project_name, settings_file):
-    print(f"Loading {settings_file} @ {get_current_time()}")
-    with open(settings_file, "rb") as f:
-        bio = BytesIO(f.read())
-    with pd.ExcelFile(bio, engine="openpyxl") as xls:
-        VPS_DICT[project_name] = {}
-        VPS_DICT[project_name + " - Version"] = datetime.now()
-        for page_name in ['Source Table', 'Dataset Types', 'Reserving Class Types']:
-            VPS_DICT[project_name][page_name] = pd.read_excel(xls, sheet_name=page_name, header=0, index_col=None).fillna('')
+def _project_json_paths(project_name):
+    project_dir = PROJECT_ROOT / "projects" / project_name
+    return {
+        "source_table": project_dir / "field_mapping.json",
+        "dataset_types": project_dir / "dataset_types.json",
+        "reserving_class_types": project_dir / "reserving_class_types.json",
+    }
+
+
+def _read_json(json_path):
+    with open(json_path, mode="r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _json_table_to_df(json_obj):
+    if isinstance(json_obj, dict) and "columns" in json_obj and "rows" in json_obj:
+        return pd.DataFrame(json_obj.get("rows", []), columns=json_obj.get("columns", [])).fillna('')
+    return pd.DataFrame(json_obj).fillna('')
+
+
+def _source_table_df_from_json(json_obj):
+    rows = json_obj.get("rows", []) if isinstance(json_obj, dict) else json_obj
+    normalized_rows = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        normalized_rows.append({
+            "Column Name": row.get("field_name", ""),
+            "Significances": row.get("significance", ""),
+            "Level": row.get("level", ""),
+        })
+    return pd.DataFrame(normalized_rows, columns=["Column Name", "Significances", "Level"]).fillna('')
+
+
+def _get_vps_last_modified_time(project_name):
+    json_paths = _project_json_paths(project_name)
+    missing = [str(path) for path in json_paths.values() if not path.exists()]
+    if missing:
+        raise FileNotFoundError(f"Missing project JSON file(s): {', '.join(missing)}")
+    return max(datetime.fromtimestamp(path.stat().st_mtime) for path in json_paths.values())
+
+
+def load_to_VPS_DICT(project_name, settings_file=None):
+    json_paths = _project_json_paths(project_name)
+    print(f"Loading JSON settings for [{project_name}] @ {get_current_time()}")
+
+    source_table_json = _read_json(json_paths["source_table"])
+    dataset_types_json = _read_json(json_paths["dataset_types"])
+    reserving_class_types_json = _read_json(json_paths["reserving_class_types"])
+
+    VPS_DICT[project_name] = {}
+    VPS_DICT[project_name]["Source Table"] = _source_table_df_from_json(source_table_json)
+    VPS_DICT[project_name]["Dataset Types"] = _json_table_to_df(dataset_types_json)
+    VPS_DICT[project_name]["Reserving Class Types"] = _json_table_to_df(reserving_class_types_json)
+    VPS_DICT[project_name + " - Version"] = _get_vps_last_modified_time(project_name)
 
 
 def load_to_DATA_DICT(csv_path):
@@ -365,7 +427,7 @@ def eval_triangle_formula(triangles: dict[str, pd.DataFrame],
 
 
 def _get_df(project_name):
-    table_path = DLOOKUP(BASE_DICT['Team Profile'], project_name, 'Project Name', 'Table Path')
+    table_path = DLOOKUP(BASE_DICT['Project Map'], project_name, 'Project Name', 'Table Path')
     table_name = os.path.basename(table_path)
 
     # DATA table cache (guarded)
@@ -381,8 +443,7 @@ def _get_df(project_name):
     # VPS cache (guarded)
     with VPS_DICT_LOCK:
         if project_name not in VPS_DICT:
-            VPS_path = DLOOKUP(BASE_DICT['Team Profile'], project_name, 'Project Name', 'Project Settings')
-            load_to_VPS_DICT(project_name, VPS_path)
+            load_to_VPS_DICT(project_name)
 
     return DATA_DICT[table_name]
 
@@ -732,8 +793,8 @@ class RequestHandler(FileSystemEventHandler):
 
         file_path = event.dest_path
 
-        # Don’t block watchdog’s thread; queue to worker pool
-        EXECUTOR.submit(self.process_file, file_path)
+        # Process request immediately in the watchdog event thread
+        self.process_file(file_path)
         
     def process_file_debug(self, file_path):
         if debug_mode == 0:
@@ -754,7 +815,7 @@ class RequestHandler(FileSystemEventHandler):
 
         try:
             project_name = arg['ProjectName']
-            settings_file = DLOOKUP(BASE_DICT['Team Profile'], project_name, 'Project Name', 'Project Settings')
+            DLOOKUP(BASE_DICT['Project Map'], project_name, 'Project Name', 'Table Path')
         except:
             write_lists_to_csv(arg['DataPath'], [[f'(project not found: {project_name})']])
             return
@@ -769,9 +830,10 @@ class RequestHandler(FileSystemEventHandler):
         # Check VPS Updates (guarded)
         with VPS_DICT_LOCK:
             if project_name + " - Version" in VPS_DICT:
-                if VPS_DICT[project_name + " - Version"] < File(settings_file).last_modified_time:
-                    load_to_VPS_DICT(project_name, settings_file)
-                    print(f">>> Virtual Project Settings Updated -> [{settings_file}]\n")
+                vps_last_modified_time = _get_vps_last_modified_time(project_name)
+                if VPS_DICT[project_name + " - Version"] < vps_last_modified_time:
+                    load_to_VPS_DICT(project_name)
+                    print(f">>> Virtual Project Settings Updated -> [{project_name} JSON]\n")
             # If missing, _get_df() will load it later; or you can proactively load it here.
 
         # Go to Functions
@@ -803,14 +865,6 @@ def start_monitoring(path):
 
     remove_old_instances()
     load_BASE_DICT()
-    preload_table_list = BASE_DICT['Team Profile'][BASE_DICT['Team Profile']['Preload'] == 'Y']['Table Path'].tolist()
-
-    # inital load
-    for csv_path in preload_table_list:
-        project_name  = DLOOKUP(BASE_DICT['Team Profile'], csv_path, 'Table Path', 'Project Name')
-        settings_file = DLOOKUP(BASE_DICT['Team Profile'], csv_path, 'Table Path', 'Project Settings')
-        load_to_VPS_DICT(project_name, settings_file)
-        load_to_DATA_DICT(csv_path)
 
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -822,7 +876,7 @@ def start_monitoring(path):
             if not os.path.exists(id_path):
                 observer.stop(); break
 
-            if read_txt(command_path)['KILL_ALL_AGENTS'] in ['True', '1']:
+            if get_config_value('apps.agent.kill_all'):
                 File(id_path).delete()
                 observer.stop(); break
             
@@ -834,9 +888,9 @@ def start_monitoring(path):
             write_txt(id_path, arg_1)
 
             # Check Base Settings (New Version Available?)
-            if BASE_DICT["Team Profile - Version"] < File(team_profile_path).last_modified_time:
+            if BASE_DICT["Project Map - Version"] < File(project_map_path).last_modified_time:
                 load_BASE_DICT()
-                print(">>> Team Profile Updated\n")
+                print(">>> Project Map Updated\n")
 
             time.sleep(5)
 
@@ -846,4 +900,4 @@ def start_monitoring(path):
     observer.join()
 
 
-start_monitoring("E:\\ADAS\\requests")
+start_monitoring(f"{PROJECT_ROOT}\\requests")

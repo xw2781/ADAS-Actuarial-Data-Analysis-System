@@ -9,24 +9,22 @@ VENV_PYTHON = BASE_DIR / ".venv" / "Scripts" / "python.exe"
 REQ_FILE = BASE_DIR / "requirements.txt"
 
 ENTRY_PY = BASE_DIR / "main.py"
-ICON = r"E:\ADAS\library\icon\ADAS_icon_v2.ico"
+ICON = r"E:\ADAS\library\icon\ADASV7.ico"
 
 DIST_DIR = BASE_DIR / "dist"
 BUILD_DIR = BASE_DIR / "build"
 
-# try:
-#     shutil.rmtree(DIST_DIR)
-# except:
-#     pass
+try:
+    shutil.rmtree(DIST_DIR)
+except:
+    pass
 
-# try:
-#     shutil.rmtree(BUILD_DIR)
-# except:
-#     pass
+try:
+    shutil.rmtree(BUILD_DIR)
+except:
+    pass
 
-shutil.rmtree(DIST_DIR)
-shutil.rmtree(BUILD_DIR)
-
+shutil.rmtree(r"E:\ADAS\core\ADAS Master\spec")
 
 def run(cmd, check=True):
     print("\n>>>", " ".join(map(str, cmd)))
@@ -64,12 +62,13 @@ def build_exe():
     cmd = [
         VENV_PYTHON,
         "-m", "PyInstaller",
+        "--specpath", BASE_DIR / "spec",
         "--noconfirm",   
         f"--icon={ICON}",
         "--add-data", f"{ICON};.",
         "--noconsole",
         "--clean",
-        "--name", "ADAS Master V2",
+        "--name", "ADAS Master",
         "--distpath", DIST_DIR,
         "--workpath", BUILD_DIR,
         ENTRY_PY,
