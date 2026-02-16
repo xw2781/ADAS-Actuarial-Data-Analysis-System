@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UraLab - Actuarial Data & Analytics</title>
+    <title>ArcRho - Actuarial Data & Analytics</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -126,6 +126,11 @@
         @keyframes fadeInScale {
             from { opacity: 0; transform: scale(0.8); }
             to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(0.95); }
         }
 
         @keyframes aiPulse {
@@ -776,9 +781,11 @@
         /* AI Visualization Section */
         .ai-viz {
             padding: 120px 24px;
-            background: linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 100%);
+            background: linear-gradient(180deg, #f8fafc 0%, #f3f6fb 45%, #eef2f7 100%);
             position: relative;
             overflow: hidden;
+            border-top: 1px solid rgba(148, 163, 184, 0.2);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
         }
 
         .ai-viz::before {
@@ -789,8 +796,21 @@
             right: 0;
             bottom: 0;
             background:
-                radial-gradient(circle at 30% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
-                radial-gradient(circle at 70% 80%, rgba(168, 85, 247, 0.15) 0%, transparent 40%);
+                radial-gradient(circle at 18% 22%, rgba(30, 64, 175, 0.1) 0%, transparent 44%),
+                radial-gradient(circle at 82% 26%, rgba(14, 116, 144, 0.08) 0%, transparent 42%),
+                radial-gradient(circle at 64% 82%, rgba(15, 23, 42, 0.05) 0%, transparent 45%);
+            pointer-events: none;
+        }
+
+        .ai-viz::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(71, 85, 105, 0.06) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(71, 85, 105, 0.06) 1px, transparent 1px);
+            background-size: 36px 36px;
+            mask-image: radial-gradient(circle at 50% 40%, rgba(0, 0, 0, 0.75), transparent 80%);
             pointer-events: none;
         }
 
@@ -799,6 +819,8 @@
             margin: 0 auto;
             position: relative;
             z-index: 1;
+            --ai-two-col-gap: 28px;
+            --ai-two-col-max: 1100px;
         }
 
         .ai-viz .section-header {
@@ -806,27 +828,28 @@
         }
 
         .ai-viz .section-title {
-            color: white;
+            color: #0f172a;
         }
 
         .ai-viz .section-subtitle {
-            color: var(--gray-400);
+            color: #5f6b7e;
         }
 
         .ai-badge {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2));
+            background: linear-gradient(135deg, #ffffff, #f4f7fd);
             padding: 6px 14px;
             border-radius: 50px;
             font-size: 0.8rem;
             font-weight: 600;
-            color: #a5b4fc;
+            color: #35508a;
             margin-bottom: 16px;
-            border: 1px solid rgba(99, 102, 241, 0.3);
+            border: 1px solid #d3ddee;
             text-transform: uppercase;
             letter-spacing: 1px;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
         }
 
         .ai-badge svg {
@@ -836,16 +859,19 @@
 
         .ai-demo-container {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
-            gap: 28px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: var(--ai-two-col-gap);
             align-items: stretch;
+            max-width: var(--ai-two-col-max);
+            margin: 0 auto;
         }
 
         .ai-steps-row {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 32px;
-            margin: 0 0 22px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: var(--ai-two-col-gap);
+            margin: 0 auto 22px;
+            max-width: var(--ai-two-col-max);
         }
 
         .ai-step-pill {
@@ -854,28 +880,31 @@
             gap: 10px;
             padding: 10px 16px;
             border-radius: 999px;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            background: rgba(15, 23, 42, 0.45);
-            color: var(--gray-200);
+            border: 1px solid #d3ddea;
+            background: rgba(255, 255, 255, 0.88);
+            color: #475569;
             font-size: 0.85rem;
             font-weight: 600;
             letter-spacing: 0.3px;
             text-transform: uppercase;
             justify-content: center;
+            box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .ai-step-number {
             width: 26px;
             height: 26px;
             border-radius: 50%;
-            background: rgba(99, 102, 241, 0.6);
+            background: linear-gradient(135deg, #4f46e5, #2563eb);
             color: white;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             font-size: 0.8rem;
             font-weight: 700;
-            box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.3);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
         }
 
         .ai-demo-workflow {
@@ -1174,8 +1203,15 @@
             transition: stroke-dashoffset 0s;
         }
 
-        .chart-line.animate {
+        .chart-line.animate,
+        .chart-line-2.animate {
             animation: drawChart 1.8s ease forwards;
+        }
+
+        .chart-line-2 {
+            stroke-dasharray: 800;
+            stroke-dashoffset: 800;
+            transition: stroke-dashoffset 0s;
         }
 
         .chart-line-trend.animate {
@@ -1234,6 +1270,167 @@
         .legend-color-1 { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
         .legend-color-2 { background: linear-gradient(135deg, #22c55e, #10b981); }
         .legend-color-3 { background: linear-gradient(135deg, #f59e0b, #f97316); }
+
+        /* Floating AI Refine Chat */
+        .ai-refine-chat {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            border-radius: 12px;
+            padding: 12px 14px;
+            min-width: 260px;
+            max-width: 320px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.1);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+
+        .ai-refine-chat.visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .ai-refine-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #a5b4fc;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .ai-refine-header svg {
+            stroke: #a5b4fc;
+        }
+
+        .ai-refine-input {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 8px;
+            padding: 10px 12px;
+            min-height: 20px;
+            font-size: 13px;
+            color: #e2e8f0;
+            position: relative;
+        }
+
+        .ai-refine-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .ai-refine-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 14px;
+            background: #6366f1;
+            margin-left: 1px;
+            animation: blink 1s step-end infinite;
+            vertical-align: text-bottom;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        .ai-refine-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 8px;
+        }
+
+        .ai-refine-hint {
+            font-size: 10px;
+            color: #64748b;
+        }
+
+        .ai-refine-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            border: none;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            opacity: 0.5;
+        }
+
+        .ai-refine-btn.ready {
+            opacity: 1;
+        }
+
+        .ai-refine-btn.ready:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }
+
+        /* Click hint overlay */
+        .ai-click-hint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 20px;
+            color: #a5b4fc;
+            font-size: 12px;
+            font-weight: 500;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .ai-click-hint.visible {
+            opacity: 1;
+            visibility: visible;
+            animation: pulse-hint 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-hint {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.02); }
+        }
+
+        .ai-click-hint svg {
+            stroke: #a5b4fc;
+        }
+
+        /* Chart canvas click indicator */
+        .ai-chart-canvas.clickable {
+            cursor: pointer;
+        }
+
+        .ai-chart-canvas.clickable:hover {
+            background: rgba(99, 102, 241, 0.03);
+        }
+
+        /* Chart refinement pulse animation */
+        @keyframes refinePulse {
+            0% { filter: brightness(1); }
+            30% { filter: brightness(1.15); }
+            100% { filter: brightness(1); }
+        }
 
         /* Workflow + Workspace Sequence */
         .ai-workflow-stage {
@@ -1884,6 +2081,408 @@
             }
         }
 
+        /* Dataset-style AI visualization demo */
+        .ai-dataset-demo {
+            align-items: flex-start;
+        }
+
+        .ai-dataset-demo .ai-demo-left,
+        .ai-dataset-demo .ai-demo-right {
+            background: transparent;
+            border: none;
+            padding: 0;
+            min-height: auto;
+            backdrop-filter: none;
+        }
+
+        .ai-dataset-demo .small {
+            color: #5b6476;
+        }
+
+        .ai-prompt-workbench {
+            background: #ffffff;
+            border: 1px solid #d6dbe6;
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 14px;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
+        }
+
+        .ai-prompt-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+            min-height: 30px;
+        }
+
+        .ai-style-pill {
+            border: 1px solid #c7d2fe;
+            background: #eef2ff;
+            color: #4338ca;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            padding: 4px 10px;
+        }
+
+        .ai-prompt-preview {
+            min-height: 74px;
+            border: 1px solid #d9dee9;
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font: 13px/1.5 Consolas, "SF Mono", "Courier New", monospace;
+            color: #1f2937;
+            margin-bottom: 10px;
+            white-space: pre-wrap;
+        }
+
+        .ai-prompt-caret {
+            display: inline-block;
+            width: 2px;
+            height: 14px;
+            background: #4f46e5;
+            margin-left: 1px;
+            animation: blink 1s step-end infinite;
+            vertical-align: text-bottom;
+        }
+
+        .ai-apply-style-btn {
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #f8fafc;
+            color: #1f2937;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 8px 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .ai-apply-style-btn:hover {
+            border-color: #8aa8ff;
+            background: #eef4ff;
+        }
+
+        .ai-apply-style-btn.is-working {
+            background: #e0e7ff;
+            border-color: #a5b4fc;
+            color: #3730a3;
+        }
+
+        .ai-dataset-panel {
+            background: #ffffff;
+            border: 1px solid #d4d8e2;
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+        }
+
+        #aiTableMetaRow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .ai-muted {
+            color: #7b879c !important;
+        }
+
+        #aiTableWrap {
+            width: 100%;
+            overflow: auto;
+        }
+
+        #aiTableWrap table {
+            border-collapse: separate;
+            border-spacing: 0;
+            width: max-content;
+            min-width: 100%;
+            table-layout: fixed;
+            font-size: 13px;
+            color: #1f2937;
+        }
+
+        #aiTableWrap th,
+        #aiTableWrap td {
+            border: 0;
+            border-right: 1px solid #dde3ec;
+            border-bottom: 1px solid #dde3ec;
+            min-width: 68px;
+            height: 24px;
+            line-height: 24px;
+            padding: 0 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            box-sizing: border-box;
+        }
+
+        #aiTableWrap thead th {
+            text-align: center;
+            font-weight: 500;
+            background: #f3f5f9;
+            position: sticky;
+            top: 0;
+            z-index: 3;
+            border-top: 1px solid #dde3ec;
+        }
+
+        #aiTableWrap tbody td:not(:first-child) {
+            text-align: right;
+        }
+
+        #aiTableWrap th:first-child,
+        #aiTableWrap td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: #f3f5f9;
+            border-left: 1px solid #dde3ec;
+            box-shadow: 1px 0 0 #dde3ec;
+            text-align: center;
+            min-width: 76px;
+            max-width: 94px;
+        }
+
+        #aiTableWrap thead th:first-child {
+            z-index: 4;
+        }
+
+        #aiTableWrap td.na {
+            background: #f8fafc;
+            color: transparent;
+            border-color: #eef2f7;
+        }
+
+        #aiChartPanel {
+            height: 460px;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+
+        #aiChartPanel .chartHeader {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 12px;
+            margin-bottom: 10px;
+            min-height: 30px;
+        }
+
+        #aiChartPanel .chartRow {
+            flex: 1 1 auto;
+            min-height: 0;
+            display: flex;
+            gap: 8px;
+            align-items: stretch;
+        }
+
+        #aiChartPanel .chartCanvasWrap {
+            flex: 1 1 auto;
+            min-width: 0;
+            position: relative;
+            border: 1px solid #e4e8f0;
+            border-radius: 10px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            padding: 4px;
+            overflow: hidden;
+        }
+
+        #aiChartPanel .chartLegend {
+            width: 72px;
+            flex: 0 0 72px;
+            max-height: 100%;
+            overflow-y: auto;
+            border-left: 1px solid #e5e7eb;
+            padding-left: 6px;
+            box-sizing: border-box;
+        }
+
+        #aiChartPanel .legendItem {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 1px 2px;
+            color: #374151;
+            font-size: 12px;
+        }
+
+        #aiChartPanel .legendSwatch {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            flex: 0 0 auto;
+        }
+
+        #aiChartPanel .legendLabel {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .ai-style-chart {
+            position: absolute;
+            inset: 8px;
+            width: calc(100% - 16px);
+            height: calc(100% - 16px);
+            opacity: 0;
+            transform: translateY(8px);
+            transition: opacity 0.35s ease, transform 0.35s ease;
+            pointer-events: none;
+        }
+
+        .ai-style-chart.is-active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .ai-style-chart .ai-grid-line {
+            stroke: #e8edf5;
+            stroke-width: 1;
+        }
+
+        .ai-style-chart .ai-axis-line {
+            stroke: #d5dce8;
+            stroke-width: 1.1;
+        }
+
+        .ai-style-chart .ai-axis-label {
+            fill: #6b7280;
+            font-size: 11px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .ai-style-chart .ai-axis-title {
+            fill: #4b5563;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .ai-style-chart .ai-series {
+            fill: none;
+            stroke-width: 2.4;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-dasharray: 720;
+            stroke-dashoffset: 720;
+        }
+
+        .ai-style-chart .ai-point {
+            opacity: 0;
+            transform: scale(0.6);
+            transform-origin: center center;
+        }
+
+        .ai-style-chart.is-active .ai-series {
+            animation: aiSeriesDraw 0.9s ease forwards;
+        }
+
+        .ai-style-chart.is-active .ai-point {
+            animation: aiPointPop 0.35s ease forwards;
+        }
+
+        .ai-style-chart.is-active .ai-point:nth-of-type(2n) {
+            animation-delay: 0.05s;
+        }
+
+        .ai-style-chart.is-active .ai-point:nth-of-type(3n) {
+            animation-delay: 0.1s;
+        }
+
+        .ai-style-transition {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0;
+            background: linear-gradient(110deg, rgba(59, 130, 246, 0) 10%, rgba(59, 130, 246, 0.18) 50%, rgba(59, 130, 246, 0) 90%);
+        }
+
+        .ai-style-transition.run {
+            animation: aiStyleSweep 0.55s ease;
+        }
+
+        .ai-style-note {
+            margin-top: 10px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: #eef4ff;
+            border: 1px solid #d7e4ff;
+            color: #264487;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        @keyframes aiSeriesDraw {
+            to { stroke-dashoffset: 0; }
+        }
+
+        @keyframes aiPointPop {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes aiStyleSweep {
+            0% {
+                opacity: 0;
+                transform: translateX(-35%);
+            }
+            15% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+                transform: translateX(35%);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            #aiChartPanel {
+                height: auto;
+                min-height: 420px;
+            }
+
+            #aiChartPanel .chartRow {
+                flex-direction: column;
+            }
+
+            #aiChartPanel .chartLegend {
+                width: 100%;
+                flex: 0 0 auto;
+                border-left: none;
+                border-top: 1px solid #e5e7eb;
+                padding: 8px 0 0;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 4px 10px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            #aiTableWrap th,
+            #aiTableWrap td {
+                min-width: 58px;
+                font-size: 11px;
+                padding: 0 4px;
+            }
+
+            #aiChartPanel .chartCanvasWrap {
+                min-height: 250px;
+            }
+
+            .ai-prompt-preview {
+                min-height: 86px;
+            }
+        }
         /* Stochastic Simulation Section */
         .stochastic {
             padding: 120px 24px;
@@ -3124,7 +3723,7 @@
     <nav id="navbar">
         <div class="nav-container">
             <a href="#" class="logo">
-                <div class="logo-icon" aria-label="UraLab logo">
+                <div class="logo-icon" aria-label="ArcRho logo">
                     <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
                         <rect x="3" y="3" width="5" height="5" rx="1.2"></rect>
                         <rect x="10" y="3" width="5" height="5" rx="1.2"></rect>
@@ -3134,7 +3733,7 @@
                         <rect x="3" y="17" width="5" height="5" rx="1.2"></rect>
                     </svg>
                 </div>
-                UraLab
+                ArcRho
             </a>
             <ul class="nav-links">
                 <li><a href="#features">Features</a></li>
@@ -3181,7 +3780,7 @@
                                 <span></span>
                                 <span></span>
                             </div>
-                            <span class="app-title">UraLab - Loss Triangle Analysis</span>
+                            <span class="app-title">ArcRho - Loss Triangle Analysis</span>
                         </div>
                         <div class="app-content">
                             <div class="triangle-chart">
@@ -3266,8 +3865,8 @@
                     </div>
                     <h3>Core Tools</h3>
                     <p>
-                        Everything you need for loss development analysis in one place. 
-                        Built-in standard reserving methods and models, with seamless data loading and validation.
+                        Essential tools for reserving analysis in one place. 
+                        Built-in standard actuarial methods and models, with seamless data loading and validation.
                     </p>
                 </div>
                 <div class="feature-card animate-on-scroll animate-delay-2">
@@ -3277,10 +3876,10 @@
                             <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
                         </svg>
                     </div>
-                    <h3>Excel Integration</h3>
+                    <h3>Integration</h3>
                     <p>
-                        Native support for reading and writing Excel workbooks.
-                        Preserve formulas, formatting, and existing templates.
+                        Native support for reading and writing in Excel workbooks or SQL databases.
+                        Preserve existing templates and processes.
                     </p>
                 </div>
                 <div class="feature-card animate-on-scroll animate-delay-3">
@@ -3291,7 +3890,7 @@
                         </svg>
                     </div>
                     <h3>Workflow Automation</h3>
-                    <p>Create multi-step workflows with drag-and-drop simplicity. Automate repetitive tasks and ensure consistency.</p>
+                    <p>Create multi-step workflows with drag-and-drop simplicity. Unlock the power of scripting and automation using the built-in coding module.</p>
                 </div>
                 <div class="feature-card animate-on-scroll animate-delay-1">
                     <div class="feature-icon">
@@ -3328,14 +3927,8 @@
         </div>
     </section>
 
-    <!-- AI Visualization Section -->
+        <!-- AI Visualization Section -->
     <section class="ai-viz" id="ai-viz">
-        <!-- Sparkle decorations -->
-        <div class="ai-sparkle"><svg viewBox="0 0 24 24"><path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z"/></svg></div>
-        <div class="ai-sparkle"><svg viewBox="0 0 24 24"><path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z"/></svg></div>
-        <div class="ai-sparkle"><svg viewBox="0 0 24 24"><path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z"/></svg></div>
-        <div class="ai-sparkle"><svg viewBox="0 0 24 24"><path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z"/></svg></div>
-
         <div class="ai-viz-container">
             <div class="section-header animate-on-scroll" style="text-align: center;">
                 <div class="ai-badge">
@@ -3344,8 +3937,8 @@
                     </svg>
                     Experimental Feature
                 </div>
-                <h2 class="section-title">AI-Powered Data Visualization</h2>
-                <p class="section-subtitle">No more coding or dragging UI blocks — just describe your chart in plain English. AI builds the graph config and style so it’s reusable, shareable, and naturally integrates with the built-in workflow system.</p>
+                <h2 class="section-title">A Radically New Way to Build Visualizations</h2>
+                <p class="section-subtitle">Use AI prompts to switch chart styles instantly. This demo mirrors the dataset viewer table and chart layout, then applies style prompts between By Column and By Row modes.</p>
             </div>
 
             <div class="ai-steps-row animate-on-scroll">
@@ -3355,722 +3948,230 @@
                 </div>
                 <div class="ai-step-pill">
                     <span class="ai-step-number">2</span>
-                    Design
-                </div>
-                <div class="ai-step-pill">
-                    <span class="ai-step-number">3</span>
-                    Apply
+                    Style Update
                 </div>
             </div>
 
-            <div class="ai-demo-container">
-                <!-- Left: Data + Prompt -->
-                <div class="ai-demo-left animate-on-scroll">
-                    <div class="ai-demo-header">
-                        <div class="ai-demo-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                <path d="M3 9h18M9 21V9"/>
-                            </svg>
+            <div class="ai-demo-container ai-dataset-demo animate-on-scroll">
+                <div class="ai-demo-left">
+                    <div class="ai-prompt-workbench">
+                        <div class="ai-prompt-toolbar">
+                            <span class="small">Prompt to AI Chart Styler</span>
+                            <span class="ai-style-pill" id="aiPromptBadge">Style 1</span>
                         </div>
-                        <div>
-                            <div class="ai-demo-title">Input Data</div>
-                            <div class="ai-demo-subtitle">Commercial Auto - Paid Losses</div>
-                        </div>
+                        <div class="ai-prompt-preview" id="aiPromptPreview"></div>
+                        <button class="ai-apply-style-btn" id="aiApplyStyleBtn" type="button">Update</button>
                     </div>
 
-                    <!-- Mini Triangle 8x8 -->
-                    <div class="ai-triangle">
-                        <div class="ai-triangle-grid">
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">AY</div>
-                                <div class="ai-triangle-cell header">12</div>
-                                <div class="ai-triangle-cell header">24</div>
-                                <div class="ai-triangle-cell header">36</div>
-                                <div class="ai-triangle-cell header">48</div>
-                                <div class="ai-triangle-cell header">60</div>
-                                <div class="ai-triangle-cell header">72</div>
-                                <div class="ai-triangle-cell header">84</div>
-                                <div class="ai-triangle-cell header">96</div>
-                            </div>
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">2016</div>
-                                <div class="ai-triangle-cell active">1,124</div>
-                                <div class="ai-triangle-cell active">2,456</div>
-                                <div class="ai-triangle-cell active">3,234</div>
-                                <div class="ai-triangle-cell active">3,789</div>
-                                <div class="ai-triangle-cell active">4,123</div>
-                                <div class="ai-triangle-cell active">4,345</div>
-                                <div class="ai-triangle-cell active">4,489</div>
-                                <div class="ai-triangle-cell active">4,567</div>
-                            </div>
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">2017</div>
-                                <div class="ai-triangle-cell active">1,245</div>
-                                <div class="ai-triangle-cell active">2,678</div>
-                                <div class="ai-triangle-cell active">3,456</div>
-                                <div class="ai-triangle-cell active">4,012</div>
-                                <div class="ai-triangle-cell active">4,378</div>
-                                <div class="ai-triangle-cell active">4,612</div>
-                                <div class="ai-triangle-cell active">4,756</div>
-                                <div class="ai-triangle-cell"></div>
-                            </div>
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">2018</div>
-                                <div class="ai-triangle-cell active">1,389</div>
-                                <div class="ai-triangle-cell active">2,890</div>
-                                <div class="ai-triangle-cell active">3,678</div>
-                                <div class="ai-triangle-cell active">4,234</div>
-                                <div class="ai-triangle-cell active">4,589</div>
-                                <div class="ai-triangle-cell active">4,823</div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                            </div>
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">2019</div>
-                                <div class="ai-triangle-cell active">1,456</div>
-                                <div class="ai-triangle-cell active">3,102</div>
-                                <div class="ai-triangle-cell active">3,923</div>
-                                <div class="ai-triangle-cell active">4,512</div>
-                                <div class="ai-triangle-cell active">4,867</div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                            </div>
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">2020</div>
-                                <div class="ai-triangle-cell active">1,567</div>
-                                <div class="ai-triangle-cell active">3,345</div>
-                                <div class="ai-triangle-cell active">4,156</div>
-                                <div class="ai-triangle-cell active">4,789</div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                            </div>
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">2021</div>
-                                <div class="ai-triangle-cell active">1,678</div>
-                                <div class="ai-triangle-cell active">3,567</div>
-                                <div class="ai-triangle-cell active">4,389</div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                            </div>
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">2022</div>
-                                <div class="ai-triangle-cell active">1,823</div>
-                                <div class="ai-triangle-cell active">3,789</div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                            </div>
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">2023</div>
-                                <div class="ai-triangle-cell active">1,956</div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                            </div>
+                    <div class="ai-dataset-panel" id="aiTriPanel">
+                        <div id="aiTableMetaRow">
+                            <div class="small"><b>Paid Loss Triangle</b></div>
+                            <div class="small ai-muted">Commercial Auto</div>
+                        </div>
+                        <div id="aiTableWrap">
+                            <table aria-label="Triangle data preview">
+                                <thead>
+                                    <tr>
+                                        <th>AY</th>
+                                        <th>12</th>
+                                        <th>24</th>
+                                        <th>36</th>
+                                        <th>48</th>
+                                        <th>60</th>
+                                        <th>72</th>
+                                        <th>84</th>
+                                        <th>96</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <th>2016</th>
+                                        <td class="cell">1,124</td>
+                                        <td class="cell">2,456</td>
+                                        <td class="cell">3,234</td>
+                                        <td class="cell">4,289</td>
+                                        <td class="cell">4,123</td>
+                                        <td class="cell">4,345</td>
+                                        <td class="cell">4,489</td>
+                                        <td class="cell">4,567</td>
+                                    </tr>
+                                    <tr>
+                                        <th>2017</th>
+                                        <td class="cell">1,245</td>
+                                        <td class="cell">2,678</td>
+                                        <td class="cell">3,456</td>
+                                        <td class="cell">4,012</td>
+                                        <td class="cell">4,378</td>
+                                        <td class="cell">4,612</td>
+                                        <td class="cell">4,756</td>
+                                        <td class="na"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>2018</th>
+                                        <td class="cell">1,389</td>
+                                        <td class="cell">2,890</td>
+                                        <td class="cell">3,678</td>
+                                        <td class="cell">4,234</td>
+                                        <td class="cell">4,589</td>
+                                        <td class="cell">4,823</td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>2019</th>
+                                        <td class="cell">1,456</td>
+                                        <td class="cell">3,102</td>
+                                        <td class="cell">3,923</td>
+                                        <td class="cell">4,512</td>
+                                        <td class="cell">4,867</td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>2020</th>
+                                        <td class="cell">1,567</td>
+                                        <td class="cell">3,345</td>
+                                        <td class="cell">4,156</td>
+                                        <td class="cell">4,789</td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>2021</th>
+                                        <td class="cell">1,678</td>
+                                        <td class="cell">3,567</td>
+                                        <td class="cell">4,389</td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>2022</th>
+                                        <td class="cell">1,823</td>
+                                        <td class="cell">3,789</td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>2023</th>
+                                        <td class="cell">1,956</td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Animated Mouse Cursor -->
-                    <div class="ai-mouse-cursor" id="aiMouseCursor">
-                        <svg viewBox="0 0 24 24" fill="white" stroke="#333" stroke-width="1">
-                            <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.48 0 .72-.58.38-.92L6.35 2.85a.5.5 0 0 0-.85.36Z"/>
-                        </svg>
-                    </div>
-
-                    <!-- AI Prompt Input -->
-                    <div class="ai-prompt-container">
-                        <div class="ai-prompt-label">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                            </svg>
-                            Describe your visualization
+                <div class="ai-demo-right animate-delay-2">
+                    <div class="ai-dataset-panel" id="aiChartPanel">
+                        <div class="chartHeader">
+                            <span class="small"><b id="aiChartTitle">Development Curves</b></span>
                         </div>
-                        <div class="ai-prompt-text" id="aiPromptText"></div>
-                        <div class="ai-prompt-footer">
-                            <span class="ai-model-tag">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <path d="M12 6v6l4 2"/>
+
+                        <div class="chartRow">
+                            <div class="chartCanvasWrap">
+                                <div class="ai-style-transition" id="aiStyleTransition"></div>
+
+                                <svg class="ai-style-chart is-active" id="aiStyleChartByCol" viewBox="0 0 520 300" aria-label="By column chart style">
+                                    <line class="ai-grid-line" x1="56" y1="32" x2="472" y2="32"></line>
+                                    <line class="ai-grid-line" x1="56" y1="72" x2="472" y2="72"></line>
+                                    <line class="ai-grid-line" x1="56" y1="112" x2="472" y2="112"></line>
+                                    <line class="ai-grid-line" x1="56" y1="152" x2="472" y2="152"></line>
+                                    <line class="ai-grid-line" x1="56" y1="192" x2="472" y2="192"></line>
+                                    <line class="ai-grid-line" x1="56" y1="232" x2="472" y2="232"></line>
+                                    <line class="ai-axis-line" x1="56" y1="232" x2="472" y2="232"></line>
+                                    <line class="ai-axis-line" x1="56" y1="32" x2="56" y2="232"></line>
+
+                                    <path class="ai-series" stroke="#0ea5e9" d="M74 196 L126 188 L178 180 L230 172 L282 164 L334 156 L386 149 L438 142"></path>
+                                    <path class="ai-series" stroke="#8b5cf6" d="M74 181 L126 171 L178 162 L230 152 L282 144 L334 136 L386 128 L438 121"></path>
+                                    <path class="ai-series" stroke="#22c55e" d="M74 167 L126 156 L178 146 L230 136 L282 127 L334 119 L386 112 L438 106"></path>
+                                    <path class="ai-series" stroke="#f59e0b" d="M74 152 L126 141 L178 130 L230 120 L282 111 L334 103 L386 96 L438 90"></path>
+
+                                    <circle class="ai-point" cx="74" cy="196" r="3" fill="#0ea5e9"></circle>
+                                    <circle class="ai-point" cx="230" cy="172" r="3" fill="#0ea5e9"></circle>
+                                    <circle class="ai-point" cx="438" cy="142" r="3" fill="#0ea5e9"></circle>
+                                    <circle class="ai-point" cx="74" cy="181" r="3" fill="#8b5cf6"></circle>
+                                    <circle class="ai-point" cx="282" cy="144" r="3" fill="#8b5cf6"></circle>
+                                    <circle class="ai-point" cx="438" cy="121" r="3" fill="#8b5cf6"></circle>
+                                    <circle class="ai-point" cx="74" cy="167" r="3" fill="#22c55e"></circle>
+                                    <circle class="ai-point" cx="334" cy="119" r="3" fill="#22c55e"></circle>
+                                    <circle class="ai-point" cx="438" cy="106" r="3" fill="#22c55e"></circle>
+                                    <circle class="ai-point" cx="74" cy="152" r="3" fill="#f59e0b"></circle>
+                                    <circle class="ai-point" cx="334" cy="103" r="3" fill="#f59e0b"></circle>
+                                    <circle class="ai-point" cx="438" cy="90" r="3" fill="#f59e0b"></circle>
+
+                                    <text class="ai-axis-label" x="74" y="252">2016</text>
+                                    <text class="ai-axis-label" x="126" y="252">2017</text>
+                                    <text class="ai-axis-label" x="178" y="252">2018</text>
+                                    <text class="ai-axis-label" x="230" y="252">2019</text>
+                                    <text class="ai-axis-label" x="282" y="252">2020</text>
+                                    <text class="ai-axis-label" x="334" y="252">2021</text>
+                                    <text class="ai-axis-label" x="386" y="252">2022</text>
+                                    <text class="ai-axis-label" x="438" y="252">2023</text>
+                                    <text class="ai-axis-label ai-axis-title" x="270" y="276" text-anchor="middle">Origin Year</text>
                                 </svg>
-                                Powered by AI
-                            </span>
-                            <button class="ai-generate-btn" id="aiGenerateBtn">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+
+                                <svg class="ai-style-chart" id="aiStyleChartByRow" viewBox="0 0 520 300" aria-label="By row chart style">
+                                    <line class="ai-grid-line" x1="56" y1="32" x2="472" y2="32"></line>
+                                    <line class="ai-grid-line" x1="56" y1="72" x2="472" y2="72"></line>
+                                    <line class="ai-grid-line" x1="56" y1="112" x2="472" y2="112"></line>
+                                    <line class="ai-grid-line" x1="56" y1="152" x2="472" y2="152"></line>
+                                    <line class="ai-grid-line" x1="56" y1="192" x2="472" y2="192"></line>
+                                    <line class="ai-grid-line" x1="56" y1="232" x2="472" y2="232"></line>
+                                    <line class="ai-axis-line" x1="56" y1="232" x2="472" y2="232"></line>
+                                    <line class="ai-axis-line" x1="56" y1="32" x2="56" y2="232"></line>
+
+                                    <path class="ai-series" stroke="#6366f1" d="M74 194 L126 170 L178 144 L230 120 L282 101 L334 86 L386 74 L438 66"></path>
+                                    <path class="ai-series" stroke="#0ea5e9" d="M74 188 L126 164 L178 140 L230 116 L282 97 L334 84 L386 72"></path>
+                                    <path class="ai-series" stroke="#22c55e" d="M74 180 L126 156 L178 132 L230 109 L282 93 L334 81"></path>
+                                    <path class="ai-series" stroke="#f97316" d="M74 172 L126 148 L178 126 L230 104 L282 89"></path>
+
+                                    <circle class="ai-point" cx="74" cy="194" r="3" fill="#6366f1"></circle>
+                                    <circle class="ai-point" cx="230" cy="120" r="3" fill="#6366f1"></circle>
+                                    <circle class="ai-point" cx="438" cy="66" r="3" fill="#6366f1"></circle>
+                                    <circle class="ai-point" cx="74" cy="188" r="3" fill="#0ea5e9"></circle>
+                                    <circle class="ai-point" cx="230" cy="116" r="3" fill="#0ea5e9"></circle>
+                                    <circle class="ai-point" cx="386" cy="72" r="3" fill="#0ea5e9"></circle>
+                                    <circle class="ai-point" cx="74" cy="180" r="3" fill="#22c55e"></circle>
+                                    <circle class="ai-point" cx="178" cy="132" r="3" fill="#22c55e"></circle>
+                                    <circle class="ai-point" cx="334" cy="81" r="3" fill="#22c55e"></circle>
+                                    <circle class="ai-point" cx="74" cy="172" r="3" fill="#f97316"></circle>
+                                    <circle class="ai-point" cx="178" cy="126" r="3" fill="#f97316"></circle>
+                                    <circle class="ai-point" cx="282" cy="89" r="3" fill="#f97316"></circle>
+
+                                    <text class="ai-axis-label" x="74" y="252">12</text>
+                                    <text class="ai-axis-label" x="126" y="252">24</text>
+                                    <text class="ai-axis-label" x="178" y="252">36</text>
+                                    <text class="ai-axis-label" x="230" y="252">48</text>
+                                    <text class="ai-axis-label" x="282" y="252">60</text>
+                                    <text class="ai-axis-label" x="334" y="252">72</text>
+                                    <text class="ai-axis-label" x="386" y="252">84</text>
+                                    <text class="ai-axis-label" x="438" y="252">96</text>
+                                    <text class="ai-axis-label ai-axis-title" x="270" y="276" text-anchor="middle">Development Period</text>
                                 </svg>
-                                Generate
-                            </button>
+                            </div>
+                            <div id="aiDemoLegend" class="chartLegend" aria-label="Legend"></div>
                         </div>
+
+                        <div class="ai-style-note" id="aiStyleNote">AI prompt applied: By Column style</div>
                     </div>
                 </div>
-
-                <!-- Right: Generated Chart -->
-                <div class="ai-demo-right animate-on-scroll animate-delay-2">
-                    <div class="ai-chart-container">
-                        <div class="ai-chart-header">
-                            <span class="ai-chart-title">AI Generated Visualization</span>
-                            <div class="ai-chart-actions">
-                                <button class="ai-chart-action" title="Download">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                                    </svg>
-                                </button>
-                                <button class="ai-chart-action" title="Fullscreen">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="15 3 21 3 21 9"/>
-                                        <polyline points="9 21 3 21 3 15"/>
-                                        <line x1="21" y1="3" x2="14" y2="10"/>
-                                        <line x1="3" y1="21" x2="10" y2="14"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="ai-chart-canvas" id="aiChartCanvas">
-                            <!-- Placeholder -->
-                            <div class="ai-chart-placeholder" id="chartPlaceholder">
-                                <div class="ai-chart-placeholder-icon">
-                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                        <line x1="18" y1="20" x2="18" y2="10"/>
-                                        <line x1="12" y1="20" x2="12" y2="4"/>
-                                        <line x1="6" y1="20" x2="6" y2="14"/>
-                                    </svg>
-                                </div>
-                                <p>Enter a prompt and click Generate<br/>to create your visualization</p>
-                            </div>
-
-                            <!-- Chart Type 1: Development Curves (hidden initially) - All 8 AYs -->
-                            <svg class="ai-chart-svg" id="aiChartSvg1" viewBox="0 0 400 250" style="display: none;">
-                                <defs>
-                                    <!-- Gradients for all 8 accident years -->
-                                    <linearGradient id="gradientAY2016" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#6366f1"/>
-                                        <stop offset="100%" style="stop-color:#8b5cf6"/>
-                                    </linearGradient>
-                                    <linearGradient id="gradientAY2017" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#8b5cf6"/>
-                                        <stop offset="100%" style="stop-color:#a855f7"/>
-                                    </linearGradient>
-                                    <linearGradient id="gradientAY2018" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#22c55e"/>
-                                        <stop offset="100%" style="stop-color:#10b981"/>
-                                    </linearGradient>
-                                    <linearGradient id="gradientAY2019" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#14b8a6"/>
-                                        <stop offset="100%" style="stop-color:#06b6d4"/>
-                                    </linearGradient>
-                                    <linearGradient id="gradientAY2020" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#f59e0b"/>
-                                        <stop offset="100%" style="stop-color:#f97316"/>
-                                    </linearGradient>
-                                    <linearGradient id="gradientAY2021" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#ef4444"/>
-                                        <stop offset="100%" style="stop-color:#f43f5e"/>
-                                    </linearGradient>
-                                    <linearGradient id="gradientAY2022" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#ec4899"/>
-                                        <stop offset="100%" style="stop-color:#d946ef"/>
-                                    </linearGradient>
-                                    <linearGradient id="gradientAY2023" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#64748b"/>
-                                        <stop offset="100%" style="stop-color:#94a3b8"/>
-                                    </linearGradient>
-                                    <linearGradient id="areaGradient1" x1="0%" y1="0%" x2="0%" y2="100%">
-                                        <stop offset="0%" style="stop-color:#6366f1;stop-opacity:0.2"/>
-                                        <stop offset="100%" style="stop-color:#6366f1;stop-opacity:0"/>
-                                    </linearGradient>
-                                </defs>
-
-                                <!-- Grid lines -->
-                                <line class="chart-grid-line" x1="50" y1="30" x2="380" y2="30"/>
-                                <line class="chart-grid-line" x1="50" y1="72" x2="380" y2="72"/>
-                                <line class="chart-grid-line" x1="50" y1="114" x2="380" y2="114"/>
-                                <line class="chart-grid-line" x1="50" y1="156" x2="380" y2="156"/>
-                                <line class="chart-grid-line" x1="50" y1="198" x2="380" y2="198"/>
-
-                                <!-- Y-axis labels -->
-                                <text class="chart-axis-label" x="40" y="35" text-anchor="end">5,000</text>
-                                <text class="chart-axis-label" x="40" y="77" text-anchor="end">4,000</text>
-                                <text class="chart-axis-label" x="40" y="119" text-anchor="end">3,000</text>
-                                <text class="chart-axis-label" x="40" y="161" text-anchor="end">2,000</text>
-                                <text class="chart-axis-label" x="40" y="203" text-anchor="end">1,000</text>
-
-                                <!-- X-axis labels -->
-                                <text class="chart-axis-label" x="60" y="218">12</text>
-                                <text class="chart-axis-label" x="100" y="218">24</text>
-                                <text class="chart-axis-label" x="140" y="218">36</text>
-                                <text class="chart-axis-label" x="180" y="218">48</text>
-                                <text class="chart-axis-label" x="220" y="218">60</text>
-                                <text class="chart-axis-label" x="260" y="218">72</text>
-                                <text class="chart-axis-label" x="300" y="218">84</text>
-                                <text class="chart-axis-label" x="340" y="218">96</text>
-                                <text class="chart-axis-label" x="200" y="238" text-anchor="middle" style="font-size: 10px;">Development Period (Months)</text>
-
-                                <!-- Area fill for AY 2016 (oldest, most complete) -->
-                                <path class="chart-area" id="chartArea1" fill="url(#areaGradient1)"
-                                    d="M60,178 L100,128 L140,98 L180,78 L220,63 L260,53 L300,46 L340,42 L340,198 L60,198 Z"/>
-
-                                <!-- Lines - Loss Development Curves for all 8 AYs -->
-                                <!-- AY 2016: 8 points (complete) -->
-                                <path class="chart-line chart-line-1" stroke="url(#gradientAY2016)" fill="none" stroke-width="2.5"
-                                    d="M60,178 L100,128 L140,98 L180,78 L220,63 L260,53 L300,46 L340,42"/>
-                                <!-- AY 2017: 7 points -->
-                                <path class="chart-line chart-line-1" stroke="url(#gradientAY2017)" fill="none" stroke-width="2.5"
-                                    d="M60,175 L100,122 L140,92 L180,72 L220,58 L260,50 L300,44"/>
-                                <!-- AY 2018: 6 points -->
-                                <path class="chart-line chart-line-1" stroke="url(#gradientAY2018)" fill="none" stroke-width="2.5"
-                                    d="M60,172 L100,118 L140,88 L180,68 L220,55 L260,48"/>
-                                <!-- AY 2019: 5 points -->
-                                <path class="chart-line chart-line-1" stroke="url(#gradientAY2019)" fill="none" stroke-width="2.5"
-                                    d="M60,168 L100,112 L140,82 L180,64 L220,52"/>
-                                <!-- AY 2020: 4 points -->
-                                <path class="chart-line chart-line-1" stroke="url(#gradientAY2020)" fill="none" stroke-width="2.5"
-                                    d="M60,165 L100,108 L140,78 L180,60"/>
-                                <!-- AY 2021: 3 points -->
-                                <path class="chart-line chart-line-1" stroke="url(#gradientAY2021)" fill="none" stroke-width="2.5"
-                                    d="M60,162 L100,105 L140,76"/>
-                                <!-- AY 2022: 2 points -->
-                                <path class="chart-line chart-line-1" stroke="url(#gradientAY2022)" fill="none" stroke-width="2.5"
-                                    d="M60,158 L100,102"/>
-                                <!-- AY 2023: 1 point (just a dot, shown below) -->
-
-                                <!-- Data points for all AYs -->
-                                <!-- AY 2016 dots (purple) -->
-                                <circle class="chart-dot chart-dot-1" cx="60" cy="178" r="4" fill="#6366f1"/>
-                                <circle class="chart-dot chart-dot-1" cx="100" cy="128" r="4" fill="#6366f1"/>
-                                <circle class="chart-dot chart-dot-1" cx="140" cy="98" r="4" fill="#6366f1"/>
-                                <circle class="chart-dot chart-dot-1" cx="180" cy="78" r="4" fill="#6366f1"/>
-                                <circle class="chart-dot chart-dot-1" cx="220" cy="63" r="4" fill="#6366f1"/>
-                                <circle class="chart-dot chart-dot-1" cx="260" cy="53" r="4" fill="#6366f1"/>
-                                <circle class="chart-dot chart-dot-1" cx="300" cy="46" r="4" fill="#6366f1"/>
-                                <circle class="chart-dot chart-dot-1" cx="340" cy="42" r="4" fill="#6366f1"/>
-
-                                <!-- AY 2017 dots (violet) -->
-                                <circle class="chart-dot chart-dot-1" cx="60" cy="175" r="4" fill="#8b5cf6"/>
-                                <circle class="chart-dot chart-dot-1" cx="100" cy="122" r="4" fill="#8b5cf6"/>
-                                <circle class="chart-dot chart-dot-1" cx="140" cy="92" r="4" fill="#8b5cf6"/>
-                                <circle class="chart-dot chart-dot-1" cx="180" cy="72" r="4" fill="#8b5cf6"/>
-                                <circle class="chart-dot chart-dot-1" cx="220" cy="58" r="4" fill="#8b5cf6"/>
-                                <circle class="chart-dot chart-dot-1" cx="260" cy="50" r="4" fill="#8b5cf6"/>
-                                <circle class="chart-dot chart-dot-1" cx="300" cy="44" r="4" fill="#8b5cf6"/>
-
-                                <!-- AY 2018 dots (green) -->
-                                <circle class="chart-dot chart-dot-1" cx="60" cy="172" r="4" fill="#22c55e"/>
-                                <circle class="chart-dot chart-dot-1" cx="100" cy="118" r="4" fill="#22c55e"/>
-                                <circle class="chart-dot chart-dot-1" cx="140" cy="88" r="4" fill="#22c55e"/>
-                                <circle class="chart-dot chart-dot-1" cx="180" cy="68" r="4" fill="#22c55e"/>
-                                <circle class="chart-dot chart-dot-1" cx="220" cy="55" r="4" fill="#22c55e"/>
-                                <circle class="chart-dot chart-dot-1" cx="260" cy="48" r="4" fill="#22c55e"/>
-
-                                <!-- AY 2019 dots (teal) -->
-                                <circle class="chart-dot chart-dot-1" cx="60" cy="168" r="4" fill="#14b8a6"/>
-                                <circle class="chart-dot chart-dot-1" cx="100" cy="112" r="4" fill="#14b8a6"/>
-                                <circle class="chart-dot chart-dot-1" cx="140" cy="82" r="4" fill="#14b8a6"/>
-                                <circle class="chart-dot chart-dot-1" cx="180" cy="64" r="4" fill="#14b8a6"/>
-                                <circle class="chart-dot chart-dot-1" cx="220" cy="52" r="4" fill="#14b8a6"/>
-
-                                <!-- AY 2020 dots (orange) -->
-                                <circle class="chart-dot chart-dot-1" cx="60" cy="165" r="4" fill="#f59e0b"/>
-                                <circle class="chart-dot chart-dot-1" cx="100" cy="108" r="4" fill="#f59e0b"/>
-                                <circle class="chart-dot chart-dot-1" cx="140" cy="78" r="4" fill="#f59e0b"/>
-                                <circle class="chart-dot chart-dot-1" cx="180" cy="60" r="4" fill="#f59e0b"/>
-
-                                <!-- AY 2021 dots (red) -->
-                                <circle class="chart-dot chart-dot-1" cx="60" cy="162" r="4" fill="#ef4444"/>
-                                <circle class="chart-dot chart-dot-1" cx="100" cy="105" r="4" fill="#ef4444"/>
-                                <circle class="chart-dot chart-dot-1" cx="140" cy="76" r="4" fill="#ef4444"/>
-
-                                <!-- AY 2022 dots (pink) -->
-                                <circle class="chart-dot chart-dot-1" cx="60" cy="158" r="4" fill="#ec4899"/>
-                                <circle class="chart-dot chart-dot-1" cx="100" cy="102" r="4" fill="#ec4899"/>
-
-                                <!-- AY 2023 dot (gray - single point) -->
-                                <circle class="chart-dot chart-dot-1" cx="60" cy="155" r="4" fill="#64748b"/>
-                            </svg>
-
-                            <!-- Chart Type 2: Ultimate Losses by Accident Year (hidden initially) -->
-                            <svg class="ai-chart-svg" id="aiChartSvg2" viewBox="0 0 400 250" style="display: none;">
-                                <defs>
-                                    <linearGradient id="barGradient1" x1="0%" y1="0%" x2="0%" y2="100%">
-                                        <stop offset="0%" style="stop-color:#8b5cf6"/>
-                                        <stop offset="100%" style="stop-color:#6366f1"/>
-                                    </linearGradient>
-                                    <linearGradient id="barGradient2" x1="0%" y1="0%" x2="0%" y2="100%">
-                                        <stop offset="0%" style="stop-color:#a855f7"/>
-                                        <stop offset="100%" style="stop-color:#7c3aed"/>
-                                    </linearGradient>
-                                    <linearGradient id="lineGradientUlt" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#f59e0b"/>
-                                        <stop offset="100%" style="stop-color:#ef4444"/>
-                                    </linearGradient>
-                                </defs>
-
-                                <!-- Grid lines -->
-                                <line class="chart-grid-line" x1="50" y1="30" x2="380" y2="30"/>
-                                <line class="chart-grid-line" x1="50" y1="75" x2="380" y2="75"/>
-                                <line class="chart-grid-line" x1="50" y1="120" x2="380" y2="120"/>
-                                <line class="chart-grid-line" x1="50" y1="165" x2="380" y2="165"/>
-
-                                <!-- Y-axis labels -->
-                                <text class="chart-axis-label" x="40" y="35" text-anchor="end">5,000</text>
-                                <text class="chart-axis-label" x="40" y="80" text-anchor="end">4,000</text>
-                                <text class="chart-axis-label" x="40" y="125" text-anchor="end">3,000</text>
-                                <text class="chart-axis-label" x="40" y="170" text-anchor="end">2,000</text>
-
-                                <!-- X-axis labels - Accident Years -->
-                                <text class="chart-axis-label" x="75" y="210">2016</text>
-                                <text class="chart-axis-label" x="115" y="210">2017</text>
-                                <text class="chart-axis-label" x="155" y="210">2018</text>
-                                <text class="chart-axis-label" x="195" y="210">2019</text>
-                                <text class="chart-axis-label" x="235" y="210">2020</text>
-                                <text class="chart-axis-label" x="275" y="210">2021</text>
-                                <text class="chart-axis-label" x="315" y="210">2022</text>
-                                <text class="chart-axis-label" x="355" y="210">2023</text>
-                                <text class="chart-axis-label" x="210" y="235" text-anchor="middle" style="font-size: 11px;">Accident Year</text>
-
-                                <!-- Bars - Ultimate Loss by AY -->
-                                <rect class="chart-bar-rect" x="65" y="55" width="28" height="135" rx="4" fill="url(#barGradient1)"/>
-                                <rect class="chart-bar-rect" x="105" y="50" width="28" height="140" rx="4" fill="url(#barGradient1)"/>
-                                <rect class="chart-bar-rect" x="145" y="45" width="28" height="145" rx="4" fill="url(#barGradient1)"/>
-                                <rect class="chart-bar-rect" x="185" y="40" width="28" height="150" rx="4" fill="url(#barGradient1)"/>
-                                <rect class="chart-bar-rect" x="225" y="48" width="28" height="142" rx="4" fill="url(#barGradient2)"/>
-                                <rect class="chart-bar-rect" x="265" y="60" width="28" height="130" rx="4" fill="url(#barGradient2)"/>
-                                <rect class="chart-bar-rect" x="305" y="75" width="28" height="115" rx="4" fill="url(#barGradient2)"/>
-                                <rect class="chart-bar-rect" x="345" y="95" width="28" height="95" rx="4" fill="url(#barGradient2)"/>
-
-                                <!-- Trend line -->
-                                <path class="chart-line chart-line-trend" id="chartLineTrend"
-                                    d="M79,55 L119,50 L159,45 L199,40 L239,48 L279,60 L319,75 L359,95"
-                                    fill="none" stroke="url(#lineGradientUlt)" stroke-width="3" stroke-dasharray="500" stroke-dashoffset="500"/>
-
-                                <!-- Data points on trend line -->
-                                <circle class="chart-dot chart-dot-2" cx="79" cy="55" r="5" fill="#f59e0b"/>
-                                <circle class="chart-dot chart-dot-2" cx="119" cy="50" r="5" fill="#f59e0b"/>
-                                <circle class="chart-dot chart-dot-2" cx="159" cy="45" r="5" fill="#f59e0b"/>
-                                <circle class="chart-dot chart-dot-2" cx="199" cy="40" r="5" fill="#f59e0b"/>
-                                <circle class="chart-dot chart-dot-2" cx="239" cy="48" r="5" fill="#ef4444"/>
-                                <circle class="chart-dot chart-dot-2" cx="279" cy="60" r="5" fill="#ef4444"/>
-                                <circle class="chart-dot chart-dot-2" cx="319" cy="75" r="5" fill="#ef4444"/>
-                                <circle class="chart-dot chart-dot-2" cx="359" cy="95" r="5" fill="#ef4444"/>
-                            </svg>
-                        </div>
-
-                        <!-- Legend for Chart 1 - All 8 AYs -->
-                        <div class="ai-chart-legend" id="aiChartLegend1" style="flex-wrap: wrap; gap: 10px 16px;">
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);"></span>
-                                2016
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #8b5cf6, #a855f7);"></span>
-                                2017
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #22c55e, #10b981);"></span>
-                                2018
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #14b8a6, #06b6d4);"></span>
-                                2019
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #f59e0b, #f97316);"></span>
-                                2020
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #ef4444, #f43f5e);"></span>
-                                2021
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #ec4899, #d946ef);"></span>
-                                2022
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #64748b, #94a3b8);"></span>
-                                2023
-                            </div>
-                        </div>
-
-                        <!-- Legend for Chart 2 -->
-                        <div class="ai-chart-legend" id="aiChartLegend2" style="display: none;">
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #8b5cf6, #6366f1);"></span>
-                                Actual Ultimate
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #a855f7, #7c3aed);"></span>
-                                Projected Ultimate
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #f59e0b, #ef4444);"></span>
-                                Trend Line
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-
-                <div class="ai-demo-workflow animate-on-scroll animate-delay-3">
-                    <div class="ai-workflow-stage visible" id="aiWorkflowStage">
-                        <div class="ai-workflow-nav">
-                            <div class="ai-workflow-step" id="aiStepData">
-                                <span class="ai-step-index">1</span>
-                                Data
-                            </div>
-                            <div class="ai-workflow-step" id="aiStepViz">
-                                <span class="ai-step-index">2</span>
-                                Visualize
-                            </div>
-                            <div class="ai-workflow-step" id="aiStepWorkspace">
-                                <span class="ai-step-index">3</span>
-                                Workspace
-                            </div>
-                        </div>
-                        <div class="ai-workflow-hint">Drag customized chart templates into any workspace to build a narrative.</div>
-                        <div class="ai-workflow-body">
-                            <div class="ai-workspace" id="aiWorkspace">
-                                <div class="ai-workspace-header">
-                                    <div class="ai-workspace-header-left">
-                                        <div class="ai-workspace-icon">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                                <path d="M3 9h18M9 21V9"/>
-                                            </svg>
-                                        </div>
-                                        <span>Workspace Canvas</span>
-                                    </div>
-                                    <span class="ai-workspace-status" id="aiWorkspaceStatus">Ready</span>
-                                </div>
-                                <div class="ai-workspace-content">
-                                    <div class="workspace-triangle">
-                                        <div class="workspace-triangle-row">
-                                            <div class="workspace-cell header">AY</div>
-                                            <div class="workspace-cell header">12</div>
-                                            <div class="workspace-cell header">24</div>
-                                            <div class="workspace-cell header">36</div>
-                                        </div>
-                                        <div class="workspace-triangle-row">
-                                            <div class="workspace-cell header">2021</div>
-                                            <div class="workspace-cell">1,678</div>
-                                            <div class="workspace-cell">3,567</div>
-                                            <div class="workspace-cell">4,389</div>
-                                        </div>
-                                        <div class="workspace-triangle-row">
-                                            <div class="workspace-cell header">2022</div>
-                                            <div class="workspace-cell">1,823</div>
-                                            <div class="workspace-cell">3,789</div>
-                                            <div class="workspace-cell"></div>
-                                        </div>
-                                        <div class="workspace-triangle-row">
-                                            <div class="workspace-cell header">2023</div>
-                                            <div class="workspace-cell">1,956</div>
-                                            <div class="workspace-cell"></div>
-                                            <div class="workspace-cell"></div>
-                                        </div>
-                                    </div>
-                                    <div class="ai-workspace-drop" id="aiWorkspaceDrop">
-                                        <div class="ai-workspace-drop-label">Drop chart here</div>
-                                        <div class="ai-workspace-chart" id="aiWorkspaceChart">
-                                            <div class="workspace-chart-header">
-                                                <span class="workspace-chart-title" id="wsChartTitle">Loss Trend Chart</span>
-                                            </div>
-                                            <div class="workspace-chart-canvas">
-                                                <svg class="workspace-chart-svg" id="wsChartLine" viewBox="0 0 200 100">
-                                                    <defs>
-                                                        <linearGradient id="wsGradient1" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                            <stop offset="0%" style="stop-color:#6366f1"/>
-                                                            <stop offset="100%" style="stop-color:#8b5cf6"/>
-                                                        </linearGradient>
-                                                        <linearGradient id="wsGradient2" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                            <stop offset="0%" style="stop-color:#22c55e"/>
-                                                            <stop offset="100%" style="stop-color:#10b981"/>
-                                                        </linearGradient>
-                                                        <linearGradient id="wsGradient3" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                            <stop offset="0%" style="stop-color:#14b8a6"/>
-                                                            <stop offset="100%" style="stop-color:#06b6d4"/>
-                                                        </linearGradient>
-                                                    </defs>
-                                                    <!-- Grid lines -->
-                                                    <line x1="25" y1="15" x2="190" y2="15" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
-                                                    <line x1="25" y1="35" x2="190" y2="35" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
-                                                    <line x1="25" y1="55" x2="190" y2="55" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
-                                                    <line x1="25" y1="75" x2="190" y2="75" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
-                                                    <!-- Development curves -->
-                                                    <path d="M30,75 L55,55 L80,42 L105,32 L130,25 L155,20 L180,17"
-                                                          stroke="url(#wsGradient1)" fill="none" stroke-width="2" stroke-linecap="round"/>
-                                                    <path d="M30,73 L55,52 L80,40 L105,30 L130,24 L155,20"
-                                                          stroke="url(#wsGradient2)" fill="none" stroke-width="2" stroke-linecap="round"/>
-                                                    <path d="M30,70 L55,48 L80,36 L105,28 L130,23"
-                                                          stroke="url(#wsGradient3)" fill="none" stroke-width="2" stroke-linecap="round"/>
-                                                    <path d="M30,68 L55,45 L80,34 L105,27"
-                                                          stroke="#f59e0b" fill="none" stroke-width="2" stroke-linecap="round"/>
-                                                    <!-- Data points -->
-                                                    <circle cx="180" cy="17" r="3" fill="#6366f1"/>
-                                                    <circle cx="155" cy="20" r="3" fill="#22c55e"/>
-                                                    <circle cx="130" cy="23" r="3" fill="#14b8a6"/>
-                                                    <circle cx="105" cy="27" r="3" fill="#f59e0b"/>
-                                                </svg>
-                                                <!-- Chart Type 2: Bar Chart with Trend Line -->
-                                                <svg class="workspace-chart-svg" id="wsChartBar" viewBox="0 0 200 100" style="display: none;">
-                                                    <defs>
-                                                        <linearGradient id="wsBarGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
-                                                            <stop offset="0%" style="stop-color:#8b5cf6"/>
-                                                            <stop offset="100%" style="stop-color:#6366f1"/>
-                                                        </linearGradient>
-                                                        <linearGradient id="wsBarGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
-                                                            <stop offset="0%" style="stop-color:#a855f7"/>
-                                                            <stop offset="100%" style="stop-color:#7c3aed"/>
-                                                        </linearGradient>
-                                                        <linearGradient id="wsTrendGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                            <stop offset="0%" style="stop-color:#f59e0b"/>
-                                                            <stop offset="100%" style="stop-color:#ef4444"/>
-                                                        </linearGradient>
-                                                    </defs>
-                                                    <!-- Grid lines -->
-                                                    <line x1="15" y1="15" x2="190" y2="15" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
-                                                    <line x1="15" y1="35" x2="190" y2="35" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
-                                                    <line x1="15" y1="55" x2="190" y2="55" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
-                                                    <!-- Bars -->
-                                                    <rect x="20" y="28" width="16" height="52" rx="2" fill="url(#wsBarGrad1)"/>
-                                                    <rect x="40" y="24" width="16" height="56" rx="2" fill="url(#wsBarGrad1)"/>
-                                                    <rect x="60" y="20" width="16" height="60" rx="2" fill="url(#wsBarGrad1)"/>
-                                                    <rect x="80" y="16" width="16" height="64" rx="2" fill="url(#wsBarGrad1)"/>
-                                                    <rect x="100" y="22" width="16" height="58" rx="2" fill="url(#wsBarGrad2)"/>
-                                                    <rect x="120" y="30" width="16" height="50" rx="2" fill="url(#wsBarGrad2)"/>
-                                                    <rect x="140" y="38" width="16" height="42" rx="2" fill="url(#wsBarGrad2)"/>
-                                                    <rect x="160" y="46" width="16" height="34" rx="2" fill="url(#wsBarGrad2)"/>
-                                                    <!-- Trend line -->
-                                                    <path d="M28,28 L48,24 L68,20 L88,16 L108,22 L128,30 L148,38 L168,46"
-                                                          stroke="url(#wsTrendGrad)" fill="none" stroke-width="2.5" stroke-linecap="round"/>
-                                                    <!-- Trend dots -->
-                                                    <circle cx="28" cy="28" r="3" fill="#f59e0b"/>
-                                                    <circle cx="88" cy="16" r="3" fill="#f59e0b"/>
-                                                    <circle cx="168" cy="46" r="3" fill="#ef4444"/>
-                                                </svg>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="ai-chart-chip" id="aiChartChip">
-                                <div class="ai-chip-preview">
-                                    <span class="ai-chip-bar" style="height: 16px;"></span>
-                                    <span class="ai-chip-bar" style="height: 26px;"></span>
-                                    <span class="ai-chip-bar alt" style="height: 30px;"></span>
-                                    <span class="ai-chip-bar alt" style="height: 22px;"></span>
-                                    <span class="ai-chip-bar" style="height: 18px;"></span>
-                                    <span class="ai-chip-line"></span>
-                                </div>
-                                <div class="ai-chip-label">Loss Trend Chart</div>
-                            </div>
-                        </div>
-
-                        <div class="ai-drag-ghost" id="aiDragGhost" aria-hidden="true">
-                            <div class="ai-chip-preview">
-                                <span class="ai-chip-bar" style="height: 16px;"></span>
-                                <span class="ai-chip-bar" style="height: 26px;"></span>
-                                <span class="ai-chip-bar alt" style="height: 30px;"></span>
-                                <span class="ai-chip-bar alt" style="height: 22px;"></span>
-                                <span class="ai-chip-bar" style="height: 18px;"></span>
-                                <span class="ai-chip-line"></span>
-                            </div>
-                            <div class="ai-chip-label">Loss Trend Chart</div>
-                        </div>
-
-                        <!-- Drag Mouse Cursor -->
-                        <div class="ai-drag-cursor" id="aiDragCursor">
-                            <svg viewBox="0 0 24 24" fill="white" stroke="#333" stroke-width="1">
-                                <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.48 0 .72-.58.38-.92L6.35 2.85a.5.5 0 0 0-.85.36Z"/>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Global Chart Ghost for cross-panel drag animation -->
-            <div class="ai-global-chart-ghost" id="aiGlobalChartGhost">
-                <div class="global-ghost-chart">
-                    <!-- Ghost Line Chart -->
-                    <svg class="ghost-chart-svg" id="ghostChartLine" viewBox="0 0 400 250">
-                        <defs>
-                            <linearGradient id="ghostGradient1" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="0%" style="stop-color:#6366f1"/>
-                                <stop offset="100%" style="stop-color:#8b5cf6"/>
-                            </linearGradient>
-                            <linearGradient id="ghostGradient2" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="0%" style="stop-color:#22c55e"/>
-                                <stop offset="100%" style="stop-color:#10b981"/>
-                            </linearGradient>
-                        </defs>
-                        <!-- Simplified chart lines -->
-                        <path d="M60,178 L100,128 L140,98 L180,78 L220,63 L260,53 L300,46 L340,42"
-                              stroke="url(#ghostGradient1)" fill="none" stroke-width="3" stroke-linecap="round"/>
-                        <path d="M60,172 L100,118 L140,88 L180,68 L220,55 L260,48"
-                              stroke="url(#ghostGradient2)" fill="none" stroke-width="3" stroke-linecap="round"/>
-                        <path d="M60,165 L100,108 L140,78 L180,60"
-                              stroke="#f59e0b" fill="none" stroke-width="3" stroke-linecap="round"/>
-                        <!-- Dots -->
-                        <circle cx="340" cy="42" r="5" fill="#6366f1"/>
-                        <circle cx="260" cy="48" r="5" fill="#22c55e"/>
-                        <circle cx="180" cy="60" r="5" fill="#f59e0b"/>
-                    </svg>
-                    <!-- Ghost Bar Chart -->
-                    <svg class="ghost-chart-svg" id="ghostChartBar" viewBox="0 0 400 250" style="display: none;">
-                        <defs>
-                            <linearGradient id="ghostBarGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" style="stop-color:#8b5cf6"/>
-                                <stop offset="100%" style="stop-color:#6366f1"/>
-                            </linearGradient>
-                            <linearGradient id="ghostBarGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" style="stop-color:#a855f7"/>
-                                <stop offset="100%" style="stop-color:#7c3aed"/>
-                            </linearGradient>
-                            <linearGradient id="ghostTrendGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="0%" style="stop-color:#f59e0b"/>
-                                <stop offset="100%" style="stop-color:#ef4444"/>
-                            </linearGradient>
-                        </defs>
-                        <!-- Bars -->
-                        <rect x="50" y="90" width="32" height="110" rx="4" fill="url(#ghostBarGrad1)"/>
-                        <rect x="90" y="80" width="32" height="120" rx="4" fill="url(#ghostBarGrad1)"/>
-                        <rect x="130" y="70" width="32" height="130" rx="4" fill="url(#ghostBarGrad1)"/>
-                        <rect x="170" y="60" width="32" height="140" rx="4" fill="url(#ghostBarGrad1)"/>
-                        <rect x="210" y="75" width="32" height="125" rx="4" fill="url(#ghostBarGrad2)"/>
-                        <rect x="250" y="95" width="32" height="105" rx="4" fill="url(#ghostBarGrad2)"/>
-                        <rect x="290" y="115" width="32" height="85" rx="4" fill="url(#ghostBarGrad2)"/>
-                        <rect x="330" y="135" width="32" height="65" rx="4" fill="url(#ghostBarGrad2)"/>
-                        <!-- Trend line -->
-                        <path d="M66,90 L106,80 L146,70 L186,60 L226,75 L266,95 L306,115 L346,135"
-                              stroke="url(#ghostTrendGrad)" fill="none" stroke-width="4" stroke-linecap="round"/>
-                        <!-- Trend dots -->
-                        <circle cx="66" cy="90" r="5" fill="#f59e0b"/>
-                        <circle cx="186" cy="60" r="5" fill="#f59e0b"/>
-                        <circle cx="346" cy="135" r="5" fill="#ef4444"/>
-                    </svg>
-                </div>
-                <div class="global-ghost-label" id="ghostChartLabel">Loss Trend Chart</div>
-            </div>
-
-            <!-- Global Drag Cursor -->
-            <div class="ai-global-drag-cursor" id="aiGlobalDragCursor">
-                <svg viewBox="0 0 24 24" fill="white" stroke="#333" stroke-width="1">
-                    <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.48 0 .72-.58.38-.92L6.35 2.85a.5.5 0 0 0-.85.36Z"/>
-                </svg>
             </div>
         </div>
     </section>
@@ -4318,7 +4419,7 @@
                                     </div>
                                     <div class="script-line" data-line="2">
                                         <span class="line-number">2</span>
-                                        <span class="line-content"><span class="code-keyword">import</span> uralab <span class="code-keyword">as</span> ur</span>
+                                        <span class="line-content"><span class="code-keyword">import</span> ArcRho <span class="code-keyword">as</span> arc</span>
                                     </div>
                                     <div class="script-line" data-line="3">
                                         <span class="line-number">3</span>
@@ -4326,19 +4427,19 @@
                                     </div>
                                     <div class="script-line" data-line="4">
                                         <span class="line-number">4</span>
-                                        <span class="line-content"><span class="code-variable">data</span> = ur.<span class="code-function">import_triangle</span>(<span class="code-string">"loss_data.csv"</span>)</span>
+                                        <span class="line-content"><span class="code-variable">data</span> = arc.<span class="code-function">import_triangle</span>(<span class="code-string">"loss_data.csv"</span>)</span>
                                     </div>
                                     <div class="script-line" data-line="5">
                                         <span class="line-number">5</span>
-                                        <span class="line-content"><span class="code-variable">data</span> = ur.<span class="code-function">transform</span>(data, method=<span class="code-string">"incr_to_cum"</span>)</span>
+                                        <span class="line-content"><span class="code-variable">data</span> = arc.<span class="code-function">transform</span>(data, method=<span class="code-string">"incr_to_cum"</span>)</span>
                                     </div>
                                     <div class="script-line" data-line="6">
                                         <span class="line-number">6</span>
-                                        <span class="line-content"><span class="code-variable">result</span> = ur.<span class="code-function">chain_ladder</span>(data)</span>
+                                        <span class="line-content"><span class="code-variable">result</span> = arc.<span class="code-function">chain_ladder</span>(data)</span>
                                     </div>
                                     <div class="script-line" data-line="7">
                                         <span class="line-number">7</span>
-                                        <span class="line-content">ur.<span class="code-function">export</span>(result, <span class="code-string">"reserves.xlsx"</span>)</span>
+                                        <span class="line-content">arc.<span class="code-function">export</span>(result, <span class="code-string">"CL_Ultimates.xlsx"</span>)</span>
                                     </div>
                                 </div>
                             </div>
@@ -4453,7 +4554,7 @@
         <div class="benefits-container">
             <div class="benefits-content">
                 <div class="section-header animate-on-scroll" style="text-align: left;">
-                    <p class="section-label">Why UraLab</p>
+                    <p class="section-label">Why ArcRho</p>
                     <h2 class="section-title">Built for Real Actuarial Work</h2>
                 </div>
                 <ul class="benefits-list">
@@ -4535,9 +4636,9 @@
     <section class="cta" id="contact">
         <div class="cta-container animate-on-scroll">
             <h2>Ready to Streamline Your Reserving?</h2>
-            <p>See how UraLab can transform your actuarial workflow. Request a personalized demo today.</p>
+            <p>See how ArcRho can transform your actuarial workflow. Request a personalized demo today.</p>
             <div class="cta-buttons">
-                <a href="mailto:xw2781@gmail.com?subject=UraLab Demo Request" class="btn-primary">
+                <a href="mailto:xw2781@gmail.com?subject=ArcRho Demo Request" class="btn-primary">
                     Request a Demo
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M5 12h14M12 5l7 7-7 7"/>
@@ -4552,7 +4653,7 @@
     <footer>
         <div class="footer-container">
             <div class="footer-logo">
-                <div class="logo-icon" aria-label="UraLab logo">
+                <div class="logo-icon" aria-label="ArcRho logo">
                     <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
                         <rect x="3" y="3" width="5" height="5" rx="1.2"></rect>
                         <rect x="10" y="3" width="5" height="5" rx="1.2"></rect>
@@ -4562,9 +4663,9 @@
                         <rect x="3" y="17" width="5" height="5" rx="1.2"></rect>
                     </svg>
                 </div>
-                UraLab
+                ArcRho
             </div>
-            <p>&copy; 2026 UraLab - Ultimate Reserving Analytics Platform. All rights reserved.</p>
+            <p>&copy; 2026 ArcRho - ArcRay Platform. All rights reserved.</p>
         </div>
     </footer>
 
@@ -4659,626 +4760,228 @@
             });
         });
 
-        // AI Visualization Demo Animation
-        const aiPromptText = document.getElementById('aiPromptText');
-        const aiGenerateBtn = document.getElementById('aiGenerateBtn');
-        const chartPlaceholder = document.getElementById('chartPlaceholder');
-        const aiChartSvg1 = document.getElementById('aiChartSvg1');
-        const aiChartSvg2 = document.getElementById('aiChartSvg2');
-        const aiChartLegend1 = document.getElementById('aiChartLegend1');
-        const aiChartLegend2 = document.getElementById('aiChartLegend2');
-        const aiMouseCursor = document.getElementById('aiMouseCursor');
-        const aiPromptContainer = document.querySelector('.ai-prompt-container');
-        const aiDemoLeft = document.querySelector('.ai-demo-left');
-        const aiWorkflowStage = document.getElementById('aiWorkflowStage');
-        const aiStepData = document.getElementById('aiStepData');
-        const aiStepViz = document.getElementById('aiStepViz');
-        const aiStepWorkspace = document.getElementById('aiStepWorkspace');
-        const aiChartChip = document.getElementById('aiChartChip');
-        const aiDragGhost = document.getElementById('aiDragGhost');
-        const aiWorkspaceDrop = document.getElementById('aiWorkspaceDrop');
-        const aiWorkspaceChart = document.getElementById('aiWorkspaceChart');
-        const aiWorkspaceStatus = document.getElementById('aiWorkspaceStatus');
-        const wsChartLine = document.getElementById('wsChartLine');
-        const wsChartBar = document.getElementById('wsChartBar');
-        const wsChartTitle = document.getElementById('wsChartTitle');
-        const aiDragCursor = document.getElementById('aiDragCursor');
-        const aiChartCanvas = document.getElementById('aiChartCanvas');
-        const aiGlobalChartGhost = document.getElementById('aiGlobalChartGhost');
-        const aiGlobalDragCursor = document.getElementById('aiGlobalDragCursor');
-        const aiChartContainer = document.querySelector('.ai-chart-container');
-        const ghostChartLine = document.getElementById('ghostChartLine');
-        const ghostChartBar = document.getElementById('ghostChartBar');
-        const ghostChartLabel = document.getElementById('ghostChartLabel');
+                // AI Visualization Demo Animation
+        const aiPromptPreview = document.getElementById('aiPromptPreview');
+        const aiApplyStyleBtn = document.getElementById('aiApplyStyleBtn');
+        const aiPromptBadge = document.getElementById('aiPromptBadge');
+        const aiChartTitle = document.getElementById('aiChartTitle');
+        const aiStyleNote = document.getElementById('aiStyleNote');
+        const aiStyleTransition = document.getElementById('aiStyleTransition');
+        const aiStyleChartByCol = document.getElementById('aiStyleChartByCol');
+        const aiStyleChartByRow = document.getElementById('aiStyleChartByRow');
+        const aiDemoLegend = document.getElementById('aiDemoLegend');
 
-        // Two different prompts for alternating demos
-        const prompts = [
-            "Plot the loss development curve with gradient fills, showing all accident years in a modern style.",
-            "Show projected ultimate losses by accident year as a bar chart with accident years on the x-axis, include a trend line overlay with warm gradient colors"
-        ];
-
-        let currentPromptIndex = 0;
-        let aiDemoStarted = false;
-        let aiDemoComplete = false;
-        let aiDemoRunning = false;
-        let autoPlayInterval = null;
-        let cursorAnimationFrame = null;
-        let workflowAnimationRunning = false;
-
-        function delay(ms) {
-            return new Promise(resolve => setTimeout(resolve, ms));
-        }
-
-        // Typing animation
-        function typePrompt(text, element, speed = 25) {
-            return new Promise((resolve) => {
-                let i = 0;
-                element.innerHTML = '';
-                const cursor = document.createElement('span');
-                cursor.className = 'ai-typing-cursor';
-
-                function type() {
-                    if (i < text.length) {
-                        element.innerHTML = text.substring(0, i + 1);
-                        element.appendChild(cursor);
-                        i++;
-                        setTimeout(type, speed + Math.random() * 15);
-                    } else {
-                        cursor.remove();
-                        resolve();
-                    }
+        if (aiPromptPreview && aiApplyStyleBtn && aiStyleChartByCol && aiStyleChartByRow && aiDemoLegend) {
+            const aiStylePresets = [
+                {
+                    mode: 'byCol',
+                    badge: 'Style 1',
+                    title: 'Origin Curves',
+                    note: 'Chart template saved: By Column style',
+                    prompt: 'Use By Column style with development periods as line groups and origin years on the x-axis.',
+                    legend: [
+                        { label: '12', color: '#0ea5e9' },
+                        { label: '24', color: '#8b5cf6' },
+                        { label: '36', color: '#22c55e' },
+                        { label: '48', color: '#f59e0b' }
+                    ]
+                },
+                {
+                    mode: 'byRow',
+                    badge: 'Style 2',
+                    title: 'Development Curves',
+                    note: 'Chart template updated: By Row style',
+                    prompt: 'Switch to By Row style: one line per origin year with development period on the x-axis.',
+                    legend: [
+                        { label: '2019', color: '#6366f1' },
+                        { label: '2020', color: '#0ea5e9' },
+                        { label: '2021', color: '#22c55e' },
+                        { label: '2022', color: '#f97316' }
+                    ]
                 }
-                type();
-            });
-        }
+            ];
 
-        // Show generating state
-        function showGenerating() {
-            aiGenerateBtn.classList.add('generating');
-            aiGenerateBtn.innerHTML = `
-                <span class="dots">
-                    <span class="dot"></span>
-                    <span class="dot"></span>
-                    <span class="dot"></span>
-                </span>
-                Generating...
-            `;
-        }
+            let aiStyleIndex = 0;
+            let aiAutoPlay = false;
+            let aiCycleTimer = null;
+            let aiCycleToken = 0;
 
-        // Show generate button
-        function showGenerateReady() {
-            aiGenerateBtn.classList.remove('generating');
-            aiGenerateBtn.innerHTML = `
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                </svg>
-                Generate
-            `;
-        }
-
-        // Animate mouse cursor to button
-        function animateMouseToButton() {
-            return new Promise((resolve) => {
-                const btnRect = aiGenerateBtn.getBoundingClientRect();
-                const containerRect = aiDemoLeft.getBoundingClientRect();
-
-                // Calculate target position relative to container
-                const targetX = btnRect.left - containerRect.left + btnRect.width / 2;
-                const targetY = btnRect.top - containerRect.top + btnRect.height / 2;
-
-                // Start position (from prompt area)
-                const startX = targetX - 100;
-                const startY = targetY - 80;
-
-                aiMouseCursor.style.left = startX + 'px';
-                aiMouseCursor.style.top = startY + 'px';
-                aiMouseCursor.classList.add('visible');
-
-                // Animate to button
-                const duration = 800;
-                const startTime = performance.now();
-
-                function animate(currentTime) {
-                    const elapsed = currentTime - startTime;
-                    const progress = Math.min(elapsed / duration, 1);
-                    const easeOut = 1 - Math.pow(1 - progress, 3);
-
-                    const currentX = startX + (targetX - startX) * easeOut;
-                    const currentY = startY + (targetY - startY) * easeOut;
-
-                    aiMouseCursor.style.left = currentX + 'px';
-                    aiMouseCursor.style.top = currentY + 'px';
-
-                    if (progress < 1) {
-                        cursorAnimationFrame = requestAnimationFrame(animate);
-                    } else {
-                        // Click animation
-                        aiMouseCursor.classList.add('clicking');
-                        setTimeout(() => {
-                            aiMouseCursor.classList.remove('clicking');
-                            aiMouseCursor.classList.remove('visible');
-                            resolve();
-                        }, 300);
-                    }
-                }
-
-                requestAnimationFrame(animate);
-            });
-        }
-
-        // Hide mouse cursor
-        function hideMouseCursor() {
-            if (cursorAnimationFrame) {
-                cancelAnimationFrame(cursorAnimationFrame);
-            }
-            aiMouseCursor.classList.remove('visible');
-            aiMouseCursor.classList.remove('clicking');
-        }
-
-        function setWorkflowStepState(stepEl, state) {
-            stepEl.classList.remove('active', 'complete', 'up-next');
-            if (state) {
-                stepEl.classList.add(state);
-            }
-        }
-
-        function resetWorkflowStage() {
-            aiWorkflowStage.classList.add('visible');
-            aiChartChip.classList.remove('visible', 'ghosted');
-            aiDragGhost.classList.remove('visible');
-            aiDragCursor.classList.remove('visible', 'dragging');
-            aiWorkspaceDrop.classList.remove('active', 'filled');
-            aiWorkspaceChart.classList.remove('visible');
-            resetGlobalGhost();
-            if (aiWorkspaceStatus) {
-                aiWorkspaceStatus.textContent = 'Ready';
-                aiWorkspaceStatus.classList.remove('added');
-            }
-            // Reset chart type display
-            if (wsChartLine) wsChartLine.style.display = 'block';
-            if (wsChartBar) wsChartBar.style.display = 'none';
-            if (wsChartTitle) wsChartTitle.textContent = 'Loss Trend Chart';
-
-            setWorkflowStepState(aiStepData, null);
-            setWorkflowStepState(aiStepViz, null);
-            setWorkflowStepState(aiStepWorkspace, null);
-            workflowAnimationRunning = false;
-        }
-
-        // Reset global ghost elements
-        function resetGlobalGhost() {
-            aiGlobalChartGhost.classList.remove('visible', 'lifting');
-            aiGlobalDragCursor.classList.remove('visible', 'dragging');
-            // Reset ghost chart types
-            if (ghostChartLine) ghostChartLine.style.display = 'block';
-            if (ghostChartBar) ghostChartBar.style.display = 'none';
-            if (ghostChartLabel) ghostChartLabel.textContent = 'Loss Trend Chart';
-        }
-
-        // Animate chart drag from Step 2 to Step 3 with smooth resize
-        function animateChartToWorkspace() {
-            return new Promise(resolve => {
-                // Set correct ghost chart type based on current prompt
-                if (currentPromptIndex === 0) {
-                    ghostChartLine.style.display = 'block';
-                    ghostChartBar.style.display = 'none';
-                    ghostChartLabel.textContent = 'Loss Development Curves';
-                } else {
-                    ghostChartLine.style.display = 'none';
-                    ghostChartBar.style.display = 'block';
-                    ghostChartLabel.textContent = 'Ultimate Loss by AY';
-                }
-
-                // Get positions
-                const chartContainerRect = aiChartContainer.getBoundingClientRect();
-                const dropRect = aiWorkspaceDrop.getBoundingClientRect();
-
-                // Start: chart size and position (in step 2)
-                const startWidth = Math.min(chartContainerRect.width * 0.85, 320);
-                const startHeight = startWidth * 0.65;
-                const startX = chartContainerRect.left + (chartContainerRect.width - startWidth) / 2;
-                const startY = chartContainerRect.top + (chartContainerRect.height - startHeight) / 2;
-
-                // End: small chip size in workspace drop zone
-                const endWidth = Math.min(dropRect.width - 24, 110);
-                const endHeight = endWidth * 0.85;
-                const endX = dropRect.left + (dropRect.width - endWidth) / 2;
-                const endY = dropRect.top + (dropRect.height - endHeight) / 2;
-
-                // Cursor offset from ghost center
-                const cursorOffsetX = 15;
-                const cursorOffsetY = 15;
-
-                // Phase 1: Cursor moves to chart (500ms)
-                const phase1Duration = 500;
-                // Phase 2: Lift and drag with resize (1200ms)
-                const phase2Duration = 1200;
-
-                // Initial cursor position (above-left of chart)
-                const cursorStartX = startX - 60;
-                const cursorStartY = startY - 40;
-                const cursorChartX = startX + startWidth / 2 + cursorOffsetX;
-                const cursorChartY = startY + startHeight / 2 + cursorOffsetY;
-
-                // Show cursor and move to chart
-                aiGlobalDragCursor.style.left = `${cursorStartX}px`;
-                aiGlobalDragCursor.style.top = `${cursorStartY}px`;
-                aiGlobalDragCursor.classList.add('visible');
-
-                let startTime = performance.now();
-
-                function animatePhase1(currentTime) {
-                    const elapsed = currentTime - startTime;
-                    const progress = Math.min(elapsed / phase1Duration, 1);
-                    const easeOut = 1 - Math.pow(1 - progress, 3);
-
-                    const curX = cursorStartX + (cursorChartX - cursorStartX) * easeOut;
-                    const curY = cursorStartY + (cursorChartY - cursorStartY) * easeOut;
-
-                    aiGlobalDragCursor.style.left = `${curX}px`;
-                    aiGlobalDragCursor.style.top = `${curY}px`;
-
-                    if (progress < 1) {
-                        requestAnimationFrame(animatePhase1);
-                    } else {
-                        // Phase 2: Lift chart and drag
-                        startPhase2();
-                    }
-                }
-
-                function startPhase2() {
-                    // Position and show the ghost at chart location
-                    aiGlobalChartGhost.style.left = `${startX}px`;
-                    aiGlobalChartGhost.style.top = `${startY}px`;
-                    aiGlobalChartGhost.style.width = `${startWidth}px`;
-                    aiGlobalChartGhost.style.height = `${startHeight}px`;
-                    aiGlobalChartGhost.classList.add('visible', 'lifting');
-                    aiGlobalDragCursor.classList.add('dragging');
-
-                    // Activate drop zone
-                    aiWorkspaceDrop.classList.add('active');
-
-                    startTime = performance.now();
-                    requestAnimationFrame(animatePhase2);
-                }
-
-                function animatePhase2(currentTime) {
-                    const elapsed = currentTime - startTime;
-                    const progress = Math.min(elapsed / phase2Duration, 1);
-
-                    // Use easeInOutCubic for smooth movement
-                    const easeProgress = progress < 0.5
-                        ? 4 * progress * progress * progress
-                        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-
-                    // Interpolate position
-                    const currentX = startX + (endX - startX) * easeProgress;
-                    const currentY = startY + (endY - startY) * easeProgress;
-
-                    // Interpolate size (shrink smoothly)
-                    const currentWidth = startWidth + (endWidth - startWidth) * easeProgress;
-                    const currentHeight = startHeight + (endHeight - startHeight) * easeProgress;
-
-                    // Apply transforms
-                    aiGlobalChartGhost.style.left = `${currentX}px`;
-                    aiGlobalChartGhost.style.top = `${currentY}px`;
-                    aiGlobalChartGhost.style.width = `${currentWidth}px`;
-                    aiGlobalChartGhost.style.height = `${currentHeight}px`;
-
-                    // Move cursor with ghost
-                    aiGlobalDragCursor.style.left = `${currentX + currentWidth / 2 + cursorOffsetX}px`;
-                    aiGlobalDragCursor.style.top = `${currentY + currentHeight / 2 + cursorOffsetY}px`;
-
-                    if (progress < 1) {
-                        requestAnimationFrame(animatePhase2);
-                    } else {
-                        // Animation complete
-                        aiGlobalChartGhost.classList.remove('visible', 'lifting');
-                        aiGlobalDragCursor.classList.remove('visible', 'dragging');
-                        resolve();
-                    }
-                }
-
-                requestAnimationFrame(animatePhase1);
-            });
-        }
-
-        async function runWorkflowSequence() {
-            if (workflowAnimationRunning) return;
-            workflowAnimationRunning = true;
-
-            aiWorkflowStage.classList.add('visible');
-            setWorkflowStepState(aiStepData, 'complete');
-            setWorkflowStepState(aiStepViz, 'active');
-            setWorkflowStepState(aiStepWorkspace, 'up-next');
-            if (aiWorkspaceStatus) {
-                aiWorkspaceStatus.textContent = 'Ready';
+            function sleep(ms) {
+                return new Promise((resolve) => setTimeout(resolve, ms));
             }
 
-            await delay(300);
-
-            // Animate chart drag from Step 2 to Step 3 with smooth resize
-            await animateChartToWorkspace();
-
-            // Complete the drop
-            aiWorkspaceDrop.classList.remove('active');
-            aiWorkspaceDrop.classList.add('filled');
-            if (aiWorkspaceStatus) {
-                aiWorkspaceStatus.textContent = 'Chart added';
-                aiWorkspaceStatus.classList.add('added');
-            }
-            if (aiWorkspaceChart) {
-                // Show the correct chart type based on what was generated
-                if (currentPromptIndex === 0) {
-                    // Line chart (development curves)
-                    wsChartLine.style.display = 'block';
-                    wsChartBar.style.display = 'none';
-                    wsChartTitle.textContent = 'Loss Development Curves';
-                } else {
-                    // Bar chart
-                    wsChartLine.style.display = 'none';
-                    wsChartBar.style.display = 'block';
-                    wsChartTitle.textContent = 'Ultimate Loss by AY';
-                }
-                aiWorkspaceChart.classList.add('visible');
+            function setPromptText(text, withCaret = true) {
+                aiPromptPreview.textContent = text;
+                if (!withCaret) return;
+                const caret = document.createElement('span');
+                caret.className = 'ai-prompt-caret';
+                aiPromptPreview.appendChild(caret);
             }
 
-            setWorkflowStepState(aiStepViz, 'complete');
-            setWorkflowStepState(aiStepWorkspace, 'active');
+            function renderLegend(items) {
+                aiDemoLegend.innerHTML = '';
+                items.forEach((item) => {
+                    const row = document.createElement('div');
+                    row.className = 'legendItem';
 
-            await delay(400);
-            setWorkflowStepState(aiStepWorkspace, 'complete');
+                    const swatch = document.createElement('span');
+                    swatch.className = 'legendSwatch';
+                    swatch.style.background = item.color;
 
-            workflowAnimationRunning = false;
-        }
+                    const label = document.createElement('span');
+                    label.className = 'legendLabel';
+                    label.textContent = item.label;
 
-        // Animate chart type 1 (development curves)
-        function animateChart1() {
-            chartPlaceholder.style.display = 'none';
-            aiChartSvg1.style.display = 'block';
-            aiChartSvg2.style.display = 'none';
-            aiChartLegend1.style.display = 'flex';
-            aiChartLegend2.style.display = 'none';
-            aiChartSvg1.style.animation = 'fadeInScale 0.5s ease forwards';
-
-            // Animate lines with staggered delays
-            setTimeout(() => {
-                const lines = aiChartSvg1.querySelectorAll('.chart-line');
-                lines.forEach((line, index) => {
-                    setTimeout(() => {
-                        line.classList.add('animate');
-                    }, index * 120);
+                    row.appendChild(swatch);
+                    row.appendChild(label);
+                    aiDemoLegend.appendChild(row);
                 });
-            }, 300);
-
-            // Animate area
-            setTimeout(() => {
-                const area = document.getElementById('chartArea1');
-                if (area) area.classList.add('visible');
-            }, 600);
-
-            // Animate dots with staggered delays
-            setTimeout(() => {
-                aiChartSvg1.querySelectorAll('.chart-dot-1').forEach((dot, index) => {
-                    setTimeout(() => {
-                        dot.classList.add('visible');
-                    }, index * 40);
-                });
-            }, 1800);
-
-            // Animate legend
-            setTimeout(() => {
-                aiChartLegend1.querySelectorAll('.legend-item').forEach((item, index) => {
-                    setTimeout(() => {
-                        item.classList.add('visible');
-                    }, index * 80);
-                });
-            }, 2500);
-        }
-
-        // Animate chart type 2 (bar chart with AY on x-axis)
-        function animateChart2() {
-            chartPlaceholder.style.display = 'none';
-            aiChartSvg1.style.display = 'none';
-            aiChartSvg2.style.display = 'block';
-            aiChartLegend1.style.display = 'none';
-            aiChartLegend2.style.display = 'flex';
-            aiChartSvg2.style.animation = 'fadeInScale 0.5s ease forwards';
-
-            // Animate bars
-            setTimeout(() => {
-                aiChartSvg2.querySelectorAll('.chart-bar-rect').forEach((bar, index) => {
-                    setTimeout(() => {
-                        bar.classList.add('visible');
-                        bar.style.animation = `fadeInScale 0.4s ease forwards`;
-                    }, index * 100);
-                });
-            }, 300);
-
-            // Animate trend line
-            setTimeout(() => {
-                const trendLine = document.getElementById('chartLineTrend');
-                if (trendLine) trendLine.classList.add('animate');
-            }, 1200);
-
-            // Animate dots
-            setTimeout(() => {
-                aiChartSvg2.querySelectorAll('.chart-dot-2').forEach((dot, index) => {
-                    setTimeout(() => {
-                        dot.classList.add('visible');
-                    }, index * 80);
-                });
-            }, 1800);
-
-            // Animate legend
-            setTimeout(() => {
-                aiChartLegend2.querySelectorAll('.legend-item').forEach((item, index) => {
-                    setTimeout(() => {
-                        item.classList.add('visible');
-                    }, index * 150);
-                });
-            }, 2200);
-        }
-
-        // Reset all chart states
-        function resetCharts() {
-            chartPlaceholder.style.display = 'flex';
-            aiChartSvg1.style.display = 'none';
-            aiChartSvg2.style.display = 'none';
-
-            // Reset chart 1
-            aiChartSvg1.querySelectorAll('.chart-line').forEach(line => {
-                line.classList.remove('animate');
-                line.style.strokeDashoffset = '800';
-            });
-            const area1 = document.getElementById('chartArea1');
-            if (area1) area1.classList.remove('visible');
-            aiChartSvg1.querySelectorAll('.chart-dot-1').forEach(dot => dot.classList.remove('visible'));
-            aiChartLegend1.querySelectorAll('.legend-item').forEach(item => item.classList.remove('visible'));
-
-            // Reset chart 2
-            aiChartSvg2.querySelectorAll('.chart-bar-rect').forEach(bar => {
-                bar.classList.remove('visible');
-                bar.style.animation = '';
-            });
-            const trendLine = document.getElementById('chartLineTrend');
-            if (trendLine) {
-                trendLine.classList.remove('animate');
-                trendLine.style.strokeDashoffset = '800';
             }
-            aiChartSvg2.querySelectorAll('.chart-dot-2').forEach(dot => dot.classList.remove('visible'));
-            aiChartLegend2.querySelectorAll('.legend-item').forEach(item => item.classList.remove('visible'));
-        }
 
-        let nextDemoTimeout = null;
+            function triggerStyleTransition() {
+                aiStyleTransition.classList.remove('run');
+                void aiStyleTransition.offsetWidth;
+                aiStyleTransition.classList.add('run');
+            }
 
-        // Schedule next demo after 4 seconds
-        function scheduleNextDemo() {
-            if (nextDemoTimeout) clearTimeout(nextDemoTimeout);
-            nextDemoTimeout = setTimeout(() => {
-                if (aiDemoComplete && !aiDemoRunning) {
-                    runAiDemo(true);
+            function applyStyle(index, opts = {}) {
+                const preset = aiStylePresets[index];
+                aiStyleIndex = index;
+
+                if (opts.updatePrompt !== false) {
+                    setPromptText(preset.prompt, false);
                 }
-            }, 4000); // 4 second pause after completion
-        }
 
-        // Main demo sequence
-        async function runAiDemo(withCursor = true) {
-            if (aiDemoRunning) return;
+                if (aiPromptBadge) aiPromptBadge.textContent = preset.badge;
+                if (aiChartTitle) aiChartTitle.textContent = preset.title;
+                if (aiStyleNote) aiStyleNote.textContent = preset.note;
 
-            // Clear any pending next demo
-            if (nextDemoTimeout) clearTimeout(nextDemoTimeout);
+                aiStyleChartByCol.classList.remove('is-active');
+                aiStyleChartByRow.classList.remove('is-active');
+                const targetChart = preset.mode === 'byCol' ? aiStyleChartByCol : aiStyleChartByRow;
+                void targetChart.offsetWidth;
+                targetChart.classList.add('is-active');
 
-            aiDemoRunning = true;
-            aiDemoStarted = true;
-            aiDemoComplete = false;
+                renderLegend(preset.legend);
 
-            // Reset state
-            aiPromptText.innerHTML = '';
-            resetCharts();
-            resetWorkflowStage();
-            showGenerateReady();
-            hideMouseCursor();
-
-            // Type prompt
-            await typePrompt(prompts[currentPromptIndex], aiPromptText);
-
-            // Animate mouse cursor to button (if enabled)
-            if (withCursor) {
-                await new Promise(resolve => setTimeout(resolve, 300));
-                await animateMouseToButton();
-            }
-
-            // Show generating
-            await delay(200);
-            showGenerating();
-
-            // Wait and show chart
-            await delay(1500);
-
-            if (currentPromptIndex === 0) {
-                animateChart1();
-            } else {
-                animateChart2();
-            }
-
-            // Wait for chart animation, then run workflow sequence
-            await delay(2600);
-            await runWorkflowSequence();
-
-            showGenerateReady();
-            aiDemoComplete = true;
-            aiDemoRunning = false;
-
-            // Toggle to next prompt for next run
-            currentPromptIndex = (currentPromptIndex + 1) % prompts.length;
-
-            // Schedule next demo after 4 seconds
-            scheduleNextDemo();
-        }
-
-        // Start auto-play cycle
-        function startAutoPlay() {
-            stopAutoPlay();
-            runAiDemo(true);
-        }
-
-        // Stop auto-play
-        function stopAutoPlay() {
-            if (autoPlayInterval) {
-                clearInterval(autoPlayInterval);
-                autoPlayInterval = null;
-            }
-            if (nextDemoTimeout) {
-                clearTimeout(nextDemoTimeout);
-                nextDemoTimeout = null;
-            }
-        }
-
-        // Click handler for generate button (manual trigger)
-        aiGenerateBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (!aiDemoRunning) {
-                stopAutoPlay();
-                runAiDemo(false); // No cursor animation for manual clicks
-            }
-        });
-
-        // Click on prompt area to restart animation with next prompt
-        aiPromptContainer.addEventListener('click', (e) => {
-            if (e.target === aiGenerateBtn || aiGenerateBtn.contains(e.target)) return;
-
-            if (!aiDemoRunning) {
-                stopAutoPlay();
-                currentPromptIndex = (currentPromptIndex + 1) % prompts.length; // Switch prompt
-                runAiDemo(true);
-            }
-        });
-
-        // Click on chart area to switch to next animation
-        aiChartCanvas.addEventListener('click', (e) => {
-            if (!aiDemoRunning) {
-                stopAutoPlay();
-                currentPromptIndex = (currentPromptIndex + 1) % prompts.length; // Switch to next
-                runAiDemo(true);
-            }
-        });
-
-        // Auto-start demo when section is visible
-        const aiVizSection = document.querySelector('.ai-viz');
-        const aiVizObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting && !aiDemoStarted) {
-                    setTimeout(() => startAutoPlay(), 800);
-                } else if (!entry.isIntersecting) {
-                    // Pause when not visible
-                    stopAutoPlay();
-                    hideMouseCursor();
+                if (opts.transition !== false) {
+                    triggerStyleTransition();
                 }
-            });
-        }, { threshold: 0.3 });
+            }
 
-        aiVizObserver.observe(aiVizSection);
+            function getVariableTypingDelay(text, charIndex) {
+                const ch = text[charIndex] || '';
+                const progress = (charIndex + 1) / Math.max(text.length, 1);
+
+                // Oscillate speed to create visible fast/slow rhythm.
+                const wave = Math.sin(progress * Math.PI * 5);
+                let delay = wave >= 0
+                    ? 8 + Math.random() * 10
+                    : 18 + Math.random() * 16;
+
+                // Natural pauses around spaces/punctuation.
+                if (ch === ' ') delay += 18 + Math.random() * 14;
+                if (',.;:!?'.includes(ch)) delay += 80 + Math.random() * 90;
+
+                // Rare "thinking" micro-pause for human-like cadence.
+                if (charIndex > 3 && Math.random() < 0.06) {
+                    delay += 50 + Math.random() * 90;
+                }
+
+                // Slight slowdown near the end.
+                if (progress > 0.88) delay += 14 + Math.random() * 14;
+
+                return Math.round(delay);
+            }
+
+            async function typePromptAnimated(text, token) {
+                for (let i = 1; i <= text.length; i += 1) {
+                    if (token !== aiCycleToken) return false;
+                    setPromptText(text.slice(0, i), true);
+                    await sleep(getVariableTypingDelay(text, i - 1));
+                }
+                setPromptText(text, false);
+                return token === aiCycleToken;
+            }
+
+            function queueNextCycle(delayMs = 0) {
+                if (!aiAutoPlay) return;
+                if (aiCycleTimer) clearTimeout(aiCycleTimer);
+                aiCycleTimer = setTimeout(() => {
+                    void runCycleStep();
+                }, delayMs);
+            }
+
+            async function runCycleStep() {
+                if (!aiAutoPlay) return;
+
+                const token = ++aiCycleToken;
+                const nextIndex = (aiStyleIndex + 1) % aiStylePresets.length;
+                const nextPreset = aiStylePresets[nextIndex];
+                const typed = await typePromptAnimated(nextPreset.prompt, token);
+                if (!typed || !aiAutoPlay || token !== aiCycleToken) return;
+
+                aiApplyStyleBtn.classList.add('is-working');
+                await sleep(260);
+                if (!aiAutoPlay || token !== aiCycleToken) return;
+
+                applyStyle(nextIndex, { updatePrompt: false });
+                aiApplyStyleBtn.classList.remove('is-working');
+
+                queueNextCycle(2200);
+            }
+
+            function startAutoCycle() {
+                if (aiAutoPlay) return;
+                aiAutoPlay = true;
+                queueNextCycle(900);
+            }
+
+            function stopAutoCycle() {
+                aiAutoPlay = false;
+                aiCycleToken += 1;
+                if (aiCycleTimer) {
+                    clearTimeout(aiCycleTimer);
+                    aiCycleTimer = null;
+                }
+                aiApplyStyleBtn.classList.remove('is-working');
+            }
+
+            aiApplyStyleBtn.addEventListener('click', async () => {
+                const nextIndex = (aiStyleIndex + 1) % aiStylePresets.length;
+                const token = ++aiCycleToken;
+                if (aiCycleTimer) clearTimeout(aiCycleTimer);
+
+                const typed = await typePromptAnimated(aiStylePresets[nextIndex].prompt, token);
+                if (!typed || token !== aiCycleToken) return;
+
+                aiApplyStyleBtn.classList.add('is-working');
+                await sleep(180);
+                if (token !== aiCycleToken) return;
+
+                applyStyle(nextIndex, { updatePrompt: false });
+                aiApplyStyleBtn.classList.remove('is-working');
+
+                if (aiAutoPlay) queueNextCycle(2400);
+            });
+
+            applyStyle(0, { transition: false, updatePrompt: true });
+
+            const aiVizSection = document.querySelector('.ai-viz');
+            if (aiVizSection) {
+                const aiVizObserver = new IntersectionObserver((entries) => {
+                    entries.forEach((entry) => {
+                        if (entry.isIntersecting) {
+                            startAutoCycle();
+                        } else {
+                            stopAutoCycle();
+                        }
+                    });
+                }, { threshold: 0.35 });
+
+                aiVizObserver.observe(aiVizSection);
+            }
+        }
 
         // ========================================
         // Stochastic Simulation Animation
