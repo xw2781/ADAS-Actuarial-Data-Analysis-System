@@ -6,3 +6,6 @@ It provides a structured framework for transforming insurance loss data into rep
 ## Frontend Preview
 ![Screenshot](./assets/images/UI_Plots.png)
 
+## Interactive Chart for Chain-Ladder Method
+![Screenshot](./assets/images/UI_ChainLadder.png)
+
