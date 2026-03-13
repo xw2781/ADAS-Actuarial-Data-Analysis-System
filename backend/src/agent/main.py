@@ -22,7 +22,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from core.utils import *
 
-debug_mode = 0
+debug_mode = 1
 device_name = os.environ.get("COMPUTERNAME")
 project_map_path = rf"{PROJECT_ROOT}\projects\map.json"
 command_path = rf"{PROJECT_ROOT}\core\ADAS Master\command.txt"
@@ -33,10 +33,10 @@ id_path = id_folder + '\\' + robot_id + '.txt'
 
 
 BASE_DICT = {}  # Base Settings Table
-VPS_DICT = {}   # Virtual Project Setting Files
+PROJECT_CONFIG = {}   # Project configuration (Source Table, Dataset Types, Reserving Class Types)
 DATA_DICT = {}  # CSV Data Table Files
 DATA_DICT_LOCK = Lock() # for atomic swap
-VPS_DICT_LOCK = Lock()
+PROJECT_CONFIG_LOCK = Lock()
 BASE_DICT_LOCK = Lock()
 DATA_DICT_LOAD_ORDER = []  # Track load order for oldest removal
 
@@ -149,12 +149,18 @@ def _load_project_settings(project_name, df=None, date_cols=None):
     Returns:
         Dictionary with keys: origin_start, origin_end, dev_end (all in YYYYMM format)
     """
-    # Check cache first
-    if project_name in PROJECT_SETTINGS_CACHE:
-        return PROJECT_SETTINGS_CACHE[project_name]
-
     # Build path to project settings file
     settings_path = PROJECT_ROOT / "projects" / project_name / "general_settings.json"
+
+    # Check cache: reuse if file hasn't been modified since last load
+    if project_name in PROJECT_SETTINGS_CACHE:
+        cached = PROJECT_SETTINGS_CACHE[project_name]
+        if settings_path.exists():
+            current_mtime = os.path.getmtime(settings_path)
+            if cached.get('_mtime') == current_mtime:
+                return cached
+        else:
+            return cached
 
     settings = None
 
@@ -210,7 +216,9 @@ def _load_project_settings(project_name, df=None, date_cols=None):
     else:
         settings['date_granularity'] = 'monthly'
 
-    # Cache the settings
+    # Cache the settings along with file mtime for staleness detection
+    if settings_path.exists():
+        settings['_mtime'] = os.path.getmtime(settings_path)
     PROJECT_SETTINGS_CACHE[project_name] = settings
 
     return settings
@@ -366,7 +374,7 @@ def _get_vps_last_modified_time(project_name):
     return max(datetime.fromtimestamp(path.stat().st_mtime) for path in json_paths.values())
 
 
-def load_to_VPS_DICT(project_name, settings_file=None):
+def load_to_PROJECT_CONFIG(project_name, settings_file=None):
     json_paths = _project_json_paths(project_name)
     print(f"Loading JSON settings for [{project_name}] @ {get_current_time()}")
 
@@ -374,11 +382,11 @@ def load_to_VPS_DICT(project_name, settings_file=None):
     dataset_types_json = _read_json(json_paths["dataset_types"])
     reserving_class_types_json = _read_json(json_paths["reserving_class_types"])
 
-    VPS_DICT[project_name] = {}
-    VPS_DICT[project_name]["Source Table"] = _source_table_df_from_json(source_table_json)
-    VPS_DICT[project_name]["Dataset Types"] = _json_table_to_df(dataset_types_json)
-    VPS_DICT[project_name]["Reserving Class Types"] = _json_table_to_df(reserving_class_types_json)
-    VPS_DICT[project_name + " - Version"] = _get_vps_last_modified_time(project_name)
+    PROJECT_CONFIG[project_name] = {}
+    PROJECT_CONFIG[project_name]["Source Table"] = _source_table_df_from_json(source_table_json)
+    PROJECT_CONFIG[project_name]["Dataset Types"] = _json_table_to_df(dataset_types_json)
+    PROJECT_CONFIG[project_name]["Reserving Class Types"] = _json_table_to_df(reserving_class_types_json)
+    PROJECT_CONFIG[project_name + " - Version"] = _get_vps_last_modified_time(project_name)
 
 
 def load_to_DATA_DICT(csv_path):
@@ -687,7 +695,7 @@ def _get_df(project_name):
     # DATA table cache (guarded)
     with DATA_DICT_LOCK:
         need_load = (table_name not in DATA_DICT) or (DATA_DICT.get(table_name + " - Version") is None) \
-                    or (DATA_DICT[table_name + " - Version"] < File(table_path).last_modified_time)
+                    or (DATA_DICT[table_name + " - Version"] < datetime.fromtimestamp(os.path.getmtime(table_path)))
 
     if need_load:
         # build outside lock if you want, but simplest is just load here
@@ -695,9 +703,9 @@ def _get_df(project_name):
             load_to_DATA_DICT(table_path)
 
     # VPS cache (guarded)
-    with VPS_DICT_LOCK:
-        if project_name not in VPS_DICT:
-            load_to_VPS_DICT(project_name)
+    with PROJECT_CONFIG_LOCK:
+        if project_name not in PROJECT_CONFIG:
+            load_to_PROJECT_CONFIG(project_name)
 
     return DATA_DICT[table_name]
 
@@ -711,7 +719,7 @@ def _get_dataset_info(arg):
     df = _get_df(project_name)
 
     # Set user defined name (ResQ) to actual SQL table col names
-    df_info = VPS_DICT[project_name]['Dataset Types']
+    df_info = PROJECT_CONFIG[project_name]['Dataset Types']
     
     if dataset_name in df_info['Name'].values:
         source = df_info.loc[df_info['Name'] == dataset_name, 'Source'].iloc[0]
@@ -722,7 +730,7 @@ def _get_dataset_info(arg):
     output_data_format = df_info.loc[df_info['Name'] == dataset_name, 'Data Format'].iloc[0]
 
     # find all required table and column names
-    df_info = VPS_DICT[project_name]['Source Table']
+    df_info = PROJECT_CONFIG[project_name]['Source Table']
     required_datasets = split_formula(source)
     rsv_cls_col_names = df_info.loc[df_info['Significances'].isin(['Reserving Class']), 'Column Name'].unique().tolist()
 
@@ -738,7 +746,7 @@ def _get_dataset_info(arg):
     required_datasets = list(set(required_datasets))                       # remove duplicates
 
     # determine the categorical values need to be included/adjusted in the calculation
-    df_info = VPS_DICT[project_name]['Reserving Class Types']
+    df_info = PROJECT_CONFIG[project_name]['Reserving Class Types']
     name_lookup = {str(v).lower(): v for v in df_info['Name'].dropna()}
     splited_path = path.split('\\')
     included_rsv_cls_types = []  # use original value
@@ -817,7 +825,7 @@ def UDF_ADASProjectSettings(arg):
     project_name = arg['ProjectName']
     df = _get_df(project_name)
 
-    df_info = VPS_DICT[project_name]['Source Table']
+    df_info = PROJECT_CONFIG[project_name]['Source Table']
     date_cols = []
     date_cols.append(DLOOKUP(df_info, 'Origin Date', 'Significances', 'Column Name'))
     date_cols.append(DLOOKUP(df_info, 'Development Date', 'Significances', 'Column Name'))
@@ -849,7 +857,7 @@ def UDF_ADASHeaders(arg):
     period_type = int(arg['periodType'])
 
     df = _get_df(project_name)
-    df_info = VPS_DICT[project_name]['Source Table']
+    df_info = PROJECT_CONFIG[project_name]['Source Table']
     date_cols = []
     date_cols.append(DLOOKUP(df_info, 'Origin Date', 'Significances', 'Column Name'))
     date_cols.append(DLOOKUP(df_info, 'Development Date', 'Significances', 'Column Name'))
@@ -1053,7 +1061,7 @@ def UDF_ADASTri(arg):
         if cumulative == True: 
             df2 = df2.cumsum(axis=1)
 
-        data_format = DLOOKUP(VPS_DICT[arg['ProjectName']]['Dataset Types'], name, 'Source', 'Data Format')
+        data_format = DLOOKUP(PROJECT_CONFIG[arg['ProjectName']]['Dataset Types'], name, 'Source', 'Data Format')
         if data_format == 'Vector':
             df2 = vector_to_triangle(df2.iloc[:, [0]], dev_label)
 
@@ -1166,11 +1174,11 @@ class RequestHandler(FileSystemEventHandler):
         print(f"\n> {get_current_time()} \n> new request # {robot_id} # user [{arg['UserName']}]")
 
         # Check VPS Updates (guarded)
-        with VPS_DICT_LOCK:
-            if project_name + " - Version" in VPS_DICT:
+        with PROJECT_CONFIG_LOCK:
+            if project_name + " - Version" in PROJECT_CONFIG:
                 vps_last_modified_time = _get_vps_last_modified_time(project_name)
-                if VPS_DICT[project_name + " - Version"] < vps_last_modified_time:
-                    load_to_VPS_DICT(project_name)
+                if PROJECT_CONFIG[project_name + " - Version"] < vps_last_modified_time:
+                    load_to_PROJECT_CONFIG(project_name)
                     print(f">>> Virtual Project Settings Updated -> [{project_name} JSON]\n")
             # If missing, _get_df() will load it later; or you can proactively load it here.
 
@@ -1219,7 +1227,7 @@ def start_monitoring(path):
                 observer.stop(); break
 
             if get_config_value('apps.agent.kill_all'):
-                File(id_path).delete()
+                os.remove(id_path)
                 observer.stop(); break
             
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -1230,7 +1238,7 @@ def start_monitoring(path):
             write_txt(id_path, arg_1)
 
             # Check Base Settings (New Version Available?)
-            if BASE_DICT["Project Map - Version"] < File(project_map_path).last_modified_time:
+            if BASE_DICT["Project Map - Version"] < datetime.fromtimestamp(os.path.getmtime(project_map_path)):
                 load_BASE_DICT()
                 print(">>> Project Map Updated\n")
 
