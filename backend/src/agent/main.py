@@ -22,7 +22,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from core.utils import *
 
-debug_mode = 1
+debug_mode = 0
 device_name = os.environ.get("COMPUTERNAME")
 project_map_path = rf"{PROJECT_ROOT}\projects\map.json"
 command_path = rf"{PROJECT_ROOT}\core\ADAS Master\command.txt"
@@ -1097,7 +1097,7 @@ def UDF_ADASTri(arg):
         df2.loc[acc, dev_label[max_dev_age:]] = np.nan
 
     if output_data_format == 'Vector' or arg['Function'] == 'ADASVec':
-        df2 = df2.iloc[:, [0]]
+        df2 = df2.iloc[:, [0]].fillna(0)
 
     # Output
     _export_dataframe(df2, arg)
