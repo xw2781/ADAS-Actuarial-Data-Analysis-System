@@ -27,37 +27,20 @@ ArcRho replaces the traditional vendor-based reserving database with a lightweig
 
 ```mermaid
 flowchart LR
-    subgraph Excel["Excel Front-End (VBA)"]
-        A[UDF Call\ne.g. ADASTri / ADASVec]
+    subgraph Excel["Excel · VBA"]
+        A[UDF Call\nADASTri · ADASVec]
     end
 
-    subgraph Engine["ArcRho Agent (Python)"]
-        B[Request File\n.txt dropped in /requests/]
-        C[Watchdog Listener\ndetects file move]
-        D[Parse Arguments\nProjectName · Path · DatasetName]
-        E{Config Cache\nPROJECT_CONFIG}
-        F{Data Cache\nDATA_DICT · LRU 10 tables}
-        G[Filter Rows\nby Reserving Class Hierarchy]
-        H[Pivot → Loss Triangle\nOrigin × Development Age]
-        I[Formula Engine\neval_triangle_formula]
-        J[Write Output CSV]
+    subgraph Engine["ArcRho Agent · Python"]
+        B[Watchdog\nFile Listener] --> C[Parse Request\nProject · Path · Dataset] --> D[(In-Memory Cache\nData + Config)] --> E[Build Triangle\nFilter · Pivot] --> F[Formula Engine]
+        subgraph Store["Local Storage"]
+            K[(CSV\nSource Data)] ~~~ L[(JSON\nConfig)]
+        end
+        D -.->|cache miss| Store
     end
 
-    subgraph Storage["Local Storage"]
-        K[(Flat CSV\nSource Table)]
-        L[(JSON Config\nfield_mapping\ndataset_types\nreserving_class_types)]
-    end
-
-    A -->|writes request| B
-    B --> C --> D
-    D --> E
-    E -->|miss| L
-    D --> F
-    F -->|miss| K
-    F --> G
-    E --> G
-    G --> H --> I --> J
-    J -->|Excel reads CSV| A
+    A -->|"① request"| B
+    F -->|"② result"| A
 ```
 
 ### How It Works
@@ -81,15 +64,9 @@ Loaded source tables and project configs are held in memory (`DATA_DICT`, `PROJE
 
 ```mermaid
 flowchart LR
-    A[Raw flat table] --> B[Filter\nby segment]
-    B --> C[Map to\norg & age buckets]
-    C --> D[GroupBy\n& Sum]
-    D --> E[Pivot\nOrigin × Dev Age]
-    E --> F{Cumulative?}
-    F -->|Yes| G[cumsum]
+    A[Raw flat table] --> B[Filter\nby segment] --> D[GroupBy\n& Sum] --> E[Pivot\nOrigin × Dev Age]
+    E --> F{Cumulative?} -->|Yes| G[cumsum] --> H[Evaluate\nformula] --> J[Output\nDataset]
     F -->|No| G
-    G --> H[Evaluate\nformula]
-    H --> J[Output\nDataset]
 ```
 
 **5. Formula engine**
@@ -152,49 +129,13 @@ Click **Select Datasets** to browse all datasets defined for the active project.
 
 All functions are available under both the `ADAS` prefix and the `Arc` alias prefix (e.g. `ADASTri` ≡ `ArcTri`).
 
-#### Triangle Functions
-
-```
-=ADASTri(Path, TriangleName, [Cumulative], [Transposed], [Calendar],
-         [ProjectName], [OriginLength], [DevelopmentLength])
-```
-Returns a full loss triangle as a spilled array. `Path` is the reserving class path; `TriangleName` is the dataset name. `Cumulative` (default `TRUE`) controls whether development values are cumulated. `OriginLength` and `DevelopmentLength` set the aggregation period in months (default 12 = annual).
-
-```
-=ADASTriDiag(Path, TriangleName, [DiagonalIndex], [Cumulative], [Transposed], ...)
-```
-Returns a single diagonal of the triangle. `DiagonalIndex = 0` (default) returns the latest diagonal; negative values step back.
-
-```
-=ADASTriOrigin(Path, TriangleName, OriginPeriod, [Cumulative], [Transposed], ...)
-```
-Returns a single row (one origin period) across all development ages.
-
-```
-=ADASTriCell(Path, TriangleName, OriginPeriod, DevelopmentPeriod, [Cumulative], ...)
-```
-Returns a single scalar cell from the triangle at a specified origin and development position.
-
-#### Vector Functions
-
-```
-=ADASVec(Path, VectorName, [Transposed], [ProjectName], [PeriodLength])
-```
-Returns a one-dimensional origin-period vector (e.g. earned exposure, premium). Useful for vectors that do not have a development dimension.
-
-```
-=ADASVecCell(Path, VectorName, Index, [ProjectName], [PeriodLength])
-```
-Returns a single element from a vector by 1-based index.
-
-#### Utility Functions
-
-```
-=ADASHeaders(periodType, Transposed, [PeriodLength], [ProjectName])
-```
-Returns axis labels for use as triangle headers. `periodType = 0` returns origin period labels; `periodType = 1` returns development age labels (e.g. `23m`, `35m`, …).
-
-```
-=ADASProjectSettings([ProjectName])
-```
-Returns project metadata as a spilled table: name, origin type, start/end dates, development end date, and period lengths. Useful for dynamic formula construction and audit trails.
+| Function | Category | Description | Arguments |
+|---|---|---|---|
+| `ADASTri` | Triangle | Returns a full loss triangle as a spilled array | `Path`, `TriangleName`, `[Cumulative]`, `[Transposed]`, `[Calendar]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
+| `ADASTriDiag` | Triangle | Extracts a single diagonal. `DiagonalIndex = 0` = latest; negative values step back | `Path`, `TriangleName`, `[DiagonalIndex]`, `[Cumulative]`, `[Transposed]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
+| `ADASTriOrigin` | Triangle | Returns one origin-period row across all development ages | `Path`, `TriangleName`, `OriginPeriod`, `[Cumulative]`, `[Transposed]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
+| `ADASTriCell` | Triangle | Returns a single scalar cell at a specified origin and development position | `Path`, `TriangleName`, `OriginPeriod`, `DevelopmentPeriod`, `[Cumulative]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
+| `ADASVec` | Vector | Returns a one-dimensional origin-period vector (e.g. earned exposure, premium) | `Path`, `VectorName`, `[Transposed]`, `[ProjectName]`, `[PeriodLength]` |
+| `ADASVecCell` | Vector | Returns a single element from a vector by 1-based index | `Path`, `VectorName`, `Index`, `[ProjectName]`, `[PeriodLength]` |
+| `ADASHeaders` | Utility | Returns axis labels for triangle headers. `periodType = 0` = origin labels; `1` = development age labels | `periodType`, `Transposed`, `[PeriodLength]`, `[ProjectName]` |
+| `ADASProjectSettings` | Utility | Returns project metadata: name, origin type, start/end dates, development end date, period lengths | `[ProjectName]` |

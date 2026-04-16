@@ -2,6 +2,11 @@
 # ADAS .gitignore
 # =========================
 
+# -------- Scripts --------
+backup_src_vba.ps1
+backup_src_vba.cmd
+push.cmd
+
 # -------- Excel / VBA --------
 *.xlam
 *.xlsm
