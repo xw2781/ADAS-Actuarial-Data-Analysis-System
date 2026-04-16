@@ -1,7 +1,8 @@
 # ArcRho
+### Actuarial Reserving Automation Platform
 
-ArcRho is an actuarial data automation platform focused on loss reserving analytics.
-It provides a structured framework for transforming insurance loss data into reproducible reserving workflows, helping actuaries reduce manual effort while maintaining transparency and control over assumptions.
+ArcRho is an actuarial data automation platform focused on loss reserving analytics, with an emphasis on streamlining the end-to-end data preparation pipeline.
+It provides a structured framework for transforming raw insurance loss data into reproducible reserving workflows — eliminating manual data handling, accelerating turnaround, and giving actuaries full transparency and control over their assumptions.
 
 ## Background & Motivation
 
@@ -11,10 +12,10 @@ The core problems are structural: the traditional vendor platform's hierarchical
 
 ArcRho was built to break this pattern. By replacing the pre-computation model with on-demand query execution directly against flat source tables, and exposing the results through familiar Excel formulas, it eliminates manual data transfers, removes vendor dependency, and gives the reserving team the speed and flexibility to respond to emerging trends without waiting on system constraints.
 
-## Frontend Preview
+## Modernized Web UI for a Seamless User Experience
 ![Screenshot](./assets/images/UI_Plots.png)
 
-## Interactive Chart for Chain-Ladder Method
+## Discover New Ways to Interact with Reserving Methods
 ![Screenshot](./assets/images/UI_ChainLadder.png)
 
 ---
