@@ -1,15 +1,42 @@
-// Entry point: orchestrates load/save/toggle and wires events.
+﻿// Entry point: orchestrates load/save/toggle and wires events.
 
 import { state } from "./state.js";
 import { config } from "./config.js";
 import { $, logLine } from "./dom.js";
-import { getDataset, patchDataset } from "./api.js";
-import { parseFormulaInput } from "./formula.js";
-import { renderTable, renderActiveCellUI, renderChart, redrawChartSafely} from "./render.js";
+import { getDataset, loadDatasetNotes, patchDataset, saveDatasetNotes } from "./api.js";
+import { renderTable, renderActiveCellUI, renderChart, redrawChartSafely} from "./dataset_render.js";
+import { createTabbedPage } from "./tabbed_page.js";
+import { createDatasetDependencyGuard } from "./dataset_dependency_guard.js";
+import { createDatasetHeadersService } from "./dataset_headers_service.js";
+import { wireDatasetGridInteractions } from "./dataset_grid_interactions.js";
+import { wireDatasetNotesEditor } from "./dataset_notes_editor.js";
+import { publishDfmInputHelpers as publishDatasetHostDfmHelpers, wireDatasetHostBridge } from "./dataset_host_bridge.js";
+import { createDatasetRunController } from "./dataset_run_controller.js";
+import { wireDatasetInputController } from "./dataset_input_controller.js";
+import { openLazyReservingClassPicker } from "./reserving_class_lazy_picker.js";
+import { openProjectNameTreePicker } from "./project_name_tree_picker.js";
+import { openDatasetNamePicker } from "./dataset_name_picker.js";
+import {
+  loadProjectValidValueList,
+  loadDatasetValidValueList,
+  loadReservingClassValidValueList,
+  validateReservingClassPathByTypeNames,
+  buildReservingClassPathPartLookup,
+  normalizeReservingClassPathByPartLookup,
+  normalizeReservingClassPath,
+  normalizeReservingClassPathKey,
+} from "./valid_value_list_provider.js";
+import {
+  getLastViewedDatasetInputs,
+  setLastViewedDatasetInputs,
+  pushBrowsingHistoryEntry,
+  normalizeBrowsingHistoryEntry,
+} from "./browsing_history.js";
 
 const ZOOM_STORAGE_KEY = "adas_ui_zoom_pct";
 const ZOOM_MODE_KEY = "adas_zoom_mode";
 const FONT_STORAGE_KEY = "adas_app_font";
+const FORCE_REBUILD_KEY = "adas_force_rebuild_enabled";
 
 function applyZoomValue(v) {
   try {
@@ -58,6 +85,14 @@ function loadZoomFromStorage() {
   return 100;
 }
 
+function isForceRebuildEnabled() {
+  try {
+    return localStorage.getItem(FORCE_REBUILD_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 applyZoomValue(loadZoomFromStorage());
 applyAppFont(loadAppFontFromStorage());
 
@@ -71,6 +106,23 @@ window.addEventListener("message", (e) => {
   }
   if (e?.data?.type === "adas:set-app-font") {
     applyAppFont(e.data.font);
+  }
+  if (e?.data?.type === "adas:workflow-global-changed") {
+    handleWorkflowGlobalChange(e.data.globalControl);
+  }
+  if (e?.data?.type === "adas:force-rebuild-toggle") {
+    try {
+      localStorage.setItem(FORCE_REBUILD_KEY, e?.data?.enabled ? "1" : "0");
+    } catch {
+      // ignore
+    }
+  }
+});
+
+window.addEventListener("storage", (e) => {
+  if (!workflowId) return;
+  if (e.key === `${WF_GLOBAL_CTRL_PREFIX}${workflowId}`) {
+    handleWorkflowGlobalChange();
   }
 });
 
@@ -150,19 +202,244 @@ const qs = new URLSearchParams(window.location.search);
 const instanceId = qs.get("inst") || "default";
 const stepId = instanceId.startsWith("step_") ? instanceId : null;
 const scopedKey = (k) => `${k}::${instanceId}`;
+const workflowId = qs.get("wf") || "";
+const WF_GLOBAL_CTRL_PREFIX = "adas_workflow_global_ctrl_v1::";
+const DEFAULT_DISPLAY = "Default";
+const DEFAULT_TOKEN = "__DEFAULT__";
+const BROWSING_HISTORY_MAX_ENTRIES = 15;
+const APPDATA_PREFS_ENDPOINT = "/scripting/preferences";
+const APPDATA_LAST_PROJECT_PATH_KEY = "dataset_last_project_path_v1";
+const LEN_DROPDOWN_CONFIG = {
+  originLenSelect: {
+    wrapId: "originLenWrap",
+    buttonId: "originLenDisplay",
+    dropdownId: "originLenDropdown",
+  },
+  devLenSelect: {
+    wrapId: "devLenWrap",
+    buttonId: "devLenDisplay",
+    dropdownId: "devLenDropdown",
+  },
+};
 
 let syncingLen = false;
+let syncingDatasetTypeFields = false;
 let allProjects = [];
 let lastProjectSelection = "";
 let activeProjectIndex = -1;
 let allDatasetTypes = [];
 let activeDatasetIndex = -1;
 let lastDatasetSelection = "";
-let projectBookSheetName = "";
-let projectBookValues = null;
+let allReservingClassPaths = [];
+let datasetDependencyGuard = null;
+let datasetHeadersService = null;
+let datasetGridInteractions = null;
+let datasetRunController = null;
+let reservingClassPathByKey = new Map();
+let reservingClassPathPartByKey = new Map();
+let lastReservingClassSelection = "";
+let appDataProjectPathDefaults = null;
+let appDataProjectPathLoadPromise = null;
+let appDataProjectPathSaveTimer = null;
+let appDataProjectPathPending = null;
+let appDataProjectPathLastSavedSig = "";
+let notesContextKey = "";
+let notesContextPayload = null;
+let notesDirty = false;
+let lastSavedNotesText = "";
+let notesProgrammaticInput = false;
+let notesSyncNonce = 0;
+const lenDropdownActiveIndexBySelect = new Map();
+
+function setLastProjectSelection(value) {
+  lastProjectSelection = String(value || "");
+}
+
+function setLastDatasetSelection(value) {
+  lastDatasetSelection = String(value || "");
+}
+
+function getSyncingDatasetTypeFields() {
+  return syncingDatasetTypeFields;
+}
+
+function setSyncingDatasetTypeFields(value) {
+  syncingDatasetTypeFields = !!value;
+}
+
+function readDatasetInputsFromQueryParams() {
+  const project = String(
+    qs.get("project")
+    || qs.get("project_name")
+    || qs.get("p")
+    || "",
+  ).trim();
+  const path = normalizeReservingClassPath(
+    qs.get("path")
+    || qs.get("reserving_class")
+    || qs.get("rc")
+    || "",
+  );
+  const tri = String(
+    qs.get("tri")
+    || qs.get("dataset_name")
+    || qs.get("dataset")
+    || "",
+  ).trim();
+  const normalized = normalizeBrowsingHistoryEntry({ project, path, tri });
+  return normalized;
+}
 
 function normalizeProjectText(s) {
   return String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function normalizeProjectPathDefaults(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const project = String(
+    raw.project
+    || raw.project_name
+    || raw.projectName
+    || "",
+  ).trim();
+  const path = normalizeReservingClassPath(
+    raw.path
+    || raw.reservingClass
+    || raw.reserving_class
+    || raw.class
+    || "",
+  );
+  if (!project || !path) return null;
+  return { project, path };
+}
+
+function buildProjectPathSignature(value) {
+  const normalized = normalizeProjectPathDefaults(value);
+  if (!normalized) return "";
+  return `${normalizeProjectText(normalized.project)}||${normalizeReservingClassPathKey(normalized.path)}`;
+}
+
+async function ensureAppDataProjectPathDefaultsLoaded() {
+  if (appDataProjectPathLoadPromise) return appDataProjectPathLoadPromise;
+
+  appDataProjectPathLoadPromise = (async () => {
+    try {
+      const res = await fetch(APPDATA_PREFS_ENDPOINT, { cache: "no-store" });
+      if (!res.ok) return null;
+      const payload = await res.json().catch(() => ({}));
+      const normalized = normalizeProjectPathDefaults(payload?.[APPDATA_LAST_PROJECT_PATH_KEY]);
+      appDataProjectPathDefaults = normalized;
+      appDataProjectPathLastSavedSig = buildProjectPathSignature(normalized);
+      return normalized;
+    } catch {
+      return null;
+    }
+  })();
+
+  try {
+    return await appDataProjectPathLoadPromise;
+  } finally {
+    appDataProjectPathLoadPromise = null;
+  }
+}
+
+function getCachedAppDataProjectPathDefaults() {
+  return normalizeProjectPathDefaults(appDataProjectPathDefaults);
+}
+
+async function flushAppDataProjectPathDefaultsSave() {
+  const normalized = normalizeProjectPathDefaults(appDataProjectPathPending);
+  appDataProjectPathPending = null;
+  if (!normalized) return;
+
+  const signature = buildProjectPathSignature(normalized);
+  if (!signature || signature === appDataProjectPathLastSavedSig) return;
+
+  try {
+    const res = await fetch(APPDATA_PREFS_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        [APPDATA_LAST_PROJECT_PATH_KEY]: {
+          project: normalized.project,
+          path: normalized.path,
+          updated_at: new Date().toISOString(),
+        },
+      }),
+    });
+    if (!res.ok) return;
+    appDataProjectPathDefaults = normalized;
+    appDataProjectPathLastSavedSig = signature;
+  } catch {
+    // ignore save failures
+  }
+}
+
+function scheduleAppDataProjectPathDefaultsSave(raw) {
+  const normalized = normalizeProjectPathDefaults(raw);
+  if (!normalized) return;
+  const signature = buildProjectPathSignature(normalized);
+  if (!signature || signature === appDataProjectPathLastSavedSig) return;
+
+  appDataProjectPathPending = normalized;
+  if (appDataProjectPathSaveTimer) clearTimeout(appDataProjectPathSaveTimer);
+  appDataProjectPathSaveTimer = setTimeout(() => {
+    appDataProjectPathSaveTimer = null;
+    void flushAppDataProjectPathDefaultsSave();
+  }, 250);
+}
+
+function buildDefaultDisplayValue(raw) {
+  const resolved = String(raw || "").trim();
+  return resolved ? `${DEFAULT_DISPLAY} (${resolved})` : DEFAULT_DISPLAY;
+}
+
+function getDefaultValueForInput(input) {
+  const defaults = loadWorkflowDefaults();
+  if (!defaults || !input) return "";
+  if (input.id === "projectSelect") return defaults.project || "";
+  if (input.id === "pathInput") return defaults.reservingClass || "";
+  return "";
+}
+
+function isDefaultTokenValue(value) {
+  const v = String(value || "").trim();
+  if (!v) return false;
+  const lower = v.toLowerCase();
+  if (lower === DEFAULT_DISPLAY.toLowerCase() || lower === DEFAULT_TOKEN.toLowerCase()) return true;
+  const prefix = `${DEFAULT_DISPLAY.toLowerCase()} (`;
+  return lower.startsWith(prefix) && lower.endsWith(")");
+}
+
+function isInputDefaultBound(input) {
+  if (!input) return false;
+  if (input.dataset?.globalDefault === "1") return true;
+  return isDefaultTokenValue(input.value);
+}
+
+function setInputDefaultBound(input, bound) {
+  if (!input) return;
+  if (bound) {
+    input.dataset.globalDefault = "1";
+    input.value = buildDefaultDisplayValue(getDefaultValueForInput(input));
+  } else {
+    delete input.dataset.globalDefault;
+  }
+}
+
+function getWorkflowVarValue(vars, key, fallbackName) {
+  if (!Array.isArray(vars)) return "";
+  const byKey = vars.find((v) => v && typeof v === "object" && String(v.key || "") === key);
+  if (byKey && typeof byKey.value === "string") return byKey.value.trim();
+  const target = String(fallbackName || "").trim().toLowerCase();
+  if (!target) return "";
+  const byName = vars.find((v) => {
+    if (!v || typeof v !== "object") return false;
+    const name = String(v.name || "").trim().toLowerCase();
+    return name === target;
+  });
+  if (byName && typeof byName.value === "string") return byName.value.trim();
+  return "";
 }
 
 function normalizeSearchTokens(q) {
@@ -186,11 +463,24 @@ function renderProjectOptions(projects, activeValue = "") {
   const list = document.getElementById("projectDropdown");
   if (!list) return;
   list.innerHTML = "";
-  projects.forEach((p, i) => {
+  const defaults = loadWorkflowDefaults();
+  const defaultProject = (defaults?.project || "").trim();
+  const options = [];
+  if (window.ADA_DFM_CONTEXT && defaultProject) {
+    options.push({
+      label: buildDefaultDisplayValue(defaultProject),
+      value: DEFAULT_TOKEN,
+    });
+  }
+  for (const p of projects) {
+    options.push({ label: p, value: p });
+  }
+
+  options.forEach((optData, i) => {
     const opt = document.createElement("div");
     opt.className = "projectOption";
-    opt.textContent = p;
-    opt.dataset.value = p;
+    opt.textContent = optData.label;
+    opt.dataset.value = optData.value;
     opt.dataset.index = String(i);
     opt.addEventListener("mouseenter", () => {
       setActiveProjectIndex(i);
@@ -198,16 +488,27 @@ function renderProjectOptions(projects, activeValue = "") {
     opt.addEventListener("mousedown", (e) => {
       e.preventDefault();
       const projectInput = document.getElementById("projectSelect");
-      if (projectInput) projectInput.value = p;
+      if (projectInput) {
+        if (isDefaultTokenValue(optData.value)) {
+          setInputDefaultBound(projectInput, true);
+        } else {
+          setInputDefaultBound(projectInput, false);
+          projectInput.value = optData.value;
+        }
+      }
       showProjectDropdown(false);
-      void handleProjectSelection(p);
+      void handleProjectSelection(optData.value);
     });
     list.appendChild(opt);
   });
 
   activeProjectIndex = -1;
-  if (projects.length) {
-    const idx = activeValue ? Math.max(0, projects.indexOf(activeValue)) : 0;
+  if (options.length) {
+    let idx = 0;
+    if (activeValue) {
+      const found = options.findIndex((o) => o.value === activeValue);
+      if (found >= 0) idx = found;
+    }
     setActiveProjectIndex(idx);
   }
 }
@@ -221,14 +522,18 @@ function showProjectDropdown(open) {
 }
 
 function filterProjectOptions(query) {
-  if (!allProjects.length) return;
   const tokens = normalizeSearchTokens(query);
   const filtered = tokens.length
     ? allProjects.filter(p => matchesProject(p, tokens))
-    : allProjects;
+    : allProjects.slice();
   const activeValue = getActiveProjectValue();
   renderProjectOptions(filtered, activeValue);
   showProjectDropdown(true);
+}
+
+function getProjectFilterQuery(input) {
+  if (isInputDefaultBound(input)) return "";
+  return input?.value || "";
 }
 
 function getProjectOptionsList() {
@@ -251,13 +556,24 @@ function setActiveProjectIndex(idx) {
   opts[activeProjectIndex].scrollIntoView({ block: "nearest" });
 }
 
+function getActiveProjectIndex() {
+  return activeProjectIndex;
+}
+
 function chooseActiveProject() {
   const opts = getProjectOptionsList();
   if (activeProjectIndex < 0 || activeProjectIndex >= opts.length) return false;
   const value = opts[activeProjectIndex].dataset.value || opts[activeProjectIndex].textContent;
   if (!value) return false;
   const projectInput = document.getElementById("projectSelect");
-  if (projectInput) projectInput.value = value;
+  if (projectInput) {
+    if (isDefaultTokenValue(value)) {
+      setInputDefaultBound(projectInput, true);
+    } else {
+      setInputDefaultBound(projectInput, false);
+      projectInput.value = value;
+    }
+  }
   showProjectDropdown(false);
   void handleProjectSelection(value);
   return true;
@@ -348,6 +664,10 @@ function setActiveDatasetIndex(idx) {
   opts[activeDatasetIndex].scrollIntoView({ block: "nearest" });
 }
 
+function getActiveDatasetIndex() {
+  return activeDatasetIndex;
+}
+
 function chooseActiveDataset() {
   const opts = getDatasetOptionsList();
   if (activeDatasetIndex < 0 || activeDatasetIndex >= opts.length) return false;
@@ -366,162 +686,688 @@ function findExactDatasetMatch(value) {
   return allDatasetTypes.find(name => normalizeProjectText(name) === v) || "";
 }
 
-const LS_DATASET_TYPES_PREFIX = scopedKey("adas_dataset_types::");
+function ensureDatasetTypeOption(value) {
+  const name = String(value || "").trim();
+  if (!name) return "";
+  const key = normalizeProjectText(name);
+  const existing = allDatasetTypes.find((item) => normalizeProjectText(item) === key);
+  if (existing) return existing;
 
-function datasetTypesKey(project) {
-  return `${LS_DATASET_TYPES_PREFIX}${normalizeProjectText(project)}`;
+  allDatasetTypes = [...allDatasetTypes, name].sort((a, b) =>
+    String(a || "").localeCompare(String(b || ""), undefined, { sensitivity: "base", numeric: true }),
+  );
+  renderDatasetOptions(allDatasetTypes, name);
+  renderDetailTypeOptions(allDatasetTypes);
+  return name;
 }
 
-function loadDatasetTypesCache(project) {
-  try {
-    const raw = localStorage.getItem(datasetTypesKey(project)) || "";
-    if (!raw) return null;
-    const obj = JSON.parse(raw);
-    if (!obj || !Array.isArray(obj.items)) return null;
-    return obj;
-  } catch {
-    return null;
+function getDatasetTypeFormulaByName(datasetTypeName) {
+  const key = normalizeProjectText(datasetTypeName);
+  if (!key) return "";
+  const formulaMap = state.datasetTypeFormulaByKey instanceof Map ? state.datasetTypeFormulaByKey : null;
+  if (!formulaMap) return "";
+  return String(formulaMap.get(key) || "").trim();
+}
+
+function syncDetailFormulaFromDatasetType(datasetTypeName) {
+  const formulaInput = document.getElementById("dsDetailFormula");
+  if (!formulaInput) return;
+  const formula = getDatasetTypeFormulaByName(datasetTypeName);
+  formulaInput.value = formula;
+  formulaInput.title = formula;
+}
+
+function syncDetailDatasetTypeFromTopInput(rawValue, options = {}) {
+  const syncName = !!options?.syncName;
+  const dsDetailType = document.getElementById("dsDetailType");
+  const dsDetailName = document.getElementById("dsDetailName");
+  const prevType = String(dsDetailType?.value || "").trim();
+  const raw = String(rawValue || "").trim();
+  const canonical = raw ? (ensureDatasetTypeOption(raw) || raw) : "";
+
+  if (dsDetailType) {
+    if (canonical && [...dsDetailType.options].some((opt) => opt.value === canonical)) {
+      dsDetailType.value = canonical;
+    } else {
+      dsDetailType.value = "";
+    }
+  }
+
+  if (syncName && dsDetailName) {
+    const nextType = String(dsDetailType?.value || canonical || "").trim();
+    const currentName = String(dsDetailName.value || "").trim();
+    if (!currentName || normalizeProjectText(prevType) !== normalizeProjectText(nextType)) {
+      dsDetailName.value = nextType;
+    }
+  }
+
+  syncDetailFormulaFromDatasetType(String(dsDetailType?.value || canonical || "").trim());
+}
+
+function loadDatasetTypeDependencyModel(projectName, options = {}) {
+  return datasetDependencyGuard.loadDatasetTypeDependencyModel(projectName, options);
+}
+
+function validateDatasetTypeDependencies(datasetType, options = {}) {
+  return datasetDependencyGuard.validateDatasetTypeDependencies(datasetType, options);
+}
+
+function setInputInvalid(input, message) {
+  if (!input) return;
+  input.setCustomValidity(String(message || "Invalid value."));
+}
+
+function clearInputInvalid(input) {
+  if (!input) return;
+  input.setCustomValidity("");
+}
+
+function reportInputInvalid(input, message, statusText = "") {
+  if (!input) return;
+  setInputInvalid(input, message);
+  try { input.reportValidity(); } catch {}
+  if (statusText) setStatus(statusText);
+}
+
+function rebuildReservingClassPathLookup(paths) {
+  reservingClassPathByKey = new Map();
+  reservingClassPathPartByKey = buildReservingClassPathPartLookup(paths);
+  for (const raw of Array.isArray(paths) ? paths : []) {
+    const normalized = normalizeReservingClassPath(raw);
+    if (!normalized) continue;
+    const key = normalizeReservingClassPathKey(normalized);
+    if (!key || reservingClassPathByKey.has(key)) continue;
+    reservingClassPathByKey.set(key, normalized);
   }
 }
 
-function saveDatasetTypesCache(project, items, settingsPath) {
+function findExactReservingClassMatch(value) {
+  const normalized = normalizeReservingClassPath(value);
+  const key = normalizeReservingClassPathKey(normalized);
+  if (!key) return "";
+  const exact = reservingClassPathByKey.get(key);
+  if (exact) return exact;
+  return normalizeReservingClassPathByPartLookup(normalized, reservingClassPathPartByKey);
+}
+
+function ensureReservingClassOption(value) {
+  const normalized = normalizeReservingClassPath(value);
+  if (!normalized) return "";
+  const existing = findExactReservingClassMatch(normalized);
+  if (existing) return existing;
+  allReservingClassPaths = [...allReservingClassPaths, normalized].sort((a, b) =>
+    String(a || "").localeCompare(String(b || ""), undefined, { sensitivity: "base", numeric: true }),
+  );
+  rebuildReservingClassPathLookup(allReservingClassPaths);
+  return normalized;
+}
+
+function renderDetailTypeOptions(types) {
+  const sel = document.getElementById("dsDetailType");
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = "";
+  const blank = document.createElement("option");
+  blank.value = "";
+  blank.textContent = "";
+  sel.appendChild(blank);
+  for (const name of types) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    sel.appendChild(opt);
+  }
+  if (prev && types.includes(prev)) {
+    sel.value = prev;
+  }
+}
+
+async function refreshDatasetTypesForProject(project, useCache = true) {
+  datasetDependencyGuard.clearProjectCache(project);
+
+  if (!project) {
+    allDatasetTypes = [];
+    state.datasetTypeSourceByKey = new Map();
+    state.datasetTypeFormulaByKey = new Map();
+    renderDatasetOptions([]);
+    renderDetailTypeOptions([]);
+    syncDetailDatasetTypeFromTopInput(document.getElementById("triInput")?.value || "", { syncName: false });
+    showDatasetDropdown(false);
+    return;
+  }
+
+  let items = [];
   try {
-    localStorage.setItem(
-      datasetTypesKey(project),
-      JSON.stringify({ items, settingsPath: settingsPath || "" })
+    items = await loadDatasetValidValueList(project, { forceReload: !useCache });
+  } catch (err) {
+    console.error(`Failed to load dataset types for project "${project}":`, err);
+    items = [];
+  }
+  allDatasetTypes = Array.isArray(items) ? items : [];
+  try {
+    await loadDatasetTypeDependencyModel(project, { forceReload: !useCache });
+  } catch {
+    state.datasetTypeSourceByKey = new Map();
+    state.datasetTypeFormulaByKey = new Map();
+  }
+  renderDatasetOptions(allDatasetTypes);
+  renderDetailTypeOptions(allDatasetTypes);
+  syncDetailDatasetTypeFromTopInput(document.getElementById("triInput")?.value || "", { syncName: false });
+  showDatasetDropdown(false);
+}
+
+async function refreshReservingClassPathsForProject(project, useCache = true) {
+  if (!project) {
+    allReservingClassPaths = [];
+    rebuildReservingClassPathLookup([]);
+    return;
+  }
+
+  let items = [];
+  try {
+    items = await loadReservingClassValidValueList(project, { forceReload: !useCache });
+  } catch (err) {
+    console.error(`Failed to load reserving class values for project "${project}":`, err);
+    items = [];
+  }
+  allReservingClassPaths = Array.isArray(items) ? items : [];
+  rebuildReservingClassPathLookup(allReservingClassPaths);
+}
+
+async function handleDatasetSelection(value, options = {}) {
+  const strict = !!options?.strict;
+  const showMessage = !!options?.showMessage;
+  const name = findExactDatasetMatch(value);
+  const triInput = document.getElementById("triInput");
+  if (!name) {
+    if (strict && triInput) {
+      if (lastDatasetSelection) triInput.value = lastDatasetSelection;
+      else triInput.value = "";
+      clearInputInvalid(triInput);
+      if (showMessage) {
+        reportInputInvalid(
+          triInput,
+          "Dataset Type is not in the valid list for this project.",
+          "Invalid Dataset Type. Please select a value from the valid list.",
+        );
+      }
+    }
+    return false;
+  }
+  const switched = name !== lastDatasetSelection;
+
+  if (triInput) triInput.value = name;
+  syncDetailDatasetTypeFromTopInput(name, { syncName: switched });
+  const dependencyResult = await validateDatasetTypeDependencies(name, {
+    showMessage: switched || showMessage || strict,
+  });
+  if (!dependencyResult.ok) {
+    showDatasetDropdown(false);
+    return false;
+  }
+  lastDatasetSelection = name;
+  clearInputInvalid(triInput);
+  showDatasetDropdown(false);
+  if (switched) {
+    saveTriInputsToStorage();
+    scheduleAutoRun();
+  }
+  return true;
+}
+
+function validateAndNormalizeProjectInput(options = {}) {
+  const strict = !!options?.strict;
+  const showMessage = !!options?.showMessage;
+  const input = document.getElementById("projectSelect");
+  if (!input) return { ok: false, value: "" };
+
+  if (isInputDefaultBound(input)) {
+    const resolvedDefault = getResolvedProjectValue();
+    const matchedDefault = findExactProjectMatch(resolvedDefault);
+    if (!matchedDefault) {
+      if (strict && showMessage) {
+        reportInputInvalid(
+          input,
+          "Default Project Name is not in the valid list.",
+          "Invalid Project Name. Please select a valid project.",
+        );
+      }
+      return { ok: false, value: "" };
+    }
+    clearInputInvalid(input);
+    return { ok: true, value: matchedDefault };
+  }
+
+  const raw = String(input.value || "").trim();
+  const matched = findExactProjectMatch(raw);
+  if (!matched) {
+    if (strict) {
+      if (lastProjectSelection) input.value = lastProjectSelection;
+      else input.value = "";
+      clearInputInvalid(input);
+      if (showMessage) {
+        reportInputInvalid(
+          input,
+          "Project Name is not in the valid list.",
+          "Invalid Project Name. Please select a valid project.",
+        );
+      }
+    }
+    return { ok: false, value: "" };
+  }
+  input.value = matched;
+  clearInputInvalid(input);
+  return { ok: true, value: matched };
+}
+
+function validateAndNormalizeDatasetInput(options = {}) {
+  const strict = !!options?.strict;
+  const showMessage = !!options?.showMessage;
+  const input = document.getElementById("triInput");
+  if (!input) return { ok: false, value: "" };
+  const matched = findExactDatasetMatch(input.value);
+  if (!matched) {
+    if (strict) {
+      if (lastDatasetSelection) input.value = lastDatasetSelection;
+      else input.value = "";
+      clearInputInvalid(input);
+      if (showMessage) {
+        reportInputInvalid(
+          input,
+          "Dataset Type is not in the valid list for this project.",
+          "Invalid Dataset Type. Please select a value from the valid list.",
+        );
+      }
+    }
+    return { ok: false, value: "" };
+  }
+  input.value = matched;
+  clearInputInvalid(input);
+  return { ok: true, value: matched };
+}
+
+async function validateAndNormalizeReservingClassInput(projectName, options = {}) {
+  const strict = !!options?.strict;
+  const showMessage = !!options?.showMessage;
+  const input = document.getElementById("pathInput");
+  if (!input) return { ok: false, value: "" };
+  const project = String(projectName || "").trim();
+
+  if (isInputDefaultBound(input)) {
+    const resolvedDefault = getResolvedReservingClassValue();
+    const normalizedDefault = normalizeReservingClassPath(resolvedDefault);
+    if (!normalizedDefault) {
+      if (strict && showMessage) {
+        reportInputInvalid(
+          input,
+          "Default Reserving Class is empty.",
+          "Invalid Reserving Class. Please select a value from the valid list.",
+        );
+      }
+      return { ok: false, value: "" };
+    }
+    const validatedDefault = await validateReservingClassPathByTypeNames(project, normalizedDefault);
+    if (!validatedDefault?.ok || !validatedDefault?.path) {
+      if (strict && showMessage) {
+        reportInputInvalid(
+          input,
+          "Default Reserving Class is not in the valid list for this project.",
+          "Invalid Reserving Class. Please select a value from the valid list.",
+        );
+      }
+      return { ok: false, value: "" };
+    }
+    const canonicalDefault = normalizeReservingClassPath(validatedDefault.path);
+    clearInputInvalid(input);
+    lastReservingClassSelection = canonicalDefault;
+    return { ok: true, value: canonicalDefault };
+  }
+
+  const normalizedInput = normalizeReservingClassPath(input.value);
+  if (!normalizedInput) {
+    if (strict) {
+      if (lastReservingClassSelection) input.value = lastReservingClassSelection;
+      else input.value = "";
+      clearInputInvalid(input);
+      if (showMessage) {
+        reportInputInvalid(
+          input,
+          "Reserving Class is not in the valid list for this project.",
+          "Invalid Reserving Class. Please select a value from the valid list.",
+        );
+      }
+    }
+    return { ok: false, value: "" };
+  }
+
+  const validatedInput = await validateReservingClassPathByTypeNames(project, normalizedInput);
+  if (!validatedInput?.ok || !validatedInput?.path) {
+    if (strict) {
+      if (lastReservingClassSelection) input.value = lastReservingClassSelection;
+      else input.value = "";
+      clearInputInvalid(input);
+      if (showMessage) {
+        reportInputInvalid(
+          input,
+          "Reserving Class is not in the valid list for this project.",
+          "Invalid Reserving Class. Please select a value from the valid list.",
+        );
+      }
+    }
+    return { ok: false, value: "" };
+  }
+
+  input.value = normalizeReservingClassPath(validatedInput.path);
+  clearInputInvalid(input);
+  lastReservingClassSelection = input.value;
+  return { ok: true, value: input.value };
+}
+
+async function validateTriInputsBeforeRun(options = {}) {
+  const showMessage = !!options?.showMessage;
+  const projectResult = validateAndNormalizeProjectInput({ strict: true, showMessage });
+  if (!projectResult.ok || !projectResult.value) return { ok: false };
+
+  const project = projectResult.value;
+  await refreshDatasetTypesForProject(project);
+  await refreshReservingClassPathsForProject(project);
+
+  const reservingResult = await validateAndNormalizeReservingClassInput(project, { strict: true, showMessage });
+  if (!reservingResult.ok || !reservingResult.value) return { ok: false };
+
+  const datasetResult = validateAndNormalizeDatasetInput({ strict: true, showMessage });
+  if (!datasetResult.ok || !datasetResult.value) return { ok: false };
+  const triInputs = getTriInputs();
+  const dependencyResult = await validateDatasetTypeDependencies(datasetResult.value, {
+    showMessage,
+    precheckInputs: {
+      project,
+      path: reservingResult.value,
+      tri: datasetResult.value,
+      cumulative: triInputs.cumulative,
+      originLen: triInputs.originLen,
+      devLen: triInputs.devLen,
+    },
+  });
+  if (!dependencyResult.ok) return { ok: false };
+
+  saveTriInputsToStorage();
+  return {
+    ok: true,
+    project,
+    path: reservingResult.value,
+    tri: datasetResult.value,
+    dependencyBypassedByExistingCsv: !!dependencyResult?.bypassedByExistingCsv,
+  };
+}
+
+function recordDatasetBrowsingHistory(entry) {
+  if (window.ADA_DFM_CONTEXT) return;
+  const normalized = normalizeBrowsingHistoryEntry(entry);
+  if (!normalized) return;
+  const out = pushBrowsingHistoryEntry(normalized, { maxEntries: BROWSING_HISTORY_MAX_ENTRIES });
+  try {
+    window.parent.postMessage(
+      {
+        type: "adas:browsing-history-updated",
+        entry: out?.entry || normalized,
+      },
+      "*",
     );
   } catch {
     // ignore
   }
 }
 
-async function ensureProjectBookLoaded() {
-  if (projectBookValues && projectBookValues.length) return true;
-  const metaRes = await fetch("/project_book/meta");
-  if (!metaRes.ok) return false;
-  const meta = await metaRes.json();
-  projectBookSheetName = (meta.sheets || [])[0] || "";
-  if (!projectBookSheetName) return false;
-
-  const sheetRes = await fetch(`/project_book/sheet?sheet=${encodeURIComponent(projectBookSheetName)}`);
-  if (!sheetRes.ok) return false;
-  const out = await sheetRes.json();
-  projectBookValues = out.values || [];
-  return true;
+function getLenDropdownIds(selectId) {
+  return LEN_DROPDOWN_CONFIG[selectId] || null;
 }
 
-function findProjectSettingsPath(project) {
-  if (!projectBookValues || !projectBookValues.length) return "";
-  const header = projectBookValues[0] || [];
-  let projectCol = 0;
-  let settingsCol = -1;
+function getLenDropdownElements(selectId) {
+  const ids = getLenDropdownIds(selectId);
+  if (!ids) return null;
+  return {
+    select: document.getElementById(selectId),
+    wrap: document.getElementById(ids.wrapId),
+    button: document.getElementById(ids.buttonId),
+    dropdown: document.getElementById(ids.dropdownId),
+  };
+}
 
-  for (let c = 0; c < header.length; c++) {
-    const label = String(header[c] || "").trim().toLowerCase();
-    if (label === "project name" || label === "projectname") projectCol = c;
-    if (label === "project settings") settingsCol = c;
+function getLenDropdownActiveIndex(selectId) {
+  const idx = lenDropdownActiveIndexBySelect.get(selectId);
+  return Number.isInteger(idx) ? idx : -1;
+}
+
+function setLenDropdownActiveIndex(selectId, idx) {
+  const parts = getLenDropdownElements(selectId);
+  const dropdown = parts?.dropdown;
+  if (!dropdown) return;
+  const opts = Array.from(dropdown.children);
+  if (!opts.length) {
+    lenDropdownActiveIndexBySelect.set(selectId, -1);
+    return;
   }
-
-  if (settingsCol < 0) return "";
-
-  const target = normalizeProjectText(project);
-  for (let r = 1; r < projectBookValues.length; r++) {
-    const row = projectBookValues[r] || [];
-    const name = normalizeProjectText(row[projectCol] || "");
-    if (!name || name !== target) continue;
-    const rawPath = row[settingsCol];
-    const pathStr = rawPath === null || rawPath === undefined ? "" : String(rawPath).trim();
-    return pathStr;
-  }
-  return "";
+  let next = Number.isFinite(idx) ? idx : 0;
+  if (next < 0) next = opts.length - 1;
+  if (next >= opts.length) next = 0;
+  lenDropdownActiveIndexBySelect.set(selectId, next);
+  opts.forEach((el, i) => el.classList.toggle("active", i === next));
+  opts[next]?.scrollIntoView?.({ block: "nearest" });
 }
 
-function parseDatasetTypes(values) {
-  if (!values || !values.length) return [];
-  const header = (values[0] || []).map(v => String(v || "").trim().toLowerCase());
-  const nameCol = header.indexOf("name");
-  const hasHeader = nameCol >= 0;
-  const col = hasHeader ? nameCol : 0;
-  const startRow = hasHeader ? 1 : 0;
-
-  const out = [];
-  const seen = new Set();
-  for (let r = startRow; r < values.length; r++) {
-    const v = values[r]?.[col];
-    if (v === null || v === undefined) continue;
-    const s = String(v).trim();
-    if (!s) continue;
-    if (seen.has(s)) continue;
-    seen.add(s);
-    out.push(s);
-  }
-  return out;
+function syncLenDropdownButtonLabel(selectId) {
+  const parts = getLenDropdownElements(selectId);
+  const select = parts?.select;
+  const button = parts?.button;
+  if (!select || !button) return;
+  const label = button.querySelector(".lenSelectValue");
+  if (!label) return;
+  const selected = select.options[select.selectedIndex];
+  label.textContent = (selected?.textContent || select.value || "").trim();
 }
 
-async function fetchDatasetTypesForProject(project) {
-  const ok = await ensureProjectBookLoaded();
-  if (!ok) return { items: [], settingsPath: "" };
-  const settingsPath = findProjectSettingsPath(project);
-  if (!settingsPath) return { items: [], settingsPath: "" };
+function renderLenDropdownOptions(selectId) {
+  const parts = getLenDropdownElements(selectId);
+  const select = parts?.select;
+  const dropdown = parts?.dropdown;
+  if (!select || !dropdown) return;
 
-  const res = await fetch("/book/sheet", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ book_path: settingsPath, sheet: "Dataset Types" }),
-  });
-  if (!res.ok) return { items: [], settingsPath };
-  const out = await res.json();
-  const items = parseDatasetTypes(out.values || []);
-  return { items, settingsPath };
-}
-
-async function refreshDatasetTypesForProject(project, useCache = true) {
-  if (!project) {
-    allDatasetTypes = [];
-    renderDatasetOptions([]);
-    showDatasetDropdown(false);
+  dropdown.innerHTML = "";
+  const options = Array.from(select.options);
+  if (!options.length) {
+    lenDropdownActiveIndexBySelect.set(selectId, -1);
+    syncLenDropdownButtonLabel(selectId);
+    showLenDropdown(selectId, false);
     return;
   }
 
-  lastDatasetSelection = "";
+  options.forEach((opt, i) => {
+    const item = document.createElement("div");
+    item.className = "datasetOption lenOption";
+    item.textContent = String(opt.textContent || opt.value || "");
+    item.dataset.value = String(opt.value || "");
+    item.dataset.index = String(i);
+    item.addEventListener("mouseenter", () => {
+      setLenDropdownActiveIndex(selectId, i);
+    });
+    item.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setLenSelectValue(selectId, opt.value, { emitChange: true });
+      showLenDropdown(selectId, false);
+      parts.button?.focus();
+    });
+    dropdown.appendChild(item);
+  });
 
-  if (useCache) {
-    const cached = loadDatasetTypesCache(project);
-    if (cached && Array.isArray(cached.items)) {
-      allDatasetTypes = cached.items;
-      renderDatasetOptions(allDatasetTypes);
-      showDatasetDropdown(false);
-    } else {
-      allDatasetTypes = [];
-      renderDatasetOptions([]);
-      showDatasetDropdown(false);
-    }
-  } else {
-    allDatasetTypes = [];
-    renderDatasetOptions([]);
-    showDatasetDropdown(false);
-  }
-
-  const { items, settingsPath } = await fetchDatasetTypesForProject(project);
-  if (items.length) {
-    allDatasetTypes = items;
-    renderDatasetOptions(items);
-    showDatasetDropdown(false);
-    saveDatasetTypesCache(project, items, settingsPath);
-  }
+  const selectedIdx = options.findIndex((opt) => opt.value === select.value);
+  setLenDropdownActiveIndex(selectId, selectedIdx >= 0 ? selectedIdx : 0);
+  syncLenDropdownButtonLabel(selectId);
 }
 
-async function handleDatasetSelection(value) {
-  const name = findExactDatasetMatch(value);
-  if (!name) return;
-  if (name === lastDatasetSelection) return;
-  lastDatasetSelection = name;
+function refreshLenDropdowns() {
+  Object.keys(LEN_DROPDOWN_CONFIG).forEach((selectId) => {
+    renderLenDropdownOptions(selectId);
+  });
+}
 
-  const triInput = document.getElementById("triInput");
-  if (triInput) triInput.value = name;
-  showDatasetDropdown(false);
-  saveTriInputsToStorage();
-  scheduleAutoRun();
+function showLenDropdown(selectId, open) {
+  const parts = getLenDropdownElements(selectId);
+  const wrap = parts?.wrap;
+  const dropdown = parts?.dropdown;
+  const button = parts?.button;
+  if (!wrap || !dropdown || !button) return;
+
+  if (open) {
+    Object.keys(LEN_DROPDOWN_CONFIG).forEach((id) => {
+      if (id !== selectId) showLenDropdown(id, false);
+    });
+  }
+
+  const shouldOpen = !!open && !!dropdown.children.length;
+  wrap.classList.toggle("open", shouldOpen);
+  dropdown.classList.toggle("open", shouldOpen);
+  button.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+}
+
+function closeAllLenDropdowns() {
+  Object.keys(LEN_DROPDOWN_CONFIG).forEach((selectId) => {
+    showLenDropdown(selectId, false);
+  });
+}
+
+function setLenSelectValue(selectId, value, options = {}) {
+  const emitChange = !!options?.emitChange;
+  const select = document.getElementById(selectId);
+  if (!select) return false;
+  const nextValue = String(value ?? "");
+  if (![...select.options].some((opt) => opt.value === nextValue)) return false;
+  const changed = select.value !== nextValue;
+  select.value = nextValue;
+  syncLenDropdownButtonLabel(selectId);
+  renderLenDropdownOptions(selectId);
+  if (emitChange && changed) {
+    select.dispatchEvent(new Event("change"));
+  }
+  return true;
+}
+
+function chooseActiveLenDropdownOption(selectId) {
+  const select = document.getElementById(selectId);
+  if (!select || !select.options.length) return false;
+  const idx = getLenDropdownActiveIndex(selectId);
+  let nextIdx = idx;
+  if (nextIdx < 0 || nextIdx >= select.options.length) {
+    nextIdx = Math.max(0, select.selectedIndex);
+  }
+  const opt = select.options[nextIdx];
+  if (!opt) return false;
+  const changed = select.value !== opt.value;
+  select.value = opt.value;
+  syncLenDropdownButtonLabel(selectId);
+  renderLenDropdownOptions(selectId);
+  showLenDropdown(selectId, false);
+  if (changed) select.dispatchEvent(new Event("change"));
+  return true;
+}
+
+function moveLenDropdownActiveOption(selectId, dir) {
+  const parts = getLenDropdownElements(selectId);
+  const dropdown = parts?.dropdown;
+  if (!dropdown || !dropdown.children.length) return;
+  const idx = getLenDropdownActiveIndex(selectId);
+  const baseIdx = idx >= 0 ? idx : 0;
+  setLenDropdownActiveIndex(selectId, baseIdx + dir);
+}
+
+function cycleLenSelect(selectId, dir) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  const idx = select.selectedIndex + dir;
+  if (idx < 0 || idx >= select.options.length) return;
+  select.selectedIndex = idx;
+  syncLenDropdownButtonLabel(selectId);
+  renderLenDropdownOptions(selectId);
+  select.dispatchEvent(new Event("change"));
+}
+
+function wireLenDropdown(selectId) {
+  const parts = getLenDropdownElements(selectId);
+  const select = parts?.select;
+  const button = parts?.button;
+  const wrap = parts?.wrap;
+  if (!select || !button || !wrap) return;
+  if (button.dataset.wired === "1") return;
+  button.dataset.wired = "1";
+
+  button.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showProjectDropdown(false);
+    showDatasetDropdown(false);
+    const willOpen = !wrap.classList.contains("open");
+    if (willOpen) renderLenDropdownOptions(selectId);
+    showLenDropdown(selectId, willOpen);
+  });
+
+  button.addEventListener("keydown", (e) => {
+    const key = e.key;
+    if (key === "ArrowDown" || key === "ArrowUp") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!wrap.classList.contains("open")) {
+        renderLenDropdownOptions(selectId);
+        showLenDropdown(selectId, true);
+      }
+      moveLenDropdownActiveOption(selectId, key === "ArrowDown" ? 1 : -1);
+      return;
+    }
+    if (key === "Enter" || key === " ") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (wrap.classList.contains("open")) {
+        chooseActiveLenDropdownOption(selectId);
+      } else {
+        renderLenDropdownOptions(selectId);
+        showLenDropdown(selectId, true);
+      }
+      return;
+    }
+    if (key === "Escape" && wrap.classList.contains("open")) {
+      e.preventDefault();
+      e.stopPropagation();
+      showLenDropdown(selectId, false);
+    }
+  });
+
+  button.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const dir = e.deltaY > 0 ? 1 : -1;
+    cycleLenSelect(selectId, dir);
+  }, { passive: false });
+
+  wrap.addEventListener("focusout", (e) => {
+    const next = e.relatedTarget;
+    if (next && wrap.contains(next)) return;
+    showLenDropdown(selectId, false);
+  });
+
+  select.addEventListener("change", () => {
+    syncLenDropdownButtonLabel(selectId);
+    renderLenDropdownOptions(selectId);
+  });
+
+  syncLenDropdownButtonLabel(selectId);
+  renderLenDropdownOptions(selectId);
+  showLenDropdown(selectId, false);
+}
+
+function wireLenDropdowns() {
+  Object.keys(LEN_DROPDOWN_CONFIG).forEach((selectId) => {
+    wireLenDropdown(selectId);
+  });
 }
 
 function isLenLinked() {
@@ -538,12 +1384,12 @@ function syncLen(from) {
   syncingLen = true;
   try {
     if (from === "origin") {
-      d.value = o.value;
+      setLenSelectValue("devLenSelect", o.value);
     } else if (from === "dev") {
-      o.value = d.value;
+      setLenSelectValue("originLenSelect", d.value);
     } else {
       // init / unknown
-      d.value = o.value;
+      setLenSelectValue("devLenSelect", o.value);
     }
   } finally {
     syncingLen = false;
@@ -570,21 +1416,40 @@ function loadLastDsId() {
 // Persist ADASTri input controls so refresh doesn't reset them.
 function saveTriInputsToStorage() {
   try {
+    const projectInput = document.getElementById("projectSelect");
+    const pathInput = document.getElementById("pathInput");
+    const triInput = document.getElementById("triInput");
     const payload = {
-      project: document.getElementById("projectSelect")?.value || "",
-      path: document.getElementById("pathInput")?.value || "",
-      tri: document.getElementById("triInput")?.value || "",
+      project: getStoredInputValue(projectInput),
+      path: getStoredInputValue(pathInput),
+      tri: triInput?.value || "",
       originLen: document.getElementById("originLenSelect")?.value || "",
       devLen: document.getElementById("devLenSelect")?.value || "",
       linkLen: document.getElementById("linkLenChk")?.checked || false,
       cumulative: document.getElementById("cumulativeChk")?.checked || true,
     };
+    const resolvedInputs = normalizeBrowsingHistoryEntry({
+      project: getResolvedProjectValue(),
+      path: getResolvedReservingClassValue(),
+      tri: String(triInput?.value || "").trim(),
+    });
+    const resolvedProjectPathDefaults = normalizeProjectPathDefaults({
+      project: getResolvedProjectValue(),
+      path: getResolvedReservingClassValue(),
+    });
     localStorage.setItem(scopedKey(LS_FORM_KEY), JSON.stringify(payload));
+    if (resolvedProjectPathDefaults) {
+      scheduleAppDataProjectPathDefaultsSave(resolvedProjectPathDefaults);
+    }
+    if (!window.ADA_DFM_CONTEXT && resolvedInputs) {
+      setLastViewedDatasetInputs(resolvedInputs);
+    }
     try {
       window.parent.postMessage({
         type: "adas:dataset-settings-changed",
         stepId: instanceId,
         settings: payload,
+        resolved: resolvedInputs || null,
       }, "*");
     } catch {
       // ignore
@@ -595,19 +1460,24 @@ function saveTriInputsToStorage() {
 }
 
 function restoreTriInputsFromStorage() {
-  let raw = "";
-  try {
-    raw = localStorage.getItem(scopedKey(LS_FORM_KEY)) || "";
-  } catch {
-    raw = "";
-  }
-  if (!raw) return;
-
   let s = null;
   try {
-    s = JSON.parse(raw);
+    const raw = localStorage.getItem(scopedKey(LS_FORM_KEY)) || "";
+    if (raw) s = JSON.parse(raw);
   } catch {
-    return;
+    s = null;
+  }
+  if (!s || typeof s !== "object") {
+    const appDataDefaults = getCachedAppDataProjectPathDefaults();
+    if (appDataDefaults) {
+      s = {
+        project: appDataDefaults.project,
+        path: appDataDefaults.path,
+      };
+    }
+  }
+  if ((!s || typeof s !== "object") && !window.ADA_DFM_CONTEXT) {
+    s = getLastViewedDatasetInputs();
   }
   if (!s || typeof s !== "object") return;
 
@@ -618,11 +1488,23 @@ function restoreTriInputsFromStorage() {
   const devSel = document.getElementById("devLenSelect");
 
   // Only restore if the saved value is valid in the current UI.
-  if (projectInput && s.project) {
-    const match = findExactProjectMatch(s.project);
-    projectInput.value = match || s.project;
+  if (projectInput && typeof s.project === "string") {
+    if (isDefaultTokenValue(s.project)) {
+      setInputDefaultBound(projectInput, true);
+    } else if (s.project.trim()) {
+      setInputDefaultBound(projectInput, false);
+      const match = findExactProjectMatch(s.project);
+      projectInput.value = match || s.project;
+    }
   }
-  if (pathInput && typeof s.path === "string" && s.path.trim()) pathInput.value = s.path;
+  if (pathInput && typeof s.path === "string") {
+    if (isDefaultTokenValue(s.path)) {
+      setInputDefaultBound(pathInput, true);
+    } else if (s.path.trim()) {
+      setInputDefaultBound(pathInput, false);
+      pathInput.value = normalizeReservingClassPath(s.path);
+    }
+  }
   if (triInput && typeof s.tri === "string" && s.tri.trim()) triInput.value = s.tri;
 
   if (originSel && s.originLen && [...originSel.options].some(o => o.value === String(s.originLen))) {
@@ -631,6 +1513,7 @@ function restoreTriInputsFromStorage() {
   if (devSel && s.devLen && [...devSel.options].some(o => o.value === String(s.devLen))) {
     devSel.value = String(s.devLen);
   }
+  refreshLenDropdowns();
 
   const linkChk = document.getElementById("linkLenChk");
   if (linkChk && typeof s.linkLen === "boolean") linkChk.checked = s.linkLen;
@@ -638,6 +1521,164 @@ function restoreTriInputsFromStorage() {
   const cumChk = document.getElementById("cumulativeChk");
   if (cumChk && typeof s.cumulative === "boolean") cumChk.checked = s.cumulative;
 
+}
+
+function applyTriInputsFromQueryParams() {
+  const queryInputs = readDatasetInputsFromQueryParams();
+  if (!queryInputs) return false;
+
+  const projectInput = document.getElementById("projectSelect");
+  const pathInput = document.getElementById("pathInput");
+  const triInput = document.getElementById("triInput");
+  if (projectInput && queryInputs.project) {
+    setInputDefaultBound(projectInput, false);
+    projectInput.value = queryInputs.project;
+  }
+  if (pathInput && queryInputs.path) {
+    setInputDefaultBound(pathInput, false);
+    pathInput.value = queryInputs.path;
+  }
+  if (triInput && queryInputs.tri) {
+    triInput.value = queryInputs.tri;
+  }
+  if (!window.ADA_DFM_CONTEXT) {
+    setLastViewedDatasetInputs(queryInputs);
+  }
+  return true;
+}
+
+function hasScopedTriInputs() {
+  try {
+    return !!localStorage.getItem(scopedKey(LS_FORM_KEY));
+  } catch {
+    return false;
+  }
+}
+
+function loadWorkflowDefaults() {
+  if (!workflowId) return null;
+  try {
+    const raw = localStorage.getItem(`${WF_GLOBAL_CTRL_PREFIX}${workflowId}`) || "";
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    const vars = Array.isArray(parsed.vars) ? parsed.vars : null;
+    const project = vars
+      ? getWorkflowVarValue(vars, "project", "Project")
+      : (typeof parsed.project === "string" ? parsed.project : "");
+    const reservingClass = vars
+      ? getWorkflowVarValue(vars, "reservingClass", "Reserving Class")
+      : (typeof parsed.reservingClass === "string" ? parsed.reservingClass : "");
+    return { project, reservingClass, vars: vars || [] };
+  } catch {
+    return null;
+  }
+}
+
+function applyWorkflowDefaultsIfNew() {
+  if (!workflowId) return;
+  if (!window.ADA_DFM_CONTEXT) return;
+  if (hasScopedTriInputs()) return;
+
+  const defaults = loadWorkflowDefaults();
+  if (!defaults) return;
+
+  const projectInput = document.getElementById("projectSelect");
+  const pathInput = document.getElementById("pathInput");
+
+  if (projectInput && defaults.project) {
+    setInputDefaultBound(projectInput, true);
+  }
+  if (pathInput && defaults.reservingClass) {
+    setInputDefaultBound(pathInput, true);
+  }
+  if (defaults.project) {
+    void applyResolvedProjectDefaults(defaults.project);
+  }
+  saveTriInputsToStorage();
+}
+
+function getResolvedProjectValue() {
+  const input = document.getElementById("projectSelect");
+  const raw = (input?.value || "").trim();
+  if (isInputDefaultBound(input)) {
+    const defaults = loadWorkflowDefaults();
+    return (defaults?.project || "").trim();
+  }
+  return raw;
+}
+
+function getResolvedReservingClassValue() {
+  const input = document.getElementById("pathInput");
+  const raw = normalizeReservingClassPath(input?.value || "");
+  if (isInputDefaultBound(input)) {
+    const defaults = loadWorkflowDefaults();
+    return normalizeReservingClassPath(defaults?.reservingClass || "");
+  }
+  return raw;
+}
+
+function getStoredInputValue(input) {
+  if (!input) return "";
+  if (isInputDefaultBound(input)) return DEFAULT_TOKEN;
+  return input.value || "";
+}
+
+async function applyResolvedProjectDefaults(project) {
+  if (!project) return;
+  if (project === lastProjectSelection) return;
+  lastProjectSelection = project;
+  await ensureHeadersForProject(project);
+  await ensureDevHeadersForProject(project);
+  await refreshDatasetTypesForProject(project);
+  await refreshReservingClassPathsForProject(project);
+}
+
+function extractDefaultsFromControl(control) {
+  if (!control || typeof control !== "object") return null;
+  const vars = Array.isArray(control.vars) ? control.vars : null;
+  const project = vars
+    ? getWorkflowVarValue(vars, "project", "Project")
+    : (typeof control.project === "string" ? control.project : "");
+  const reservingClass = vars
+    ? getWorkflowVarValue(vars, "reservingClass", "Reserving Class")
+    : (typeof control.reservingClass === "string" ? control.reservingClass : "");
+  return { project, reservingClass };
+}
+
+function handleWorkflowGlobalChange(control = null) {
+  if (!workflowId || !window.ADA_DFM_CONTEXT) return;
+  const projectInput = document.getElementById("projectSelect");
+  const pathInput = document.getElementById("pathInput");
+  const projectDefault = isInputDefaultBound(projectInput);
+  const pathDefault = isInputDefaultBound(pathInput);
+  if (!projectDefault && !pathDefault) return;
+
+  const defaults = control ? extractDefaultsFromControl(control) : loadWorkflowDefaults();
+  if (!defaults) return;
+
+  if (projectDefault && projectInput) {
+    setInputDefaultBound(projectInput, true);
+  }
+  if (pathDefault && pathInput) {
+    setInputDefaultBound(pathInput, true);
+  }
+
+  if (projectDefault && defaults.project) {
+    void applyResolvedProjectDefaults(defaults.project);
+  }
+
+  if (projectDefault || pathDefault) {
+    const currentProjectValue = projectDefault ? DEFAULT_TOKEN : (projectInput?.value || "");
+    renderProjectOptions(allProjects, currentProjectValue);
+    saveTriInputsToStorage();
+    scheduleAutoRun(0);
+    try {
+      window.dispatchEvent(new CustomEvent("adas:workflow-defaults-updated", { detail: defaults }));
+    } catch {
+      // ignore
+    }
+  }
 }
 
 // NEW: allow shell to specify dataset id via ?ds=xxx
@@ -680,6 +1721,7 @@ function fillLenDropdowns() {
   // defaults
   o.value = "12";
   d.value = "12";
+  refreshLenDropdowns();
 }
 
 async function loadProjectsDropdown() {
@@ -687,32 +1729,42 @@ async function loadProjectsDropdown() {
   const list = document.getElementById("projectDropdown");
   if (!input || !list) return;
 
-  const resp = await fetch("/adas/projects");
-  if (!resp.ok) return;
-
-  const data = await resp.json();
-  allProjects = data.projects || [];
+  try {
+    allProjects = await loadProjectValidValueList();
+  } catch (err) {
+    console.error("Failed to load project names:", err);
+    setStatus("Failed to load project names.");
+    allProjects = [];
+  }
   renderProjectOptions(allProjects);
   showProjectDropdown(false);
 
   // default values you requested
   const pathInput = document.getElementById("pathInput");
   const triInput = document.getElementById("triInput");
-  if (pathInput && !pathInput.value) pathInput.value = "PRNJ - PA\\PA\\NJ\\Direct Group\\COL";
-  if (triInput && !triInput.value) triInput.value = "Net Loss--Incurred";
+  if (!window.ADA_DFM_CONTEXT && pathInput && !pathInput.value && !isInputDefaultBound(pathInput)) {
+    pathInput.value = "PRNJ - PA\\PA\\NJ\\Direct Group\\COL";
+  }
+  if (!window.ADA_DFM_CONTEXT && triInput && !triInput.value) triInput.value = "Net Loss--Incurred";
 
   // pick default project if exists
   const defaultProj = "NJ_Annual_Prod_2025 Dec";
-  if (allProjects.some(p => p === defaultProj)) input.value = defaultProj;
+  if (input && !isInputDefaultBound(input) && allProjects.some(p => p === defaultProj)) {
+    input.value = defaultProj;
+  }
 }
 
-let autoRunTimer = null;
-let lastAutoKey = "";
-let runInFlight = false;
+function showDatasetLoadingPopup(message = "") {
+  datasetRunController.showDatasetLoadingPopup(message);
+}
+
+function hideDatasetLoadingPopup() {
+  datasetRunController.hideDatasetLoadingPopup();
+}
 
 function getTriInputs() {
-  const project = document.getElementById("projectSelect")?.value || "";
-  const path = (document.getElementById("pathInput")?.value || "").trim();
+  const project = getResolvedProjectValue();
+  const path = getResolvedReservingClassValue();
   const tri = (document.getElementById("triInput")?.value || "").trim();
   const originLen = parseInt(document.getElementById("originLenSelect")?.value, 10);
   const devLen = parseInt(document.getElementById("devLenSelect")?.value, 10);
@@ -728,90 +1780,309 @@ function getTriInputs() {
   };
 }
 
+function resolveTriRequestInputs(rawInputs = {}) {
+  const project = String(rawInputs?.project || "").trim();
+  const path = normalizeReservingClassPath(rawInputs?.path || "");
+  const tri = String(rawInputs?.tri || "").trim();
+  const cumulative = !!rawInputs?.cumulative;
+  const originRaw = Number(rawInputs?.originLen);
+  const devRaw = Number(rawInputs?.devLen);
+  return {
+    project,
+    path,
+    tri,
+    cumulative,
+    originLen: Number.isFinite(originRaw) ? originRaw : 12,
+    devLen: Number.isFinite(devRaw) ? devRaw : 12,
+  };
+}
+
+function buildTriRequestPayload(rawInputs = {}) {
+  const resolved = resolveTriRequestInputs(rawInputs);
+  return {
+    Path: resolved.path,
+    TriangleName: resolved.tri,
+    ProjectName: resolved.project,
+    Cumulative: resolved.cumulative,
+    OriginLength: resolved.originLen,
+    DevelopmentLength: resolved.devLen,
+    timeout_sec: 6.0,
+  };
+}
+
+async function precheckAdasTriCsv(rawInputs = {}) {
+  const resolved = resolveTriRequestInputs(rawInputs);
+  if (!resolved.project || !resolved.path || !resolved.tri) {
+    return { ok: false, hasExistingCsv: false, skipped: true, data: null };
+  }
+  try {
+    const precheckResp = await fetch("/adas/tri/precheck", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildTriRequestPayload(resolved)),
+    });
+    if (!precheckResp.ok) {
+      return { ok: false, hasExistingCsv: false, skipped: false, data: null };
+    }
+    const data = await precheckResp.json().catch(() => ({}));
+    return {
+      ok: true,
+      hasExistingCsv: data?.need_request === false || data?.cache_exists === true,
+      skipped: false,
+      data,
+    };
+  } catch {
+    return { ok: false, hasExistingCsv: false, skipped: false, data: null };
+  }
+}
+
+datasetDependencyGuard = createDatasetDependencyGuard({
+  normalizeProjectText,
+  getResolvedProjectValue,
+  getTriInputs,
+  precheckAdasTriCsv,
+  setInputInvalid,
+  clearInputInvalid,
+  setStatus,
+});
+
+function getTriInputsForStorage() {
+  const projectInput = document.getElementById("projectSelect");
+  const pathInput = document.getElementById("pathInput");
+  const tri = (document.getElementById("triInput")?.value || "").trim();
+  const originLen = parseInt(document.getElementById("originLenSelect")?.value, 10);
+  const devLen = parseInt(document.getElementById("devLenSelect")?.value, 10);
+  const cumulative = !!document.getElementById("cumulativeChk")?.checked;
+
+  return {
+    project: getStoredInputValue(projectInput),
+    path: getStoredInputValue(pathInput),
+    tri,
+    cumulative,
+    originLen: Number.isFinite(originLen) ? originLen : 12,
+    devLen: Number.isFinite(devLen) ? devLen : 12,
+  };
+}
+
+function getDisplayProjectValue() {
+  return (document.getElementById("projectSelect")?.value || "").trim();
+}
+
+function getDisplayReservingClassValue() {
+  return (document.getElementById("pathInput")?.value || "").trim();
+}
+
+function getDisplayTriValue() {
+  return (document.getElementById("triInput")?.value || "").trim();
+}
+
+function getRawProjectValueForNotes() {
+  const input = document.getElementById("projectSelect");
+  if (isInputDefaultBound(input)) {
+    const defaults = loadWorkflowDefaults();
+    return typeof defaults?.project === "string" ? defaults.project : "";
+  }
+  return String(input?.value ?? "");
+}
+
+function getRawReservingClassValueForNotes() {
+  const input = document.getElementById("pathInput");
+  if (isInputDefaultBound(input)) {
+    const defaults = loadWorkflowDefaults();
+    return typeof defaults?.reservingClass === "string" ? defaults.reservingClass : "";
+  }
+  return String(input?.value ?? "");
+}
+
+function getRawDatasetNameValueForNotes() {
+  const input = document.getElementById("triInput");
+  return String(input?.value ?? "");
+}
+
+function buildNotesContextPayload() {
+  return {
+    project_name: getRawProjectValueForNotes(),
+    reserving_class: getRawReservingClassValueForNotes(),
+    dataset_name: getRawDatasetNameValueForNotes(),
+  };
+}
+
+function hasNotesContext(payload) {
+  if (!payload || typeof payload !== "object") return false;
+  const projectName = String(payload.project_name ?? "");
+  const reservingClass = String(payload.reserving_class ?? "");
+  const datasetName = String(payload.dataset_name ?? "");
+  return !!projectName.trim() && !!reservingClass.trim() && !!datasetName.trim();
+}
+
+function buildNotesContextKey(payload) {
+  if (!hasNotesContext(payload)) return "";
+  return `${payload.project_name}\u001f${payload.reserving_class}\u001f${payload.dataset_name}`;
+}
+
+function getNotesErrorMessage(resp, fallback) {
+  const detail = resp?.data?.detail;
+  if (typeof detail === "string" && detail.trim()) return detail.trim();
+  const error = resp?.data?.error;
+  if (typeof error === "string" && error.trim()) return error.trim();
+  if (typeof fallback === "string" && fallback.trim()) return fallback.trim();
+  return "Unknown error.";
+}
+
+function getNotesEditorElements() {
+  return {
+    input: document.getElementById("dsNotesInput"),
+    saveBtn: document.getElementById("dsNotesSaveBtn"),
+    saveState: document.getElementById("dsNotesSaveState"),
+  };
+}
+
+function updateNotesSaveUi() {
+  const { saveBtn, saveState } = getNotesEditorElements();
+  const hasContext = !!notesContextKey && hasNotesContext(notesContextPayload);
+
+  if (saveBtn) {
+    saveBtn.disabled = !hasContext;
+    saveBtn.classList.toggle("is-dirty", hasContext && notesDirty);
+  }
+
+  if (!saveState) return;
+  saveState.classList.remove("is-dirty", "is-clean", "is-hidden");
+  if (!hasContext) {
+    saveState.textContent = "No dataset context";
+    return;
+  }
+  if (notesDirty) {
+    saveState.textContent = "Unsaved changes";
+    saveState.classList.add("is-dirty");
+    return;
+  }
+  saveState.textContent = "";
+  saveState.classList.add("is-hidden");
+}
+
+function applyNotesInputValue(text) {
+  const { input } = getNotesEditorElements();
+  if (!input) return;
+  const nextText = String(text ?? "");
+  notesProgrammaticInput = true;
+  lastSavedNotesText = nextText;
+  notesDirty = false;
+  input.value = nextText;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  notesProgrammaticInput = false;
+  updateNotesSaveUi();
+}
+
+async function saveNotesForPayload(payload, options = {}) {
+  const silentStatus = !!options?.silentStatus;
+  if (!hasNotesContext(payload)) {
+    updateNotesSaveUi();
+    return { ok: false, error: "Project, Reserving Class, and Dataset Type are required." };
+  }
+
+  const { input } = getNotesEditorElements();
+  const notesText = String(input?.value ?? "");
+  const req = {
+    project_name: payload.project_name,
+    reserving_class: payload.reserving_class,
+    dataset_name: payload.dataset_name,
+    notes: notesText,
+  };
+  const resp = await saveDatasetNotes(req);
+  if (!resp.ok) {
+    return { ok: false, error: getNotesErrorMessage(resp, "Failed to save notes.") };
+  }
+
+  notesContextPayload = {
+    project_name: req.project_name,
+    reserving_class: req.reserving_class,
+    dataset_name: req.dataset_name,
+  };
+  notesContextKey = buildNotesContextKey(notesContextPayload);
+  lastSavedNotesText = notesText;
+  notesDirty = false;
+  updateNotesSaveUi();
+  if (!silentStatus) setStatus("Notes saved.");
+  return { ok: true, data: resp.data };
+}
+
+async function saveNotesForCurrentContext(options = {}) {
+  return saveNotesForPayload(notesContextPayload, options);
+}
+
+async function syncNotesForCurrentDataset() {
+  const nextPayload = buildNotesContextPayload();
+  const nextKey = buildNotesContextKey(nextPayload);
+  if (nextKey === notesContextKey) {
+    notesContextPayload = hasNotesContext(nextPayload) ? nextPayload : null;
+    updateNotesSaveUi();
+    return true;
+  }
+
+  if (notesContextKey && notesDirty) {
+    const shouldSave = window.confirm(
+      "You have unsaved Notes. Click OK to save before switching notes, or Cancel to discard unsaved changes.",
+    );
+    if (shouldSave) {
+      const saveResult = await saveNotesForCurrentContext({ silentStatus: true });
+      if (!saveResult.ok) {
+        setStatus(`Notes save failed: ${saveResult.error || "Unknown error."}`);
+        updateNotesSaveUi();
+        return false;
+      }
+    } else {
+      notesDirty = false;
+    }
+  }
+
+  notesContextPayload = hasNotesContext(nextPayload) ? nextPayload : null;
+  notesContextKey = nextKey;
+  updateNotesSaveUi();
+  if (!nextKey) {
+    applyNotesInputValue("");
+    return true;
+  }
+
+  const nonce = ++notesSyncNonce;
+  const resp = await loadDatasetNotes(nextPayload);
+  if (nonce !== notesSyncNonce) return true;
+  if (!resp.ok) {
+    const err = getNotesErrorMessage(resp, "Failed to load notes.");
+    setStatus(`Notes load failed: ${err}`);
+    applyNotesInputValue("");
+    return false;
+  }
+
+  const text = resp?.data?.exists ? String(resp?.data?.notes ?? "") : "";
+  applyNotesInputValue(text);
+  return true;
+}
+
+publishDatasetHostDfmHelpers({
+  getResolvedProjectValue,
+  getResolvedReservingClassValue,
+  getDisplayProjectValue,
+  getDisplayReservingClassValue,
+  getDisplayTriValue,
+  isInputDefaultBound,
+});
+
 
 function scheduleAutoRun(delayMs = 150) {
-  if (autoRunTimer) clearTimeout(autoRunTimer);
-  autoRunTimer = setTimeout(() => autoRun(), delayMs);
+  return datasetRunController.scheduleAutoRun(delayMs);
 }
 
 function bindAutoRunOnEnter(el) {
-  if (!el) return;
-
-  el.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter") return;
-
-    e.preventDefault();
-    el.blur();
-    scheduleAutoRun(0);
-  });
+  return datasetRunController.bindAutoRunOnEnter(el);
 }
 
-async function autoRun() {
-  const { project, path, tri, cumulative, originLen, devLen } = getTriInputs();
-
-  if (!project || !path || !tri) return;
-
-  const key = `${project}||${path}||${tri}||${cumulative}||${originLen}||${devLen}`;
-
-  if (key === lastAutoKey) return;
-
-  if (runInFlight) return;
-
-  lastAutoKey = key;
-  await runAdasTri();
+function runAdasTri(opts = {}) {
+  return datasetRunController.runAdasTri(opts);
 }
 
-async function runAdasTri() {
-  if (runInFlight) return;
-  runInFlight = true;
-
-  const btn = document.getElementById("runAdasTriBtn");
-  const status = document.getElementById("adasTriStatus");
-  const { project, path, tri, cumulative, originLen, devLen } = getTriInputs();
-
-  if (status) status.textContent = "Sending request...";
-  if (btn) btn.disabled = true;
-
-  try {
-    const resp = await fetch("/adas/tri", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        Path: path,
-        TriangleName: tri,
-        ProjectName: project,
-        Cumulative: cumulative,
-        OriginLength: originLen,
-        DevelopmentLength: devLen,
-        timeout_sec: 6.0,
-      }),
-    });
-
-    const data = await resp.json();
-
-    if (!resp.ok) {
-      logLine(`ADASTri failed: ${resp.status}`);
-      if (status) status.textContent = `Error: ${resp.status}`;
-      return;
-    }
-
-    if (!data.ok) {
-      logLine(`ADASTri timeout. data_path=${data.data_path}`);
-      if (status) status.textContent = "Timeout waiting for csv (try again).";
-      return;
-    }
-
-    logLine(`ADASTri OK. ds_id=${data.ds_id}`);
-    if (status) status.textContent = `OK: ${data.ds_id}`;
-
-    // switch dataset and load (and persist)
-    config.DS_ID = data.ds_id;
-    saveLastDsId(config.DS_ID);
-    await loadDataset();
-  } finally {
-    runInFlight = false;
-    if (btn) btn.disabled = false;
-  }
+function isRunInFlight() {
+  return datasetRunController.isRunInFlight();
 }
 
 function updateCurrentTabTitle() {
@@ -838,86 +2109,132 @@ function setStatus(text) {
   }
 }
 
-async function loadDataset() {
-  state.dirty.clear();
+datasetHeadersService = createDatasetHeadersService({
+  state,
+  setStatus,
+});
 
-  const { ok, status, data } = await getDataset(config.DS_ID, config.START_YEAR);
+datasetRunController = createDatasetRunController({
+  config,
+  state,
+  $,
+  logLine,
+  getDataset,
+  patchDataset,
+  renderTable,
+  renderChart,
+  notifyDatasetUpdated,
+  isForceRebuildEnabled,
+  validateTriInputsBeforeRun,
+  getTriInputs,
+  buildTriRequestPayload,
+  precheckAdasTriCsv,
+  clearHeadersCacheForProject: (project, options = {}) =>
+    datasetHeadersService.clearHeadersCacheForProject(project, options),
+  ensureHeadersForProject: (project, options = {}) =>
+    datasetHeadersService.ensureHeadersForProject(project, options),
+  ensureDevHeadersForProject: (project, options = {}) =>
+    datasetHeadersService.ensureDevHeadersForProject(project, options),
+  saveLastDsId,
+  recordDatasetBrowsingHistory,
+  syncNotesForCurrentDataset,
+  updateCurrentTabTitle,
+  setStatus,
+  applyGridSelectionFromState,
+  stepId,
+});
 
-  if (!ok) {
-    logLine(`ERROR loading dataset: ${status}`);
-    $("tableWrap").innerHTML = `<div style="color:#b00;"><b>Load failed:</b> ${status}</div>`;
-    setStatus("Ready");
-    return;
-  }
-
-  // persist the last successfully loaded dataset
-  saveLastDsId(config.DS_ID);
-
-  state.model = data;
-  state.fileMtime = data.mtime;
-
-  // Apply cached header labels, if available
-  if (Array.isArray(state.headerLabels) && state.headerLabels.length) {
-    state.model.origin_labels = state.headerLabels.map(String);
-  }
-  if (Array.isArray(state.devHeaderLabels) && state.devHeaderLabels.length) {
-    // Do not truncate dev labels by the UI selector.
-    // The triangle CSV may contain more columns than the current selector value.
-    state.model.dev_labels = state.devHeaderLabels.map(String);
-  }
-
-  renderTable();
-  notifyDatasetUpdated();
-  applySelectionFromState();
-
-  $("dsMeta").textContent =
-    `id=${data.id} | origins=${data.origin_labels.length} | dev=${data.dev_labels.length} | mtime=${data.mtime}`;
-
-  logLine("Loaded dataset");
-  setStatus("Ready");
-  const title = updateCurrentTabTitle() || config.DS_ID || "Dataset";
-
-  if (stepId) {
-    window.parent.postMessage(
-      {
-        type: "adas:update-workflow-step-title",
-        stepId: stepId,
-        title: title,
-      },
-      "*"
-    );
-  }
+async function openReservingClassTreeForDataset(targetInput) {
+  const projectName = getResolvedProjectValue();
+  const initialPath = targetInput
+    ? (isInputDefaultBound(targetInput) ? getResolvedReservingClassValue() : (targetInput.value || ""))
+    : "";
+  await openLazyReservingClassPicker({
+    projectName,
+    initialPath,
+    anchorElement: targetInput || null,
+    setStatus,
+    title: "Reserving Class",
+    onProjectMissing: (name) => {
+      alert(`Project "${name}" does not exist.`);
+      setStatus(`Project "${name}" does not exist.`);
+    },
+    onError: (err) => {
+      console.error("Failed to load reserving class tree:", err);
+      setStatus("Error loading reserving class paths.");
+    },
+    onSelect: (path) => {
+      if (!targetInput) return;
+      setInputDefaultBound(targetInput, false);
+      const normalized = ensureReservingClassOption(path);
+      targetInput.value = normalized || normalizeReservingClassPath(path);
+      if (targetInput.value) {
+        lastReservingClassSelection = targetInput.value;
+        clearInputInvalid(targetInput);
+      }
+      saveTriInputsToStorage();
+      setStatus("Loading dataset...");
+      scheduleAutoRun(0);
+    },
+  });
 }
 
-async function savePatch() {
-  if (state.dirty.size === 0) {
-    logLine("No changes to save.");
-    return;
-  }
+async function openProjectNameTreeForDataset(targetInput) {
+  const initialProject = getResolvedProjectValue() || targetInput?.value || "";
+  await openProjectNameTreePicker({
+    initialProject,
+    anchorElement: targetInput || null,
+    title: "Select a Project",
+    setStatus,
+    onError: (err) => {
+      console.error("Failed to load project tree:", err);
+      setStatus("Error loading project tree.");
+    },
+    onSelect: async (projectName) => {
+      const selected = String(projectName || "").trim();
+      if (!selected || !targetInput) return;
+      setInputDefaultBound(targetInput, false);
+      targetInput.value = selected;
+      showProjectDropdown(false);
+      setStatus("Loading dataset...");
+      await handleProjectSelection(selected, { strict: true, showMessage: true });
+    },
+  });
+}
 
-  const items = [];
-  for (const [key, value] of state.dirty.entries()) {
-    const [r, c] = key.split(",").map((x) => parseInt(x, 10));
-    items.push({ r, c, value });
-  }
+async function openDatasetNameTreeForDataset(targetInput) {
+  const projectName = getResolvedProjectValue();
+  await openDatasetNamePicker({
+    projectName,
+    initialName: targetInput?.value || "",
+    anchorElement: targetInput || null,
+    title: "Select a Dataset Type",
+    setStatus,
+    onError: (err) => {
+      console.error("Failed to load dataset type tree:", err);
+      setStatus("Error loading dataset types.");
+    },
+    onSelect: (datasetName) => {
+      const selected = String(datasetName || "").trim();
+      if (!selected || !targetInput) return;
+      targetInput.value = selected;
+      showDatasetDropdown(false);
+      const knownName = ensureDatasetTypeOption(selected) || selected;
+      void handleDatasetSelection(knownName, { strict: true });
+    },
+  });
+}
 
-  const { status, data } = await patchDataset(items, state.fileMtime, config.DS_ID);
+function loadDataset() {
+  return datasetRunController.loadDataset();
+}
 
-  if (status === 409) {
-    logLine("Conflict: file changed on disk. Reload first.");
-    return;
-  }
-
-  logLine(`Saved patch: applied=${data.applied}, rejected=${(data.rejected || []).length}, new_mtime=${data.mtime}`);
-  await loadDataset();
+function savePatch() {
+  return datasetRunController.savePatch();
 }
 
 function toggleBlanks() {
-  state.showBlanks = !state.showBlanks;
-  $("toggleBlankBtn").textContent = state.showBlanks ? "Hide blanks" : "Show blanks";
-  renderTable(); // re-render only, no reload
-  notifyDatasetUpdated();
-  applySelectionFromState();
+  return datasetRunController.toggleBlanks();
 }
 
 function enforceDevLenRule() {
@@ -935,8 +2252,9 @@ function enforceDevLenRule() {
     origin % dev === 0;
 
   if (!ok) {
-    d.value = String(origin);
+    setLenSelectValue("devLenSelect", String(origin));
   }
+  refreshLenDropdowns();
 }
 
 // -----------------------------
@@ -944,756 +2262,261 @@ function enforceDevLenRule() {
 // key = ProjectName + OriginLength
 // -----------------------------
 
-const LS_HEADER_PREFIX = scopedKey("adas_headers::");
-let lastHeaderKey = "";
-
-function headerKey(project, originLen) {
-  return `${LS_HEADER_PREFIX}${String(project || "")}::${String(originLen || 12)}`;
-}
-
-function loadHeadersCache(project, originLen) {
-  try {
-    const raw = localStorage.getItem(headerKey(project, originLen)) || "";
-    if (!raw) return null;
-    const obj = JSON.parse(raw);
-    if (!obj || !Array.isArray(obj.labels)) return null;
-    return obj.labels;
-  } catch {
-    return null;
-  }
-}
-
-function saveHeadersCache(project, originLen, labels) {
-  try {
-    localStorage.setItem(headerKey(project, originLen), JSON.stringify({ labels }));
-  } catch {
-    // ignore
-  }
-}
-
-const LS_DEV_HEADER_PREFIX = scopedKey("adas_dev_headers::");
-let lastDevHeaderKey = "";
-
-function devHeaderKey(project, originLen, devLen) {
-  return `${LS_DEV_HEADER_PREFIX}${String(project || "")}::o${String(originLen || 12)}::d${String(devLen || 12)}`;
-}
-
-function loadDevHeadersCache(project, originLen, devLen) {
-  try {
-    const raw = localStorage.getItem(devHeaderKey(project, originLen, devLen)) || "";
-    if (!raw) return null;
-    const obj = JSON.parse(raw);
-    if (!obj || !Array.isArray(obj.labels)) return null;
-    return obj.labels;
-  } catch {
-    return null;
-  }
-}
-
-function saveDevHeadersCache(project, originLen, devLen, labels) {
-  try {
-    localStorage.setItem(devHeaderKey(project, originLen, devLen), JSON.stringify({ labels }));
-  } catch {
-    // ignore
-  }
-}
-
 function getCurrentOriginLength() {
-  const el = document.getElementById("originLenSelect");
-  const v = parseInt(el?.value, 10);
-  return Number.isFinite(v) ? v : 12;
+  return datasetHeadersService.getCurrentOriginLength();
 }
 
 function getCurrentDevLength() {
-  const el = document.getElementById("devLenSelect");
-  const v = parseInt(el?.value, 10);
-  return Number.isFinite(v) ? v : 12;
+  return datasetHeadersService.getCurrentDevLength();
 }
 
-async function fetchHeadersViaGetDataset(
-  project,
-  originLen,
-  timeoutSec = 6.0,
-  periodType = 0,
-  transposed = false
-) {
-  const resp = await fetch("/adas/headers", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      periodType: periodType,
-      Transposed: transposed,
-      PeriodLength: originLen,
-      ProjectName: project,
-      StoredPeriodLength: -1,
-      timeout_sec: timeoutSec,
-    }),
-  });
-
-  if (!resp.ok) return null;
-  const data = await resp.json();
-
-  if (data.ok && Array.isArray(data.labels)) return data.labels;
-  if (data.status === "timeout") return "timeout";
-  return null;
+function ensureHeadersForProject(project, options = {}) {
+  return datasetHeadersService.ensureHeadersForProject(project, options);
 }
 
-async function ensureHeadersForProject(project) {
-  if (!project) return;
-
-  const originLen = getCurrentOriginLength();
-  const key = `${project}::${originLen}`;
-
-  // Only refresh when (ProjectName + OriginLength) changes
-  if (key === lastHeaderKey && Array.isArray(state.headerLabels) && state.headerLabels.length) return;
-
-  // Try cache first
-  const cached = loadHeadersCache(project, originLen);
-  if (cached) {
-    state.headerLabels = cached;
-    lastHeaderKey = key;
-    return;
-  }
-
-  // Send request + wait (like VBA GetDataset)
-  for (let i = 0; i < 3; i++) {
-    const labels = await fetchHeadersViaGetDataset(project, originLen, 6.0, 0, false);
-
-    if (labels === "timeout") {
-      await new Promise(r => setTimeout(r, 250));
-      continue;
-    }
-    if (Array.isArray(labels)) {
-      state.headerLabels = labels;
-      saveHeadersCache(project, originLen, labels);
-      lastHeaderKey = key;
-      return;
-    }
-    break;
-  }
+function ensureDevHeadersForProject(project, options = {}) {
+  return datasetHeadersService.ensureDevHeadersForProject(project, options);
 }
 
-async function ensureDevHeadersForProject(project) {
-  if (!project) return;
-
-  const originLen = getCurrentOriginLength();
-  const devLen = getCurrentDevLength();
-  const key = `${project}::o${originLen}::d${devLen}`;
-
-  // Only refresh when (ProjectName + OriginLength) changes
-  if (key === lastDevHeaderKey && Array.isArray(state.devHeaderLabels) && state.devHeaderLabels.length) return;
-
-  // Try cache first
-  const cached = loadDevHeadersCache(project, originLen, devLen);
-  if (cached) {
-    state.devHeaderLabels = cached;
-    lastDevHeaderKey = key;
-    return;
+async function handleProjectSelection(value, options = {}) {
+  const strict = !!options?.strict;
+  const showMessage = !!options?.showMessage;
+  const projectInput = document.getElementById("projectSelect");
+  if (isDefaultTokenValue(value)) {
+    if (projectInput) setInputDefaultBound(projectInput, true);
+    clearInputInvalid(projectInput);
+    const defaults = loadWorkflowDefaults();
+    if (defaults?.project) {
+      await applyResolvedProjectDefaults(defaults.project);
+    }
+    saveTriInputsToStorage();
+    scheduleAutoRun(0);
+    return true;
   }
 
-  // periodType=1, Transposed=true (csv is still one line)
-  for (let i = 0; i < 3; i++) {
-    // periodType=1, Transposed=true (csv is still one line)
-    // For dev headers, PeriodLength follows the UI "Development Length" selector.
-    const labels = await fetchHeadersViaGetDataset(project, devLen, 6.0, 1, true);
+  if (projectInput) setInputDefaultBound(projectInput, false);
 
-    if (labels === "timeout") {
-      await new Promise(r => setTimeout(r, 250));
-      continue;
-    }
-    if (Array.isArray(labels)) {
-      state.devHeaderLabels = labels;
-      saveDevHeadersCache(project, originLen, devLen, labels);
-      lastDevHeaderKey = key;
-      return;
-    }
-    break;
-  }
-}
-
-async function handleProjectSelection(value) {
   const project = findExactProjectMatch(value);
-  if (!project) return;
-  if (project === lastProjectSelection) return;
+  if (!project) {
+    if (strict && projectInput) {
+      if (lastProjectSelection) projectInput.value = lastProjectSelection;
+      else projectInput.value = "";
+      clearInputInvalid(projectInput);
+      if (showMessage) {
+        reportInputInvalid(
+          projectInput,
+          "Project Name is not in the valid list.",
+          "Invalid Project Name. Please select a valid project.",
+        );
+      }
+    }
+    return false;
+  }
+  clearInputInvalid(projectInput);
+  if (project === lastProjectSelection) return true;
 
   lastProjectSelection = project;
 
-  const projectInput = document.getElementById("projectSelect");
   if (projectInput) projectInput.value = project;
   showProjectDropdown(false);
 
   saveTriInputsToStorage();
-
-  await ensureHeadersForProject(project);
-  await ensureDevHeadersForProject(project);
-  await refreshDatasetTypesForProject(project);
-
-  scheduleAutoRun();
-}
-
-function wireArrowKeyNavigation() {
-  if (window.__adasArrowNavWired) return;
-  window.__adasArrowNavWired = true;
-
-  document.addEventListener("keydown", (e) => {
-    const isArrow = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key);
-    if (!isArrow) return;
-
-    // Don't steal keys while typing / selecting in controls
-    if (isTypingTarget(e.target)) return;
-
-    const model = state.model;
-    if (!model) return;
-
-    // If no active cell yet, pick (0,0)
-    if (!state.activeCell) state.activeCell = { r: 0, c: 0 };
-
-    const maxR = (model.origin_labels?.length || 0) - 1;
-    const maxC = (model.dev_labels?.length || 0) - 1;
-    if (maxR < 0 || maxC < 0) return;
-
-    let { r, c } = state.activeCell;
-
-    if (e.key === "ArrowUp") r -= 1;
-    else if (e.key === "ArrowDown") r += 1;
-    else if (e.key === "ArrowLeft") c -= 1;
-    else if (e.key === "ArrowRight") c += 1;
-
-    r = Math.max(0, Math.min(maxR, r));
-    c = Math.max(0, Math.min(maxC, c));
-
-    const same = r === state.activeCell.r && c === state.activeCell.c;
-    if (same) return;
-
-    e.preventDefault();
-
-    // 1) move active cell
-    state.activeCell = { r, c };
-    renderActiveCellUI();
-
-    // 2) clear previous rectangle selections (unless user is extending with Shift)
-    //    - plain arrows: collapse selection to 1x1 at new active cell
-    //    - Shift+arrows (future): you could extend selection; for now we keep simple
-    if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
-      state.selRanges = [normalizeRange(r, c, r, c)];
-      applySelectionFromState();
-    }
-
-    // 3) keep visible
-    const td = document.querySelector(`#tableWrap td[data-r="${r}"][data-c="${c}"]`);
-    if (td && td.scrollIntoView) td.scrollIntoView({ block: "nearest", inline: "nearest" });
-  });
-}
-
-function normalizeRange(r0, c0, r1, c1) {
-  const rr0 = Math.min(r0, r1);
-  const rr1 = Math.max(r0, r1);
-  const cc0 = Math.min(c0, c1);
-  const cc1 = Math.max(c0, c1);
-  return { r0: rr0, c0: cc0, r1: rr1, c1: cc1 };
-}
-
-function rcFromTd(td) {
-  const r = parseInt(td?.dataset?.r, 10);
-  const c = parseInt(td?.dataset?.c, 10);
-  if (!Number.isFinite(r) || !Number.isFinite(c)) return null;
-  return { r, c };
-}
-
-function isTypingTarget(t) {
-  if (!t) return false;
-
-  const el = t.closest
-    ? t.closest("input, textarea, select, option, button, [contenteditable='true'], #formulaBar")
-    : null;
-
-  if (el) return true;
-
-  const tag = (t.tagName ? t.tagName.toLowerCase() : "");
-  return tag === "input" || tag === "textarea" || tag === "select" || tag === "option" || tag === "button" ||
-         !!t.isContentEditable || (t.id === "formulaBar");
-}
-
-function clearSelectionClasses() {
-  document.querySelectorAll("#tableWrap td.sel").forEach(el => el.classList.remove("sel"));
-}
-
-function applyRangeClasses(range, add = true) {
-  if (!range) return;
-  const { r0, c0, r1, c1 } = range;
-  for (let r = r0; r <= r1; r++) {
-    for (let c = c0; c <= c1; c++) {
-      const td = document.querySelector(`#tableWrap td[data-r="${r}"][data-c="${c}"]`);
-      if (!td) continue;
-      if (add) td.classList.add("sel");
-      else td.classList.remove("sel");
-    }
+  const showProjectSwitchPopup = !isRunInFlight();
+  if (showProjectSwitchPopup) {
+    showDatasetLoadingPopup("Validating Reserving Class");
   }
-}
-
-function applySelectionFromState() {
-  // re-apply after re-render
-  clearSelectionClasses();
-  const ranges = state.selRanges || [];
-  for (const rg of ranges) applyRangeClasses(rg, true);
-
-  // mark active cell stronger
-  if (state.activeCell) {
-    const { r, c } = state.activeCell;
-    const td = document.querySelector(`#tableWrap td[data-r="${r}"][data-c="${c}"]`);
-    if (td && td.classList.contains("sel")) td.classList.add("active");
-  }
-}
-
-function setActiveCell(r, c) {
-  // If focus is still on a form control (select/input), arrow keys will be ignored.
-  // Blur it when user starts interacting with the grid.
-  const ae = document.activeElement;
-  if (ae && isTypingTarget(ae) && ae.id !== "formulaBar") {
-    try { ae.blur(); } catch {}
-  }
-
-  state.activeCell = { r, c };
-  renderActiveCellUI();
-
-  const td = document.querySelector(`#tableWrap td[data-r="${r}"][data-c="${c}"]`);
-  if (td && td.scrollIntoView) td.scrollIntoView({ block: "nearest", inline: "nearest" });
-}
-
-function buildTsvFromRange(range) {
-  const model = state.model;
-  if (!model) return "";
-
-  const { r0, c0, r1, c1 } = range;
-  const vals = model.values || [];
-  const mask = model.mask || [];
-
-  const lines = [];
-  for (let r = r0; r <= r1; r++) {
-    const row = [];
-    for (let c = c0; c <= c1; c++) {
-      const has = !!(mask[r] && mask[r][c]);
-      if (!has) {
-        row.push(""); // blank cell
-      } else {
-        const v = vals[r]?.[c];
-        row.push(v === null || v === undefined ? "" : String(v));
-      }
-    }
-    lines.push(row.join("\t"));
-  }
-  return lines.join("\n");
-}
-
-async function copyActiveRangeToClipboard() {
-  const ranges = state.selRanges || [];
-  if (!ranges.length) return;
-
-  // Copy the most recent rectangle (Excel-like for our UI)
-  const range = ranges[ranges.length - 1];
-  const tsv = buildTsvFromRange(range);
-  if (!tsv) return;
-
   try {
-    await navigator.clipboard.writeText(tsv);
-    logLine(`Copied range (${range.r0},${range.c0})-(${range.r1},${range.c1})`);
-  } catch {
-    // fallback for older browsers
-    const ta = document.createElement("textarea");
-    ta.value = tsv;
-    ta.style.position = "fixed";
-    ta.style.left = "-9999px";
-    document.body.appendChild(ta);
-    ta.focus();
-    ta.select();
-    try { document.execCommand("copy"); } catch {}
-    document.body.removeChild(ta);
-    logLine(`Copied range (fallback)`);
+    await ensureHeadersForProject(project);
+    await ensureDevHeadersForProject(project);
+    await refreshDatasetTypesForProject(project);
+    await refreshReservingClassPathsForProject(project);
+
+    const pathInput = document.getElementById("pathInput");
+    if (pathInput) {
+      const pathIsDefault = isInputDefaultBound(pathInput);
+      const currentPath = pathIsDefault
+        ? getResolvedReservingClassValue()
+        : pathInput.value;
+      const normalizedPath = normalizeReservingClassPath(currentPath);
+      let validatedPath = "";
+      if (normalizedPath) {
+        const validated = await validateReservingClassPathByTypeNames(project, normalizedPath);
+        if (validated?.ok && validated?.path) {
+          validatedPath = ensureReservingClassOption(validated.path) || normalizeReservingClassPath(validated.path);
+        }
+      }
+
+      if (validatedPath) {
+        lastReservingClassSelection = validatedPath;
+        if (!pathIsDefault) {
+          pathInput.value = validatedPath;
+        }
+      } else {
+        if (pathIsDefault) {
+          setInputDefaultBound(pathInput, false);
+        }
+        pathInput.value = "";
+        lastReservingClassSelection = "";
+      }
+      clearInputInvalid(pathInput);
+    }
+
+    const triInput = document.getElementById("triInput");
+    if (triInput) {
+      const matchedTri = findExactDatasetMatch(triInput.value);
+      if (matchedTri) {
+        triInput.value = matchedTri;
+        lastDatasetSelection = matchedTri;
+      } else {
+        triInput.value = "";
+        lastDatasetSelection = "";
+      }
+      clearInputInvalid(triInput);
+    }
+
+    scheduleAutoRun();
+    return true;
+  } finally {
+    if (showProjectSwitchPopup && !isRunInFlight()) {
+      hideDatasetLoadingPopup();
+    }
   }
 }
 
-function wireRectSelectionAndCopy() {
-  if (window.__adasRectSelWired) return;
-  window.__adasRectSelWired = true;
-
-  // state containers
-  if (!state.selRanges) state.selRanges = [];
-  state.dragSel = null; // { anchor:{r,c}, cur:{r,c}, append:boolean }
-
-  const wrap = document.getElementById("tableWrap");
-
-  // start drag
-  wrap.addEventListener("mousedown", (e) => {
-    if (e.button !== 0) return;
-    if (isTypingTarget(e.target)) return;
-
-    // NEW: leave dropdown/input focus when interacting with grid
-    const ae = document.activeElement;
-    if (ae && isTypingTarget(ae) && ae.id !== "formulaBar") {
-      try { ae.blur(); } catch {}
-    }
-
-    const td = e.target.closest('td[data-r][data-c]');
-    if (!td) return;
-
-    e.preventDefault(); // stop text selection
-
-    const rc = rcFromTd(td);
-    if (!rc) return;
-
-    const append = !!e.ctrlKey;
-
-    // if not appending, replace selection
-    if (!append) state.selRanges = [];
-
-    state.dragSel = {
-      anchor: { r: rc.r, c: rc.c },
-      cur: { r: rc.r, c: rc.c },
-      append,
-      lastApplied: null,
-    };
-
-    const rg = normalizeRange(rc.r, rc.c, rc.r, rc.c);
-    state.selRanges.push(rg);
-
-    setActiveCell(rc.r, rc.c);
-    applySelectionFromState();
-  });
-
-  // drag over (use mouseover to avoid heavy mousemove)
-  wrap.addEventListener("mouseover", (e) => {
-    if (!state.dragSel) return;
-
-    const td = e.target.closest('td[data-r][data-c]');
-    if (!td) return;
-
-    const rc = rcFromTd(td);
-    if (!rc) return;
-
-    const { anchor } = state.dragSel;
-    state.dragSel.cur = { r: rc.r, c: rc.c };
-
-    // update last range only
-    const lastIdx = (state.selRanges?.length || 0) - 1;
-    if (lastIdx < 0) return;
-
-    state.selRanges[lastIdx] = normalizeRange(anchor.r, anchor.c, rc.r, rc.c);
-
-    setActiveCell(rc.r, rc.c);
-    applySelectionFromState();
-  });
-
-  // end drag anywhere
-  document.addEventListener("mouseup", () => {
-    state.dragSel = null;
-  });
-
-  // Ctrl+C copy
-  document.addEventListener("keydown", (e) => {
-    if (isTypingTarget(e.target)) return;
-
-    const isCopy = (e.key === "c" || e.key === "C") && e.ctrlKey;
-    if (!isCopy) return;
-
-    if (!state.selRanges || !state.selRanges.length) return;
-
-    e.preventDefault();
-    copyActiveRangeToClipboard();
+function wireGridInteractions() {
+  if (datasetGridInteractions) return;
+  datasetGridInteractions = wireDatasetGridInteractions({
+    state,
+    renderTable,
+    renderActiveCellUI,
   });
 }
 
+function applyGridSelectionFromState() {
+  datasetGridInteractions?.applySelectionFromState?.();
+}
+
+function wireNotesEditor() {
+  return wireDatasetNotesEditor({
+    getNotesProgrammaticInput: () => notesProgrammaticInput,
+    getLastSavedNotesText: () => lastSavedNotesText,
+    setNotesDirty: (value) => {
+      notesDirty = !!value;
+    },
+    updateNotesSaveUi,
+    saveNotesForCurrentContext,
+    setStatus,
+  });
+}
 
 function wireEvents() {
-  document.getElementById("reloadBtn")?.addEventListener("click", loadDataset);
-  $("saveBtn").addEventListener("click", savePatch);
-  $("toggleBlankBtn").addEventListener("click", toggleBlanks);
-
-  const pathInput = document.getElementById("pathInput");
-  const triInput = document.getElementById("triInput");
-  const projectSelect = document.getElementById("projectSelect");
-  const originSel = document.getElementById("originLenSelect");
-  const devSel = document.getElementById("devLenSelect");
-
-  const cumulativeChk = document.getElementById("cumulativeChk");
-  if (cumulativeChk) {
-    cumulativeChk.addEventListener("change", () => {
-      saveTriInputsToStorage();
-      scheduleAutoRun(0);
-    });
-  }
-
-  const dec = document.getElementById("decimalPlaces");
-  if (dec) {
-    dec.addEventListener("change", () => {
-      renderTable();
-      notifyDatasetUpdated();
-      renderChart();
-    });
-    dec.addEventListener("input", () => {
-      renderTable();
-      notifyDatasetUpdated();
-      renderChart();
-    });
-  }
-
-  // change → auto run
-  if (pathInput) pathInput.addEventListener("change", () => { saveTriInputsToStorage(); setStatus("Loading dataset..."); scheduleAutoRun(); });
-  if (triInput) {
-    triInput.addEventListener("focus", () => {
-      filterDatasetOptions(triInput.value);
-    });
-
-    triInput.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        const list = document.getElementById("datasetDropdown");
-        if (!list || !list.classList.contains("open")) {
-          filterDatasetOptions(triInput.value);
-        }
-        const dir = e.key === "ArrowDown" ? 1 : -1;
-        if (activeDatasetIndex === -1) {
-          setActiveDatasetIndex(dir > 0 ? 0 : -1);
-        } else {
-          setActiveDatasetIndex(activeDatasetIndex + dir);
-        }
-        e.preventDefault();
-        return;
-      }
-
-      if (e.key === "Enter") {
-        if (chooseActiveDataset()) {
-          e.preventDefault();
-          return;
-        }
-        saveTriInputsToStorage();
-        setStatus("Loading dataset...");
-        scheduleAutoRun(0);
-        return;
-      }
-
-      if (e.key === "Escape") {
-        showDatasetDropdown(false);
-      }
-    });
-
-    triInput.addEventListener("input", () => {
-      filterDatasetOptions(triInput.value);
-      if (!triInput.value.trim()) lastDatasetSelection = "";
-      void handleDatasetSelection(triInput.value);
-    });
-
-    triInput.addEventListener("change", () => {
-      saveTriInputsToStorage();
-      setStatus("Loading dataset...");
-      scheduleAutoRun();
-      showDatasetDropdown(false);
-    });
-  }
-
-  if (projectSelect) {
-    projectSelect.addEventListener("focus", () => {
-      filterProjectOptions(projectSelect.value);
-    });
-
-    projectSelect.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        const list = document.getElementById("projectDropdown");
-        if (!list || !list.classList.contains("open")) {
-          filterProjectOptions(projectSelect.value);
-        }
-        const dir = e.key === "ArrowDown" ? 1 : -1;
-        if (activeProjectIndex === -1) {
-          setActiveProjectIndex(dir > 0 ? 0 : -1);
-        } else {
-          setActiveProjectIndex(activeProjectIndex + dir);
-        }
-        e.preventDefault();
-        return;
-      }
-
-      if (e.key === "Enter") {
-        if (chooseActiveProject()) e.preventDefault();
-        return;
-      }
-
-      if (e.key === "Escape") {
-        showProjectDropdown(false);
-      }
-    });
-
-    projectSelect.addEventListener("input", () => {
-      filterProjectOptions(projectSelect.value);
-      if (!projectSelect.value.trim()) lastProjectSelection = "";
-      void handleProjectSelection(projectSelect.value);
-    });
-
-    projectSelect.addEventListener("change", async () => {
-      if (!projectSelect.value.trim()) return;
-      setStatus("Loading dataset...");
-      await handleProjectSelection(projectSelect.value);
-    });
-  }
-
-  document.addEventListener("mousedown", (e) => {
-    const projectWrap = document.querySelector(".projectSelectWrap");
-    if (projectWrap && !projectWrap.contains(e.target)) {
-      showProjectDropdown(false);
-    }
-    const datasetWrap = document.querySelector(".datasetSelectWrap");
-    if (datasetWrap && !datasetWrap.contains(e.target)) {
-      showDatasetDropdown(false);
-    }
+  wireDatasetInputController({
+    state,
+    $,
+    loadDataset,
+    isRunInFlight,
+    setStatus,
+    runAdasTri,
+    savePatch,
+    toggleBlanks,
+    wireLenDropdowns,
+    syncDetailDatasetTypeFromTopInput,
+    ensureDatasetTypeOption,
+    clearInputInvalid,
+    openReservingClassTreeForDataset,
+    showProjectDropdown,
+    openProjectNameTreeForDataset,
+    showDatasetDropdown,
+    openDatasetNameTreeForDataset,
+    saveTriInputsToStorage,
+    scheduleAutoRun,
+    renderTable,
+    notifyDatasetUpdated,
+    renderChart,
+    isDefaultTokenValue,
+    setInputDefaultBound,
+    getResolvedProjectValue,
+    validateAndNormalizeReservingClassInput,
+    filterDatasetOptions,
+    getActiveDatasetIndex,
+    setActiveDatasetIndex,
+    chooseActiveDataset,
+    validateAndNormalizeDatasetInput,
+    validateDatasetTypeDependencies,
+    handleDatasetSelection,
+    setLastDatasetSelection,
+    filterProjectOptions,
+    getProjectFilterQuery,
+    getActiveProjectIndex,
+    setActiveProjectIndex,
+    chooseActiveProject,
+    handleProjectSelection,
+    setLastProjectSelection,
+    LEN_DROPDOWN_CONFIG,
+    closeAllLenDropdowns,
+    syncLen,
+    enforceDevLenRule,
+    ensureHeadersForProject,
+    ensureDevHeadersForProject,
+    isLenLinked,
+    bindAutoRunOnEnter,
+    redrawChartSafely,
+    wireDatasetHostBridge,
+    getTriInputsForStorage,
+    instanceId,
+    wireGridInteractions,
+    getSyncingDatasetTypeFields,
+    setSyncingDatasetTypeFields,
   });
-
-  // Origin change → (optional sync) → enforce rule → refresh headers → auto run
-  if (originSel) {
-    originSel.addEventListener("change", async () => {
-      syncLen("origin");
-      enforceDevLenRule();
-      saveTriInputsToStorage();
-
-      const project = document.getElementById("projectSelect")?.value || "";
-      await ensureHeadersForProject(project);
-      await ensureDevHeadersForProject(project);
-
-      renderTable();
-      notifyDatasetUpdated();
-      setStatus("Loading dataset...");
-      scheduleAutoRun(0);
-      originSel.blur();
-    });
-  }
-
-  const linkChk = document.getElementById("linkLenChk");
-  if (linkChk) {
-    linkChk.addEventListener("change", async () => {
-      // Toggling link can change the effective period lengths (origin/dev),
-      // so refresh both header label sets to keep them aligned with the data.
-      const originBefore = document.getElementById("originLenSelect")?.value || "";
-      const devBefore = document.getElementById("devLenSelect")?.value || "";
-      if (isLenLinked()) syncLen("init");
-      enforceDevLenRule();
-
-      saveTriInputsToStorage();
-
-      const project = document.getElementById("projectSelect")?.value || "";
-      if (project) {
-        await ensureHeadersForProject(project);
-        await ensureDevHeadersForProject(project);
-      }
-
-      renderTable();
-      notifyDatasetUpdated();
-      const originAfter = document.getElementById("originLenSelect")?.value || "";
-      const devAfter = document.getElementById("devLenSelect")?.value || "";
-      const changed = originBefore !== originAfter || devBefore !== devAfter;
-      if (changed) {
-        setStatus("Loading dataset...");
-        scheduleAutoRun(0);
-      }
-    });
-  }
-
-  // Dev change → (optional sync) → refresh dev headers → auto run
-  if (devSel) {
-    devSel.addEventListener("change", async () => {
-      syncLen("dev");
-      enforceDevLenRule();
-      saveTriInputsToStorage();
-
-      const project = document.getElementById("projectSelect")?.value || "";
-      // If len is linked, origin may change too; ensure both headers are consistent.
-      if (project) {
-        await ensureHeadersForProject(project);
-        await ensureDevHeadersForProject(project);
-      }
-
-      renderTable();
-      notifyDatasetUpdated();
-      setStatus("Loading dataset...");
-      scheduleAutoRun(0);
-      devSel.blur();
-    });
-  }
-
-  // Enter → auto run
-  bindAutoRunOnEnter(pathInput);
-  bindAutoRunOnEnter(originSel);
-  bindAutoRunOnEnter(devSel);
-
-  // Run button still as fallback
-  const runBtn = document.getElementById("runAdasTriBtn");
-  if (runBtn) runBtn.addEventListener("click", runAdasTri);
-
-  $("formulaBar").addEventListener("keydown", (e) => {
-    if (e.key !== "Enter") return;
-    if (!state.activeCell) return;
-
-    const { r, c } = state.activeCell;
-    const key = `${r},${c}`;
-
-    const parsed = parseFormulaInput($("formulaBar").value);
-    if (!parsed.ok) {
-      logLine(parsed.error);
-      return;
-    }
-
-    state.dirty.set(key, parsed.value);
-    logLine(`Set ${key} = ${parsed.value === null ? "null" : parsed.value}`);
-
-    renderTable();
-    notifyDatasetUpdated();
-    renderActiveCellUI();
-  });
-
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      // wait for layout to settle
-      requestAnimationFrame(() => {
-        requestAnimationFrame(redrawChartSafely);
-      });
-    }
-  });
-
-  window.addEventListener("resize", () => {
-    requestAnimationFrame(redrawChartSafely);
-  });
-
-  window.addEventListener("message", (e) => {
-    if (e?.data?.type === "adas:get-dataset-settings") {
-      const settings = getTriInputs();
-      window.parent.postMessage(
-        {
-          type: "adas:dataset-settings",
-          requestId: e.data.requestId,
-          stepId: instanceId,
-          settings,
-        },
-        "*"
-      );
-      return;
-    }
-
-    if (e?.data?.type === "adas:tab-activated") {
-      // Only redraw when THIS tab becomes active
-      requestAnimationFrame(() => {
-        requestAnimationFrame(redrawChartSafely);
-      });
-    }
-  });
-
-  wireArrowKeyNavigation();
-  wireRectSelectionAndCopy();
+  wireNotesEditor();
 }
 
 
 async function boot() {
   fillLenDropdowns();
   await loadProjectsDropdown();
+  await ensureAppDataProjectPathDefaultsLoaded();
+
+  applyWorkflowDefaultsIfNew();
 
   // restore user inputs AFTER dropdown options are populated
   restoreTriInputsFromStorage();
+  applyTriInputsFromQueryParams();
   enforceDevLenRule();
-  await refreshDatasetTypesForProject(document.getElementById("projectSelect")?.value || "");
+  const projectResult = validateAndNormalizeProjectInput({ strict: true, showMessage: false });
+  if (projectResult.ok) {
+    lastProjectSelection = projectResult.value;
+    await refreshDatasetTypesForProject(projectResult.value);
+    await refreshReservingClassPathsForProject(projectResult.value);
+  } else {
+    await refreshDatasetTypesForProject("");
+    await refreshReservingClassPathsForProject("");
+  }
+  await validateAndNormalizeReservingClassInput(getResolvedProjectValue(), { strict: true, showMessage: false });
+  validateAndNormalizeDatasetInput({ strict: true, showMessage: false });
+
+  // Initialize dataset tab system (Details / Data / Chart / Notes / Audit Log)
+  const dsTabSystem = createTabbedPage(document.body, {
+    tabs: [
+      { id: "details", label: "Details" },
+      { id: "data", label: "Data" },
+      { id: "chart", label: "Chart" },
+      { id: "notes", label: "Notes" },
+      { id: "auditLog", label: "Audit Log" },
+    ],
+    cssPrefix: "ds",
+    initialTab: "data",
+    injectTabBar: false,
+    onTabChange: (tabId) => {
+      if (tabId === "chart") {
+        // Chart canvas needs a redraw after becoming visible
+        requestAnimationFrame(() => {
+          requestAnimationFrame(redrawChartSafely);
+        });
+      }
+    },
+  });
+  window.dsTabSystem = dsTabSystem;
 
   wireEvents();
 

@@ -1,0 +1,63 @@
+"""ArcRho Web UI — FastAPI application.
+
+This module creates the FastAPI ``app`` instance, includes all API routers,
+and mounts the static frontend.  All business logic lives in
+``backend.services.*`` and route handlers in ``backend.api.*``.
+"""
+from __future__ import annotations
+
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
+
+from backend import config
+from backend.api import (
+    workflow_router,
+    app_control_router,
+    ui_config_router,
+    audit_log_router,
+    dataset_router,
+    book_router,
+    excel_router,
+    adas_router,
+    project_settings_router,
+    project_book_router,
+    table_summary_router,
+    field_mapping_router,
+    dataset_types_router,
+    reserving_class_router,
+    scripting_router,
+)
+
+# ---------------------------------------------------------------------------
+# App
+# ---------------------------------------------------------------------------
+
+app = FastAPI(title="Triangle Demo API", version="0.1")
+
+# --- Include routers (API routes BEFORE static mount) ---
+app.include_router(workflow_router)
+app.include_router(app_control_router)
+app.include_router(ui_config_router)
+app.include_router(audit_log_router)
+app.include_router(dataset_router)
+app.include_router(book_router)
+app.include_router(excel_router)
+app.include_router(adas_router)
+app.include_router(project_settings_router)
+app.include_router(project_book_router)
+app.include_router(table_summary_router)
+app.include_router(field_mapping_router)
+app.include_router(dataset_types_router)
+app.include_router(reserving_class_router)
+app.include_router(scripting_router)
+
+# --- Frontend (same folder, no /static) ---
+# Mount AFTER API routes to avoid conflicts
+
+app.mount("/ui", StaticFiles(directory=str(config.PROJECT_ROOT), html=True), name="ui")
+
+
+@app.get("/")
+def home():
+    return RedirectResponse(url="/ui/")

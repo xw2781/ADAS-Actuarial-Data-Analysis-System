@@ -1,0 +1,138 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>ArcRho</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; }
+    body { display: flex; flex-direction: column; }
+    .popout-titlebar {
+      display: flex;
+      align-items: center;
+      height: 28px;
+      padding: 0 8px;
+      background: #f5f5f5;
+      border-bottom: 1px solid #ddd;
+      font-size: 12px;
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .popout-title { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .popout-dock-btn {
+      padding: 2px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .popout-dock-btn:hover { background: #e8e8e8; }
+    iframe {
+      flex: 1;
+      width: 100%;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="popout-titlebar">
+    <span class="popout-title" id="titleLabel"></span>
+    <button class="popout-dock-btn" id="dockBtn">Dock Back</button>
+  </div>
+  <iframe id="contentFrame"></iframe>
+
+  <script type="module">
+    import { createPopoutChannel } from "./popout_bridge.js";
+
+    const params = new URLSearchParams(window.location.search);
+    const type  = params.get("type") || "";
+    const inst  = params.get("inst") || "";
+    const ds    = params.get("ds") || "";
+    const tab   = params.get("tab") || "";
+    const title = params.get("title") || "Tab";
+
+    // --- title bar ---
+    document.getElementById("titleLabel").textContent = title;
+    document.title = `${title} — ArcRho`;
+
+    // --- build iframe src (mirrors ensureIframe logic in ui_shell.js) ---
+    const iframe = document.getElementById("contentFrame");
+    const v = params.get("v") || String(Date.now());
+
+    if (type === "dataset") {
+      const p = new URLSearchParams();
+      if (ds) p.set("ds", ds);
+      p.set("inst", inst);
+      p.set("v", v);
+      iframe.src = `/ui/dataset_viewer.html?${p.toString()}`;
+    } else if (type === "dfm") {
+      const p = new URLSearchParams();
+      if (ds) p.set("ds", ds);
+      p.set("inst", inst);
+      p.set("v", v);
+      if (tab) p.set("tab", tab);
+      iframe.src = `/ui/DFM.html?${p.toString()}`;
+    } else if (type === "workflow") {
+      iframe.src = `/ui/workflow.html?inst=${encodeURIComponent(inst)}`;
+    } else if (type === "project_settings") {
+      iframe.src = "/ui/project_settings.html";
+    } else if (type === "browsing_history") {
+      iframe.src = `/ui/browsing_history.html?v=${encodeURIComponent(v)}`;
+    }
+
+    // --- BroadcastChannel bridge ---
+    const channel = createPopoutChannel(inst);
+
+    // Relay iframe postMessages → main shell
+    window.addEventListener("message", (e) => {
+      const msg = e.data;
+      if (!msg || typeof msg.type !== "string") return;
+      // Only relay adas: messages from the iframe
+      if (!msg.type.startsWith("adas:")) return;
+      channel.send({ type: "relay-to-shell", inst, msg });
+    });
+
+    // Relay main shell messages → iframe
+    channel.onMessage((data) => {
+      if (data.type === "relay-to-iframe" && data.msg) {
+        try {
+          iframe.contentWindow.postMessage(data.msg, "*");
+        } catch { /* iframe not ready */ }
+      }
+    });
+
+    // Notify main shell we're ready
+    iframe.addEventListener("load", () => {
+      channel.send({ type: "popout-ready", inst });
+
+      // Forward current zoom setting
+      try {
+        const zoom = Number(localStorage.getItem("adas_ui_zoom_pct")) || 100;
+        iframe.contentWindow.postMessage(
+          { type: "adas:set-zoom", zoom, statusBarHeight: 0 },
+          "*"
+        );
+      } catch { /* ignore */ }
+    }, { once: true });
+
+    // --- close / dock back ---
+    function dockBack() {
+      // Build tab state for restoration
+      const tabState = { type, inst, ds, tab, title };
+      channel.send({ type: "popout-closed", inst, tabState });
+      // Small delay to let the message send before window closes
+      setTimeout(() => window.close(), 50);
+    }
+
+    document.getElementById("dockBtn").addEventListener("click", dockBack);
+
+    window.addEventListener("beforeunload", () => {
+      const tabState = { type, inst, ds, tab, title };
+      channel.send({ type: "popout-closed", inst, tabState });
+      channel.close();
+    });
+  </script>
+</body>
+</html>

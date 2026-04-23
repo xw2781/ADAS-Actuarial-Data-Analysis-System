@@ -10,6 +10,28 @@
 // - Never overwrite #content.innerHTML after initialization.
 // - Create each iframe once per tab; switch tabs by display:none/block.
 
+import {
+  getLastViewedDatasetInputs,
+  normalizeBrowsingHistoryEntry,
+} from "./browsing_history.js";
+
+// ==========================
+// Pop-out window tracking
+// ==========================
+/** @type {Map<string, { tabState: object, channel: object }>} */
+const poppedOutTabs = new Map();
+let _popoutBridge = null;
+
+async function getPopoutBridge() {
+  if (!_popoutBridge) {
+    try {
+      _popoutBridge = await import("./popout_bridge.js");
+    } catch (err) {
+      console.warn("popout_bridge.js not available:", err);
+    }
+  }
+  return _popoutBridge;
+}
 
 // ==========================
 // Hotkey override (F5 / Reload)
@@ -42,11 +64,13 @@ const ZOOM_MAX = 160;
 const ZOOM_STEP = 10;
 const AUTOSAVE_KEY = "adas_autosave_enabled";
 const FONT_STORAGE_KEY = "adas_app_font";
+const FORCE_REBUILD_KEY = "adas_force_rebuild_enabled";
 let zoomPercent = 100;
 let zoomToastTimer = null;
 let zoomUiWired = false;
 let zoomRangeDragging = false;
 let autoSaveEnabled = true;
+let forceRebuildEnabled = false;
 const hostZoomAvailable = () => typeof window.ADAHost?.setZoomFactor === "function";
 
 window.__adas_should_intercept_close = function () {
@@ -92,6 +116,15 @@ function loadAppFont() {
   return "";
 }
 
+function loadForceRebuildEnabled() {
+  try {
+    const raw = localStorage.getItem(FORCE_REBUILD_KEY);
+    if (raw == null) return false;
+    return raw === "1";
+  } catch {}
+  return false;
+}
+
 function buildFontStack(font) {
   const raw = String(font || "").trim();
   if (!raw) return "";
@@ -109,6 +142,30 @@ function applyAppFont(font) {
 }
 
 applyAppFont(loadAppFont());
+forceRebuildEnabled = loadForceRebuildEnabled();
+
+function broadcastForceRebuildToggle() {
+  for (const t of state.tabs || []) {
+    if (!t.iframe || !t.iframe.contentWindow) continue;
+    try {
+      t.iframe.contentWindow.postMessage(
+        { type: "adas:force-rebuild-toggle", enabled: forceRebuildEnabled },
+        "*",
+      );
+    } catch {
+      // ignore
+    }
+  }
+  relayToPopoutChannels({ type: "adas:force-rebuild-toggle", enabled: forceRebuildEnabled });
+}
+
+function setForceRebuildEnabled(enabled, { persist = true, notify = true } = {}) {
+  forceRebuildEnabled = !!enabled;
+  if (persist) {
+    try { localStorage.setItem(FORCE_REBUILD_KEY, forceRebuildEnabled ? "1" : "0"); } catch {}
+  }
+  if (notify) broadcastForceRebuildToggle();
+}
 
 async function clearCacheAndReload() {
   const confirmed = await showAppConfirm({
@@ -329,6 +386,53 @@ function initRootPathSettingsModal() {
   }, true);
 }
 
+// ---------- Force Rebuild Settings Modal ----------
+let forceRebuildModalWired = false;
+
+function openForceRebuildSettingsModal() {
+  const overlay = $("forceRebuildSettingsOverlay");
+  const toggle = $("forceRebuildToggle");
+  if (!overlay || !toggle) return;
+  toggle.checked = loadForceRebuildEnabled();
+  overlay.classList.add("open");
+  requestAnimationFrame(() => toggle.focus());
+}
+
+function closeForceRebuildSettingsModal() {
+  const overlay = $("forceRebuildSettingsOverlay");
+  if (overlay) overlay.classList.remove("open");
+}
+
+function initForceRebuildSettingsModal() {
+  if (forceRebuildModalWired) return;
+  forceRebuildModalWired = true;
+  const overlay = $("forceRebuildSettingsOverlay");
+  const toggle = $("forceRebuildToggle");
+  const applyBtn = $("forceRebuildApplyBtn");
+  const cancelBtn = $("forceRebuildCancelBtn");
+  if (!overlay || !toggle || !applyBtn || !cancelBtn) return;
+
+  applyBtn.addEventListener("click", () => {
+    setForceRebuildEnabled(!!toggle.checked);
+    closeForceRebuildSettingsModal();
+    updateStatusBar(`Force Rebuild ${toggle.checked ? "enabled" : "disabled"}.`);
+  });
+  cancelBtn.addEventListener("click", () => closeForceRebuildSettingsModal());
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeForceRebuildSettingsModal();
+  });
+  window.addEventListener("keydown", (e) => {
+    if (!overlay.classList.contains("open")) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeForceRebuildSettingsModal();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      applyBtn.click();
+    }
+  }, true);
+}
+
 function applyZoom() {
   const root = document.documentElement;
   const body = document.body;
@@ -451,6 +555,8 @@ function broadcastZoomToIframes() {
       // ignore
     }
   }
+  // Also relay zoom to pop-out windows
+  relayToPopoutChannels({ type: "adas:set-zoom", zoom: z, statusBarHeight: statusH });
 }
 
 function broadcastAppFont(font) {
@@ -466,6 +572,8 @@ function broadcastAppFont(font) {
       // ignore
     }
   }
+  // Also relay font to pop-out windows
+  relayToPopoutChannels({ type: "adas:set-app-font", font });
 }
 
 function getStatusBarHeight() {
@@ -498,6 +606,8 @@ const hotkeys = {
   "Ctrl+O": "file_import",
   "Ctrl+P": "file_print",
   "Ctrl+Shift+F": "view_toggle_nav",
+  "Ctrl+Shift+L": "view_toggle_line_numbers",
+  "Ctrl+Shift+E": "view_toggle_exec_time",
   "Ctrl+Q": "app_shutdown",
   "Ctrl+Alt+R": "file_restart",
 };
@@ -536,6 +646,12 @@ function runHotkeyAction(action) {
       sendWorkflowCommand("adas:workflow-save");
     } else if (isActiveDFMTab()) {
       sendDFMCommand("adas:dfm-save");
+    } else if (isActiveScriptingTab()) {
+      sendScriptingCommand("adas:scripting-save");
+    } else if (isActiveProjectSettingsReservingClassTypesTab()) {
+      sendProjectSettingsCommand("adas:project-settings-reserving-class-types-save-local");
+    } else if (isActiveProjectSettingsDatasetTypesTab()) {
+      sendProjectSettingsCommand("adas:project-settings-dataset-types-save-local");
     }
     return;
   }
@@ -543,7 +659,13 @@ function runHotkeyAction(action) {
     if (isActiveWorkflowTab()) {
       sendWorkflowCommand("adas:workflow-save-as");
     } else if (isActiveDFMTab()) {
-      sendDFMCommand("adas:dfm-save-as");
+      sendDFMCommand(isActiveDFMDetailsTab() ? "adas:dfm-save-template" : "adas:dfm-save-as");
+    } else if (isActiveScriptingTab()) {
+      sendScriptingCommand("adas:scripting-save-as");
+    } else if (isActiveProjectSettingsReservingClassTypesTab()) {
+      sendProjectSettingsCommand("adas:project-settings-reserving-class-types-load-local");
+    } else if (isActiveProjectSettingsDatasetTypesTab()) {
+      sendProjectSettingsCommand("adas:project-settings-dataset-types-load-local");
     }
     return;
   }
@@ -557,6 +679,18 @@ function runHotkeyAction(action) {
   }
   if (action === "view_toggle_nav") {
     toggleNavigationPanel();
+    return;
+  }
+  if (action === "view_toggle_line_numbers") {
+    if (isActiveScriptingTab()) {
+      sendScriptingCommand("adas:scripting-toggle-line-numbers");
+    }
+    return;
+  }
+  if (action === "view_toggle_exec_time") {
+    if (isActiveScriptingTab()) {
+      sendScriptingCommand("adas:scripting-toggle-exec-time");
+    }
     return;
   }
   if (action === "file_restart") {
@@ -673,15 +807,24 @@ window.addEventListener(
 
 const $ = (id) => document.getElementById(id);
 
-function updateStatusBar(text) {
+function updateStatusBar(text, options = {}) {
+  const tone = String(options?.tone || "").trim().toLowerCase();
   const textEl = $("statusText");
+  const barEl = $("statusBar");
+  const applyTone = (el) => {
+    if (!el || !el.classList) return;
+    el.classList.remove("status-tone-error", "status-tone-warn");
+    if (tone === "error") el.classList.add("status-tone-error");
+    if (tone === "warn" || tone === "warning") el.classList.add("status-tone-warn");
+  };
+  applyTone(textEl);
+  applyTone(barEl);
   if (textEl) {
     textEl.textContent = text || "";
     return;
   }
-  const el = $("statusBar");
-  if (!el) return;
-  el.textContent = text || "";
+  if (!barEl) return;
+  barEl.textContent = text || "";
 }
 
 function clearSavedStatusOnDirty() {
@@ -896,11 +1039,15 @@ function loadState() {
       title: t.title,
       type: t.type,
       datasetId: t.datasetId,
+      datasetInputs: normalizeBrowsingHistoryEntry(t.datasetInputs || null) || undefined,
       dsInst: t.dsInst || (t.type === "dataset" ? `ds_${t.id}` : undefined),
       wfInst: t.wfInst,
       wfFresh: t.wfFresh,
-      wfInst: t.wfInst,
-      wfFresh: t.wfFresh,
+      scInst: t.scInst || (t.type === "scripting" ? `sc_${t.id}` : undefined),
+      scFresh: !!t.scFresh,
+      projectSettingsRibbon: t.type === "project_settings"
+        ? (String(t.projectSettingsRibbon || "").trim().toLowerCase() || "summary")
+        : undefined,
       isDirty: false,
       // iframe is runtime-only
       iframe: null,
@@ -941,11 +1088,15 @@ function saveState() {
           title: t.title,
           type: t.type,
           datasetId: t.datasetId,
+          datasetInputs: t.datasetInputs || undefined,
           dsInst: t.dsInst,
-      wfInst: t.wfInst,
-      wfFresh: t.wfFresh,
-      wfInst: t.wfInst,
-      wfFresh: t.wfFresh,
+          wfInst: t.wfInst,
+          wfFresh: t.wfFresh,
+          scInst: t.scInst,
+          scFresh: t.scFresh,
+          projectSettingsRibbon: t.type === "project_settings"
+            ? String(t.projectSettingsRibbon || "").trim().toLowerCase()
+            : undefined,
         })),
         activeId: state.activeId,
         nextId: state.nextId,
@@ -983,6 +1134,20 @@ function ensureContentContainers() {
 }
 
 let homeWired = false;
+
+function notifyBrowsingHistoryTabs(message = {}) {
+  for (const t of state.tabs || []) {
+    if (t.type !== "browsing_history") continue;
+    ensureIframe(t);
+    if (!t.iframe || !t.iframe.contentWindow) continue;
+    try {
+      t.iframe.contentWindow.postMessage({ type: "adas:browsing-history-updated", ...message }, "*");
+    } catch {
+      // ignore
+    }
+  }
+}
+
 function renderHomeViewOnce() {
   if (!homeView) return;
 
@@ -1011,7 +1176,7 @@ function renderHomeViewOnce() {
           </div>
           <div class="card clickable" id="cardScripting">
             <h3>Scripting</h3>
-            <div class="muted">Write an ADAS script.</div>
+            <div class="muted">Write code in a notebook.</div>
           </div>
         </div>
       </div>
@@ -1025,7 +1190,7 @@ function renderHomeViewOnce() {
           </div>
           <div class="card clickable" id="cardBrowsingHistory">
             <h3>Browsing History</h3>
-            <div class="muted">Pick up where you left off.</div>
+            <div class="muted">Open recent dataset views in a dedicated tab.</div>
           </div>
         </div>
       </div>
@@ -1066,7 +1231,14 @@ function renderHomeViewOnce() {
     const bh = document.getElementById("cardBrowsingHistory");
     if (bh) {
       bh.addEventListener("click", () => {
-        alert("Browsing History: TODO");
+        openBrowsingHistoryTab();
+      });
+    }
+
+    const sc = document.getElementById("cardScripting");
+    if (sc) {
+      sc.addEventListener("click", () => {
+        openScriptingTab({ forceNew: true });
       });
     }
 
@@ -1083,6 +1255,7 @@ const viewMenuBtn = document.querySelector('.menu[data-menu="view"]');
 const viewMenuDropdown = document.getElementById("viewMenuDropdown");
 const settingsMenuBtn = document.querySelector('.menu[data-menu="settings"]');
 const settingsMenuDropdown = document.getElementById("settingsMenuDropdown");
+const menuBarEl = document.getElementById("menubar");
 let dfmEditEnabled = false;
 
 function positionFileMenu() {
@@ -1149,6 +1322,34 @@ function toggleSettingsMenu(forceOpen) {
   if (shouldOpen) positionSettingsMenu();
 }
 
+const shellMenuToggles = {
+  file: toggleFileMenu,
+  edit: toggleEditMenu,
+  view: toggleViewMenu,
+  settings: toggleSettingsMenu,
+};
+
+const shellMenuDropdowns = {
+  file: fileMenuDropdown,
+  edit: editMenuDropdown,
+  view: viewMenuDropdown,
+  settings: settingsMenuDropdown,
+};
+
+function openShellMenu(type, forceOpen) {
+  const toggle = shellMenuToggles[type];
+  const dropdown = shellMenuDropdowns[type];
+  if (!toggle || !dropdown) return;
+  if (type === "file") updateFileMenuState();
+  if (type === "edit") updateEditMenuState();
+  if (type === "view") updateViewMenuState();
+  const isOpen = dropdown.classList.contains("open");
+  const shouldOpen = (typeof forceOpen === "boolean") ? forceOpen : !isOpen;
+  closeAllShellMenus();
+  if (shouldOpen && !hasVisibleMenuItems(dropdown)) return;
+  if (shouldOpen) toggle(true);
+}
+
 function closeAllShellMenus() {
   toggleFileMenu(false);
   toggleEditMenu(false);
@@ -1157,6 +1358,48 @@ function closeAllShellMenus() {
   togglePlusMenu(false);
   closeTabCtxMenu();
 }
+
+function wireIframeMenuAutoClose(iframe) {
+  if (!iframe) return;
+  const attachBridge = () => {
+    try {
+      const frameWin = iframe.contentWindow;
+      const frameDoc = frameWin?.document;
+      if (!frameWin || !frameDoc) return;
+      if (frameWin.__adasShellMenuBridgeWired) return;
+
+      const closeMenus = () => {
+        closeAllShellMenus();
+      };
+
+      frameDoc.addEventListener("pointerdown", closeMenus, true);
+      frameWin.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeMenus();
+      }, true);
+      frameWin.__adasShellMenuBridgeWired = true;
+    } catch {
+      // ignore cross-frame wiring failures
+    }
+  };
+
+  iframe.addEventListener("load", attachBridge);
+  attachBridge();
+}
+
+// ---------- About dialog ----------
+const aboutOverlay = document.getElementById("aboutOverlay");
+const aboutCloseBtn = document.getElementById("aboutCloseBtn");
+
+function openAboutDialog() {
+  aboutOverlay?.classList.add("open");
+}
+function closeAboutDialog() {
+  aboutOverlay?.classList.remove("open");
+}
+aboutCloseBtn?.addEventListener("click", closeAboutDialog);
+aboutOverlay?.addEventListener("click", (e) => {
+  if (e.target === aboutOverlay) closeAboutDialog();
+});
 
 function isActiveWorkflowTab() {
   const tab = state.tabs.find(t => t.id === state.activeId);
@@ -1168,36 +1411,195 @@ function isActiveDFMTab() {
   return !!tab && tab.type === "dfm";
 }
 
+function getActiveDFMSubTab() {
+  const tab = state.tabs.find(t => t.id === state.activeId);
+  if (!tab || tab.type !== "dfm") return "";
+  return String(tab.dfmTab || "details").trim().toLowerCase();
+}
+
+function isActiveDFMDetailsTab() {
+  return isActiveDFMTab() && getActiveDFMSubTab() === "details";
+}
+
+function isActiveScriptingTab() {
+  const tab = state.tabs.find(t => t.id === state.activeId);
+  return !!tab && tab.type === "scripting";
+}
+
+function isActiveProjectSettingsTab() {
+  const tab = state.tabs.find(t => t.id === state.activeId);
+  return !!tab && tab.type === "project_settings";
+}
+
+function getActiveProjectSettingsRibbon() {
+  const tab = state.tabs.find(t => t.id === state.activeId);
+  if (!tab || tab.type !== "project_settings") return "";
+  return String(tab.projectSettingsRibbon || "").trim().toLowerCase();
+}
+
+function isActiveProjectSettingsDatasetTypesTab() {
+  return isActiveProjectSettingsTab() && getActiveProjectSettingsRibbon() === "dataset-types";
+}
+
+function isActiveProjectSettingsReservingClassTypesTab() {
+  return isActiveProjectSettingsTab() && getActiveProjectSettingsRibbon() === "reserving-class-types";
+}
+
+function getActiveTabType() {
+  const tab = state.tabs.find(t => t.id === state.activeId);
+  return String(tab?.type || "").toLowerCase();
+}
+
+function parsePageScopes(raw) {
+  if (!raw) return null;
+  const scopes = String(raw)
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return scopes.length ? scopes : null;
+}
+
+function applyScopedMenuVisibility(dropdown) {
+  if (!dropdown) return;
+  const activeType = getActiveTabType();
+  const requiresScope = dropdown.hasAttribute("data-requires-page-scope");
+  dropdown.querySelectorAll(".menuItem").forEach((el) => {
+    const scopes = parsePageScopes(el.getAttribute("data-page-scopes"));
+    if (!scopes) {
+      el.hidden = requiresScope;
+      return;
+    }
+    if (scopes.includes("*")) {
+      el.hidden = false;
+      return;
+    }
+    el.hidden = !activeType || !scopes.includes(activeType);
+  });
+}
+
+function normalizeMenuSeparators(dropdown) {
+  if (!dropdown) return;
+  const children = Array.from(dropdown.children);
+  children.forEach((el) => {
+    if (el.classList.contains("menuSep")) {
+      el.hidden = false;
+    }
+  });
+
+  children.forEach((el) => {
+    if (!el.classList.contains("menuSep")) return;
+
+    let prev = el.previousElementSibling;
+    while (prev && prev.hidden) prev = prev.previousElementSibling;
+
+    let next = el.nextElementSibling;
+    while (next && next.hidden) next = next.nextElementSibling;
+
+    const prevIsItem = !!prev && prev.classList.contains("menuItem");
+    const nextIsItem = !!next && next.classList.contains("menuItem");
+    el.hidden = !(prevIsItem && nextIsItem);
+  });
+}
+
+function hasVisibleMenuItems(dropdown) {
+  if (!dropdown) return false;
+  return Array.from(dropdown.querySelectorAll(".menuItem")).some((el) => !el.hidden);
+}
+
+function updateFileSaveMenuLabels() {
+  if (!fileMenuDropdown) return;
+  const saveLabel = fileMenuDropdown.querySelector('.menuItem[data-action="save"] > span:not(.menuShortcut)');
+  const saveAsLabel = fileMenuDropdown.querySelector('.menuItem[data-action="save-as"] > span:not(.menuShortcut)');
+  const reservingClassTypesMode = isActiveProjectSettingsReservingClassTypesTab();
+  const datasetTypesMode = isActiveProjectSettingsDatasetTypesTab();
+  if (saveLabel) {
+    if (reservingClassTypesMode) {
+      saveLabel.textContent = "Save Reserving Class Types As...";
+    } else if (datasetTypesMode) {
+      saveLabel.textContent = "Save Dataset Types";
+    } else {
+      saveLabel.textContent = "Save";
+    }
+  }
+  if (saveAsLabel) {
+    if (reservingClassTypesMode) {
+      saveAsLabel.textContent = "Load Reserving Class Types From...";
+    } else if (datasetTypesMode) {
+      saveAsLabel.textContent = "Load Dataset Types";
+    } else if (isActiveDFMDetailsTab()) {
+      saveAsLabel.textContent = "Save as Template";
+    } else {
+      saveAsLabel.textContent = "Save As...";
+    }
+  }
+}
+
 function updateFileMenuState() {
   if (!fileMenuDropdown) return;
-  const enabled = isActiveWorkflowTab() || isActiveDFMTab();
+  applyScopedMenuVisibility(fileMenuDropdown);
+  updateFileSaveMenuLabels();
+  const saveEnabled =
+    isActiveWorkflowTab()
+    || isActiveDFMTab()
+    || isActiveScriptingTab()
+    || isActiveProjectSettingsReservingClassTypesTab()
+    || isActiveProjectSettingsDatasetTypesTab();
   fileMenuDropdown.querySelectorAll(".menuItem").forEach((el) => {
+    if (el.hidden) {
+      el.classList.remove("disabled");
+      return;
+    }
     const action = el.getAttribute("data-action") || "";
-    const shouldDisable = (!enabled && (action === "save" || action === "save-as"))
+    const shouldDisable = (!saveEnabled && (action === "save" || action === "save-as"))
       || (action === "close-tab" && state.activeId === "home");
     el.classList.toggle("disabled", shouldDisable);
   });
+  normalizeMenuSeparators(fileMenuDropdown);
 }
 
 function updateEditMenuState() {
   if (!editMenuDropdown) return;
+  applyScopedMenuVisibility(editMenuDropdown);
   const isDfm = isActiveDFMTab();
+  const isScripting = isActiveScriptingTab();
   const editEnabled = isDfm && dfmEditEnabled;
   editMenuDropdown.querySelectorAll(".menuItem").forEach((el) => {
+    if (el.hidden) {
+      el.classList.remove("disabled");
+      return;
+    }
     const action = el.getAttribute("data-action") || "";
-    const shouldDisable = action === "dfm-include-all" ? !isDfm : !editEnabled;
+    let shouldDisable = false;
+    if (action === "render-all-markdown") {
+      shouldDisable = !isScripting;
+    } else if (action === "dfm-include-all") {
+      shouldDisable = !isDfm;
+    } else {
+      shouldDisable = !editEnabled;
+    }
     el.classList.toggle("disabled", shouldDisable);
   });
+  normalizeMenuSeparators(editMenuDropdown);
 }
 
 function updateViewMenuState() {
   if (!viewMenuDropdown) return;
-  const enabled = isActiveWorkflowTab();
+  applyScopedMenuVisibility(viewMenuDropdown);
+  const isWorkflow = isActiveWorkflowTab();
+  const isScripting = isActiveScriptingTab();
   viewMenuDropdown.querySelectorAll(".menuItem").forEach((el) => {
+    if (el.hidden) {
+      el.classList.remove("disabled");
+      return;
+    }
     const action = el.getAttribute("data-action") || "";
-    const shouldDisable = !enabled && action === "toggle-nav";
+    let shouldDisable = false;
+    if (action === "toggle-nav") shouldDisable = !isWorkflow;
+    if (action === "toggle-line-numbers") shouldDisable = !isScripting;
+    if (action === "toggle-exec-time") shouldDisable = !isScripting;
     el.classList.toggle("disabled", shouldDisable);
   });
+  normalizeMenuSeparators(viewMenuDropdown);
 }
 
 function sendWorkflowCommand(type) {
@@ -1214,6 +1616,28 @@ function sendWorkflowCommand(type) {
 function sendDFMCommand(type) {
   const tab = state.tabs.find(t => t.id === state.activeId);
   if (!tab || tab.type !== "dfm") return;
+  ensureIframe(tab);
+  try {
+    tab.iframe?.contentWindow?.postMessage({ type }, "*");
+  } catch {
+    // ignore
+  }
+}
+
+function sendScriptingCommand(type) {
+  const tab = state.tabs.find(t => t.id === state.activeId);
+  if (!tab || tab.type !== "scripting") return;
+  ensureIframe(tab);
+  try {
+    tab.iframe?.contentWindow?.postMessage({ type }, "*");
+  } catch {
+    // ignore
+  }
+}
+
+function sendProjectSettingsCommand(type) {
+  const tab = state.tabs.find(t => t.id === state.activeId);
+  if (!tab || tab.type !== "project_settings") return;
   ensureIframe(tab);
   try {
     tab.iframe?.contentWindow?.postMessage({ type }, "*");
@@ -1344,7 +1768,7 @@ async function pickWorkflowFile() {
     if (lastDir) {
       try {
         const [fileHandle] = await window.showOpenFilePicker({
-          types: [{ description: "Workflow", accept: { "application/json": [".adaswf", ".json"] } }],
+          types: [{ description: "Workflow", accept: { "application/json": [".arcwf", ".json"] } }],
           multiple: false,
           startIn: lastDir,
           id: WF_IMPORT_PICKER_ID,
@@ -1382,7 +1806,7 @@ async function pickWorkflowFile() {
       }
     }
     const [fileHandle] = await window.showOpenFilePicker({
-      types: [{ description: "Workflow", accept: { "application/json": [".adaswf", ".json"] } }],
+      types: [{ description: "Workflow", accept: { "application/json": [".arcwf", ".json"] } }],
       multiple: false,
       startIn,
       id: WF_IMPORT_PICKER_ID,
@@ -1397,7 +1821,7 @@ async function pickWorkflowFile() {
   return await new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = ".adaswf,.json,application/json";
+    input.accept = ".arcwf,.json,application/json";
     input.addEventListener("change", async () => {
       const file = input.files?.[0];
       if (!file) return resolve(null);
@@ -1594,33 +2018,21 @@ window.__adas_confirm_app_shutdown = function () {
   return showAppConfirm({ title: "Warning", message: "Quit the application?", okText: "Quit" });
 };
 
-fileMenuBtn?.addEventListener("click", (e) => {
+menuBarEl?.addEventListener("click", (e) => {
+  const btn = e.target?.closest?.(".menu[data-menu]");
+  if (!btn) return;
+  const type = btn.getAttribute("data-menu") || "";
+  if (type === "about") {
+    closeAllShellMenus();
+    openAboutDialog();
+    return;
+  }
+  if (!shellMenuToggles[type]) {
+    closeAllShellMenus();
+    return;
+  }
   e.stopPropagation();
-  toggleEditMenu(false);
-  toggleViewMenu(false);
-  toggleFileMenu();
-});
-
-editMenuBtn?.addEventListener("click", (e) => {
-  e.stopPropagation();
-  toggleFileMenu(false);
-  toggleViewMenu(false);
-  toggleEditMenu();
-});
-
-viewMenuBtn?.addEventListener("click", (e) => {
-  e.stopPropagation();
-  toggleFileMenu(false);
-  toggleEditMenu(false);
-  toggleViewMenu();
-});
-
-settingsMenuBtn?.addEventListener("click", (e) => {
-  e.stopPropagation();
-  toggleFileMenu(false);
-  toggleEditMenu(false);
-  toggleViewMenu(false);
-  toggleSettingsMenu();
+  openShellMenu(type);
 });
 
 fileMenuDropdown?.addEventListener("click", (e) => {
@@ -1642,14 +2054,37 @@ fileMenuDropdown?.addEventListener("click", (e) => {
     } else if (isActiveDFMTab()) {
       updateStatusBar("Saving...");
       sendDFMCommand("adas:dfm-save");
+    } else if (isActiveScriptingTab()) {
+      updateStatusBar("Saving...");
+      sendScriptingCommand("adas:scripting-save");
+    } else if (isActiveProjectSettingsReservingClassTypesTab()) {
+      updateStatusBar("Saving reserving class types to local file...");
+      sendProjectSettingsCommand("adas:project-settings-reserving-class-types-save-local");
+    } else if (isActiveProjectSettingsDatasetTypesTab()) {
+      updateStatusBar("Saving dataset types to local file...");
+      sendProjectSettingsCommand("adas:project-settings-dataset-types-save-local");
     }
   } else if (action === "save-as") {
     if (isActiveWorkflowTab()) {
       updateStatusBar("Saving as...");
       sendWorkflowCommand("adas:workflow-save-as");
     } else if (isActiveDFMTab()) {
+      if (isActiveDFMDetailsTab()) {
+        updateStatusBar("Saving template...");
+        sendDFMCommand("adas:dfm-save-template");
+      } else {
+        updateStatusBar("Saving as...");
+        sendDFMCommand("adas:dfm-save-as");
+      }
+    } else if (isActiveScriptingTab()) {
       updateStatusBar("Saving as...");
-      sendDFMCommand("adas:dfm-save-as");
+      sendScriptingCommand("adas:scripting-save-as");
+    } else if (isActiveProjectSettingsReservingClassTypesTab()) {
+      updateStatusBar("Loading reserving class types from local file...");
+      sendProjectSettingsCommand("adas:project-settings-reserving-class-types-load-local");
+    } else if (isActiveProjectSettingsDatasetTypesTab()) {
+      updateStatusBar("Loading dataset types from local file...");
+      sendProjectSettingsCommand("adas:project-settings-dataset-types-load-local");
     }
   } else if (action === "import-workflow") {
     importWorkflow();
@@ -1672,6 +2107,10 @@ viewMenuDropdown?.addEventListener("click", (e) => {
   toggleViewMenu(false);
   if (action === "toggle-nav") {
     toggleNavigationPanel();
+  } else if (action === "toggle-line-numbers") {
+    sendScriptingCommand("adas:scripting-toggle-line-numbers");
+  } else if (action === "toggle-exec-time") {
+    sendScriptingCommand("adas:scripting-toggle-exec-time");
   }
 });
 
@@ -1684,6 +2123,8 @@ settingsMenuDropdown?.addEventListener("click", (e) => {
     openFontSettingsModal();
   } else if (action === "root-path-settings") {
     openRootPathSettingsModal();
+  } else if (action === "force-rebuild-settings") {
+    openForceRebuildSettingsModal();
   } else if (action === "clear-cache-reload") {
     clearCacheAndReload();
   }
@@ -1701,12 +2142,20 @@ editMenuDropdown?.addEventListener("click", (e) => {
     sendDFMCommand("adas:dfm-exclude-low");
   } else if (action === "dfm-include-all") {
     sendDFMCommand("adas:dfm-include-all");
+  } else if (action === "render-all-markdown") {
+    sendScriptingCommand("adas:scripting-render-all-markdown");
   }
 });
 
-window.addEventListener("click", () => {
+document.addEventListener("pointerdown", (e) => {
+  const hit = e.target?.closest?.(".menu, .menuDropdown, .tabMenu, .plusTab, #tabCtxMenu");
+  if (hit) return;
   closeAllShellMenus();
-});
+}, true);
+window.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  closeAllShellMenus();
+}, true);
 window.addEventListener("resize", () => {
   if (fileMenuDropdown?.classList.contains("open")) positionFileMenu();
   if (editMenuDropdown?.classList.contains("open")) positionEditMenu();
@@ -1730,13 +2179,20 @@ function setActive(id) {
   saveState();
 }
 
-function closeTab(id) {
+function closeTab(id, skipConfirm = false) {
   if (id === "home") return;
   const idx = state.tabs.findIndex(t => t.id === id);
   if (idx < 0) return;
 
-  const wasActive = state.activeId === id;
   const tab = state.tabs[idx];
+
+  // Show confirmation if tab has unsaved changes
+  if (!skipConfirm && tab.isDirty) {
+    const confirmed = confirm("This tab has unsaved changes. Are you sure you want to close it?");
+    if (!confirmed) return;
+  }
+
+  const wasActive = state.activeId === id;
 
   if (tab.iframe && tab.iframe.parentNode) {
     tab.iframe.parentNode.removeChild(tab.iframe);
@@ -1753,7 +2209,10 @@ function closeTab(id) {
   saveState();
 }
 
-function openDatasetTab() {
+function openDatasetTab(options = {}) {
+  const requestedInputs = normalizeBrowsingHistoryEntry(options?.datasetInputs || null);
+  const lastViewedInputs = getLastViewedDatasetInputs();
+  const datasetInputs = requestedInputs || lastViewedInputs || null;
   const id = `ds_${state.nextId++}`;
 
   state.tabs.push({
@@ -1762,6 +2221,7 @@ function openDatasetTab() {
     type: "dataset",
     iframe: null,
     dsInst: `ds_${id}_${Date.now()}`,
+    datasetInputs: datasetInputs || undefined,
   });
 
   state.activeId = id;
@@ -1778,6 +2238,8 @@ function openDFMTab() {
     type: "dfm",
     iframe: null,
     dsInst: `dfm_${id}_${Date.now()}`,
+    dfmTab: "details",
+    isDirty: false,
   });
 
   state.activeId = id;
@@ -1807,6 +2269,7 @@ function openWorkflowTab() {
 function openProjectSettingsTab() {
   const existing = state.tabs.find(t => t.type === "project_settings");
   if (existing) {
+    if (!existing.projectSettingsRibbon) existing.projectSettingsRibbon = "summary";
     setActive(existing.id);
     return;
   }
@@ -1816,6 +2279,51 @@ function openProjectSettingsTab() {
     id,
     title: "Project Explorer",
     type: "project_settings",
+    projectSettingsRibbon: "summary",
+    iframe: null,
+  });
+
+  state.activeId = id;
+  render();
+  saveState();
+}
+
+function openBrowsingHistoryTab() {
+  const existing = state.tabs.find(t => t.type === "browsing_history");
+  if (existing) {
+    setActive(existing.id);
+    return;
+  }
+
+  const id = `bh_${state.nextId++}`;
+  state.tabs.push({
+    id,
+    title: "Browsing History",
+    type: "browsing_history",
+    iframe: null,
+  });
+
+  state.activeId = id;
+  render();
+  saveState();
+}
+
+function openScriptingTab(options = {}) {
+  const forceNew = !!options?.forceNew;
+  const existing = !forceNew ? state.tabs.find(t => t.type === "scripting") : null;
+  if (existing) {
+    setActive(existing.id);
+    return;
+  }
+
+  const id = `sc_${state.nextId++}`;
+  const scInst = `sc_${state.nextId - 1}_${Date.now()}`;
+  state.tabs.push({
+    id,
+    title: "Untitled Notebook",
+    type: "scripting",
+    scInst,
+    scFresh: true,
     iframe: null,
   });
 
@@ -2182,6 +2690,7 @@ function ensurePlusMenu(host) {
       <div class="tabMenuItem" data-action="add-dataset">Dataset</div>
       <div class="tabMenuItem" data-action="add-dfm">DFM</div>
       <div class="tabMenuItem" data-action="add-workflow">Workflow</div>
+      <div class="tabMenuItem" data-action="add-scripting">Scripting Console</div>
       <div class="tabMenuSep"></div>
       <div class="tabMenuItem" data-action="close-menu">Cancel</div>
     `;
@@ -2206,6 +2715,12 @@ function ensurePlusMenu(host) {
       if (action === "add-workflow") {
         togglePlusMenu(false);
         openWorkflowTab();
+        return;
+      }
+
+      if (action === "add-scripting") {
+        togglePlusMenu(false);
+        openScriptingTab();
         return;
       }
 
@@ -2453,12 +2968,20 @@ function ensureIframe(tab) {
   iframe.style.height = "100%";
   iframe.style.border = "0";
   iframe.style.display = "none";
+  wireIframeMenuAutoClose(iframe);
 
   if (tab.type === "dataset") {
     const params = new URLSearchParams();
     if (tab.datasetId) params.set("ds", tab.datasetId);
+    const initial = normalizeBrowsingHistoryEntry(tab.datasetInputs || null);
+    if (initial) {
+      params.set("project", initial.project);
+      params.set("path", initial.path);
+      params.set("tri", initial.tri);
+    }
     const inst = tab.dsInst || tab.id || `ds_${Date.now()}`;
     params.set("inst", inst);
+    params.set("v", UI_VERSION_PARAM);
     iframe.src = `/ui/dataset_viewer.html?${params.toString()}`;
   } else if (tab.type === "dfm") {
     const params = new URLSearchParams();
@@ -2466,6 +2989,7 @@ function ensureIframe(tab) {
     const inst = tab.dsInst || tab.id || `dfm_${Date.now()}`;
     params.set("inst", inst);
     params.set("v", UI_VERSION_PARAM);
+    if (tab.dfmTab) params.set("tab", tab.dfmTab);
     iframe.src = `/ui/DFM.html?${params.toString()}`;
   } else if (tab.type === "workflow") {
     const inst = tab.wfInst || tab.id || `wf_${Date.now()}`;
@@ -2480,6 +3004,12 @@ function ensureIframe(tab) {
     }, { once: true });
   } else if (tab.type === "project_settings") {
     iframe.src = "/ui/project_settings.html";
+  } else if (tab.type === "browsing_history") {
+    iframe.src = `/ui/browsing_history.html?v=${encodeURIComponent(UI_VERSION_PARAM)}`;
+  } else if (tab.type === "scripting") {
+    const inst = tab.scInst || tab.id || `sc_${Date.now()}`;
+    iframe.src = `/ui/scripting_console.html?inst=${encodeURIComponent(inst)}${tab.scFresh ? "&fresh=1" : ""}`;
+    tab.scFresh = false;
   }
 
   iframeHost.appendChild(iframe);
@@ -2517,7 +3047,7 @@ function updateTabCtxMenuState(tabId) {
   if (!tabCtxMenu) return;
   const isHome = tabId === "home";
   const tab = state.tabs.find(t => t.id === tabId);
-  const canOpenWindow = !!tab && tab.type === "dataset";
+  const canOpenWindow = !!tab && tab.type !== "home";
   tabCtxMenu.querySelectorAll(".tabCtxItem").forEach((el) => {
     el.classList.toggle("disabled", isHome);
     const action = el.getAttribute("data-action") || "";
@@ -2541,8 +3071,16 @@ function removeTabById(id) {
 function closeTabsExcept(keepIds) {
   const keep = new Set(keepIds || []);
   keep.add("home");
-  const toRemove = state.tabs.filter(t => !keep.has(t.id)).map(t => t.id);
-  toRemove.forEach(removeTabById);
+  const toRemove = state.tabs.filter(t => !keep.has(t.id));
+
+  // Check if any tabs to be removed have unsaved changes
+  const dirtyTabs = toRemove.filter(t => t.isDirty);
+  if (dirtyTabs.length > 0) {
+    const confirmed = confirm(`${dirtyTabs.length} tab(s) have unsaved changes. Are you sure you want to close them?`);
+    if (!confirmed) return;
+  }
+
+  toRemove.forEach(t => removeTabById(t.id));
 
   if (!keep.has(state.activeId)) {
     const next = keepIds && keepIds.length ? keepIds[0] : "home";
@@ -2614,22 +3152,136 @@ function renderContent() {
       // ignore
     }
   }
+
+  if (activeTab.iframe && activeTab.type === "browsing_history") {
+    try {
+      activeTab.iframe.contentWindow.postMessage(
+        { type: "adas:tab-activated" },
+        "*"
+      );
+    } catch {
+      // ignore
+    }
+  }
 }
 
-function openTabInNewWindow(tabId) {
+async function openTabInNewWindow(tabId) {
   const tab = state.tabs.find(t => t.id === tabId);
-  if (!tab || tab.type !== "dataset") return;
+  if (!tab || tab.type === "home") return;
+
   const hostApi = getHostApi();
   if (!hostApi?.openTabWindow) {
     updateStatusBar("Open in new window is not available.");
     return;
   }
-  hostApi.openTabWindow({
+
+  // Build instance key and pop-out URL params
+  const inst = tab.dsInst || tab.wfInst || tab.id || `pop_${Date.now()}`;
+  const urlParams = new URLSearchParams();
+  urlParams.set("type", tab.type);
+  urlParams.set("inst", inst);
+  if (tab.datasetId) urlParams.set("ds", tab.datasetId);
+  if (tab.dfmTab) urlParams.set("tab", tab.dfmTab);
+  urlParams.set("title", tab.title || tab.type);
+  urlParams.set("v", UI_VERSION_PARAM);
+
+  // Save tab state for restoration when pop-out closes
+  const savedState = {
+    id: tab.id,
+    title: tab.title,
     type: tab.type,
-    datasetId: tab.datasetId || "",
-    dsInst: tab.dsInst || tab.id || "",
-    title: tab.title || "Dataset",
-  });
+    datasetId: tab.datasetId,
+    datasetInputs: tab.datasetInputs,
+    dsInst: tab.dsInst,
+    wfInst: tab.wfInst,
+    dfmTab: tab.dfmTab,
+    projectSettingsRibbon: tab.projectSettingsRibbon,
+    isDirty: tab.isDirty,
+  };
+
+  // Set up BroadcastChannel to receive messages from pop-out
+  const bridge = await getPopoutBridge();
+  if (bridge) {
+    const channel = bridge.createPopoutChannel(inst);
+    channel.onMessage((data) => {
+      if (data.type === "popout-closed") {
+        restorePopoutTab(inst);
+      } else if (data.type === "relay-to-shell" && data.msg) {
+        // Process relayed message through the existing message handler
+        window.dispatchEvent(new MessageEvent("message", { data: data.msg }));
+      }
+    });
+    poppedOutTabs.set(inst, { tabState: savedState, channel });
+  }
+
+  // Open the pop-out window via host API
+  let opened = false;
+  try {
+    opened = !!(await hostApi.openTabWindow({
+      type: tab.type,
+      url: `/ui/popout_shell.html?${urlParams.toString()}`,
+      datasetId: tab.datasetId || "",
+      dsInst: tab.dsInst || tab.id || "",
+      wfInst: tab.wfInst || "",
+      title: tab.title || tab.type,
+    }));
+  } catch {
+    opened = false;
+  }
+
+  if (!opened) {
+    const entry = poppedOutTabs.get(inst);
+    if (entry) {
+      try { entry.channel.close(); } catch {}
+      poppedOutTabs.delete(inst);
+    }
+    updateStatusBar("Failed to open tab in new window.");
+    return;
+  }
+
+  // Close the tab from the main shell
+  removeTabById(tabId);
+  if (state.activeId === tabId) {
+    state.activeId = "home";
+  }
+  render();
+  saveState();
+}
+
+function restorePopoutTab(inst) {
+  const entry = poppedOutTabs.get(inst);
+  if (!entry) return;
+
+  const { tabState, channel } = entry;
+  channel.close();
+  poppedOutTabs.delete(inst);
+
+  // Re-add the tab to state
+  const newTab = {
+    id: tabState.id || `restored_${Date.now()}`,
+    title: tabState.title || tabState.type,
+    type: tabState.type,
+    datasetId: tabState.datasetId,
+    datasetInputs: normalizeBrowsingHistoryEntry(tabState.datasetInputs || null) || undefined,
+    dsInst: tabState.dsInst,
+    wfInst: tabState.wfInst,
+    dfmTab: tabState.dfmTab,
+    projectSettingsRibbon: tabState.type === "project_settings"
+      ? String(tabState.projectSettingsRibbon || "").trim().toLowerCase() || "summary"
+      : undefined,
+    isDirty: tabState.isDirty,
+  };
+
+  state.tabs.push(newTab);
+  state.activeId = newTab.id;
+  render();
+  saveState();
+}
+
+function relayToPopoutChannels(msg) {
+  for (const [, entry] of poppedOutTabs) {
+    entry.channel.send({ type: "relay-to-iframe", msg });
+  }
 }
 
 function printActiveTab() {
@@ -2668,6 +3320,7 @@ function wire() {
   initAutoSaveToggle();
   initFontSettingsModal();
   initRootPathSettingsModal();
+  initForceRebuildSettingsModal();
 
   window.addEventListener("message", (e) => {
     const msg = e.data;
@@ -2681,6 +3334,30 @@ function wire() {
     if (msg.type === "adas:dfm-edit-state") {
       dfmEditEnabled = !!msg.enabled;
       updateEditMenuState();
+      return;
+    }
+
+    if (msg.type === "adas:project-settings-ribbon-changed") {
+      const ribbon = String(msg.ribbon || "").trim().toLowerCase();
+      let updated = false;
+      for (const tab of state.tabs || []) {
+        if (tab.type !== "project_settings" || !tab.iframe) continue;
+        if (tab.iframe.contentWindow !== e.source) continue;
+        tab.projectSettingsRibbon = ribbon;
+        updated = true;
+        break;
+      }
+      if (!updated) {
+        const activeTab = state.tabs.find((t) => t.id === state.activeId && t.type === "project_settings");
+        if (activeTab) {
+          activeTab.projectSettingsRibbon = ribbon;
+          updated = true;
+        }
+      }
+      if (updated) {
+        updateFileMenuState();
+        saveState();
+      }
       return;
     }
 
@@ -2728,6 +3405,35 @@ function wire() {
       return;
     }
 
+    if (msg.type === "adas:dfm-tab-changed") {
+      const inst = String(msg.inst || "");
+      const dfmTab = msg.tab;
+      if (!inst || !dfmTab) return;
+      const tab = state.tabs.find(t => t.type === "dfm" && t.dsInst === inst);
+      if (tab && tab.dfmTab !== dfmTab) {
+        tab.dfmTab = dfmTab;
+        if (tab.id === state.activeId) {
+          updateFileMenuState();
+        }
+        saveState();
+      }
+      return;
+    }
+
+    if (msg.type === "adas:dfm-dirty") {
+      const inst = String(msg.inst || "");
+      if (!inst) return;
+      const tab = state.tabs.find(t => t.type === "dfm" && t.dsInst === inst);
+      if (!tab) return;
+      const dirty = !!msg.dirty;
+      if (tab.isDirty === dirty) return;
+      tab.isDirty = dirty;
+      if (dirty) clearSavedStatusOnDirty();
+      renderTabs();
+      saveState();
+      return;
+    }
+
     if (msg.type === "adas:zoom") {
       const deltaY = Number(msg.deltaY || 0);
       adjustZoomByDelta(deltaY);
@@ -2746,9 +3452,77 @@ function wire() {
       return;
     }
 
+    if (msg.type === "adas:open-path") {
+      const requestId = String(msg.requestId || "").trim();
+      const targetPath = String(msg.path || "").trim();
+      const source = e?.source;
+      const reply = (payload) => {
+        if (!requestId || !source || typeof source.postMessage !== "function") return;
+        try {
+          source.postMessage({ type: "adas:open-path-result", requestId, ...payload }, "*");
+        } catch {
+          // ignore
+        }
+      };
+
+      if (!requestId) return;
+      if (!targetPath) {
+        reply({ ok: false, error: "Empty path." });
+        return;
+      }
+
+      const hostApi = getHostApi();
+      if (!hostApi || typeof hostApi.openPath !== "function") {
+        reply({ ok: false, error: "Open path requires desktop app." });
+        return;
+      }
+
+      Promise.resolve(hostApi.openPath({ path: targetPath }))
+        .then((result) => {
+          if (result?.ok) {
+            reply({ ok: true });
+          } else {
+            reply({ ok: false, error: String(result?.error || `Path not found: ${targetPath}`) });
+          }
+        })
+        .catch((err) => {
+          reply({ ok: false, error: String(err?.message || err) });
+        });
+      return;
+    }
+
     if (msg.type === "adas:status") {
       const text = String(msg.text || "").trim();
-      if (text) updateStatusBar(text);
+      if (text) updateStatusBar(text, { tone: msg.tone || msg.level || "" });
+      return;
+    }
+
+    if (msg.type === "adas:dataset-settings-changed") {
+      const active = state.tabs.find(t => t.id === state.activeId);
+      const resolved = normalizeBrowsingHistoryEntry(msg?.resolved || null);
+      if (active && active.type === "dataset" && resolved) {
+        active.datasetInputs = resolved;
+        saveState();
+      }
+      notifyBrowsingHistoryTabs({ resolved });
+      return;
+    }
+
+    if (msg.type === "adas:browsing-history-updated") {
+      const active = state.tabs.find(t => t.id === state.activeId);
+      const entry = normalizeBrowsingHistoryEntry(msg?.entry || null);
+      if (active && active.type === "dataset" && entry) {
+        active.datasetInputs = entry;
+        saveState();
+      }
+      notifyBrowsingHistoryTabs({ entry });
+      return;
+    }
+
+    if (msg.type === "adas:open-dataset-from-history") {
+      const entry = normalizeBrowsingHistoryEntry(msg?.entry || null);
+      if (!entry) return;
+      openDatasetTab({ datasetInputs: entry });
       return;
     }
 
@@ -2813,6 +3587,7 @@ function wire() {
     if (tab.type === "home") return;
     if (tab.type === "workflow") return;
     if (tab.type === "project_settings") return;
+    if (tab.type === "browsing_history") return;
 
     // if (tab.type !== "dataset" && tab.type !== "workflow") return;
 

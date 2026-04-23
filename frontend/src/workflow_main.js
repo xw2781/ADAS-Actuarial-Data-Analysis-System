@@ -1,4 +1,6 @@
 import { openContextMenu } from "./menu_utils.js";
+import { openLazyReservingClassPicker } from "./reserving_class_lazy_picker.js";
+import { openProjectNameTreePicker } from "./project_name_tree_picker.js";
 
 const stepsEl = document.getElementById("steps");
 const inspectorEl = document.getElementById("inspector");
@@ -10,11 +12,41 @@ const sidebarResizer = document.getElementById("sidebarResizer");
 const datasetEmbedCache = new Map();
 const dfmEmbedCache = new Map();
 const TRI_INPUTS_KEY = "adas_tri_inputs";
+const GLOBAL_VAR_TYPE_PROJECT = "project";
+const GLOBAL_VAR_TYPE_RESERVING_CLASS = "reservingClass";
+const GLOBAL_VAR_TYPE_STRING = "string";
+const GLOBAL_VAR_TYPE_OPTIONS = [
+  { value: GLOBAL_VAR_TYPE_PROJECT, label: "Project" },
+  { value: GLOBAL_VAR_TYPE_RESERVING_CLASS, label: "Reserving Class" },
+  { value: GLOBAL_VAR_TYPE_STRING, label: "String" },
+];
+
+function getDefaultGlobalVarTypeForKey(key) {
+  if (key === "project") return GLOBAL_VAR_TYPE_PROJECT;
+  if (key === "reservingClass") return GLOBAL_VAR_TYPE_RESERVING_CLASS;
+  return GLOBAL_VAR_TYPE_STRING;
+}
+
+function normalizeGlobalVarType(type, key = "") {
+  const raw = String(type == null ? "" : type).trim().toLowerCase();
+  if (raw === "project") return GLOBAL_VAR_TYPE_PROJECT;
+  if (raw === "reservingclass" || raw === "reserving_class" || raw === "reserving class") {
+    return GLOBAL_VAR_TYPE_RESERVING_CLASS;
+  }
+  if (raw === "string") return GLOBAL_VAR_TYPE_STRING;
+  return getDefaultGlobalVarTypeForKey(key);
+}
+
+const DEFAULT_GLOBAL_VARS = [
+  { key: "project", name: "Project", type: GLOBAL_VAR_TYPE_PROJECT, value: "" },
+  { key: "reservingClass", name: "Reserving Class", type: GLOBAL_VAR_TYPE_RESERVING_CLASS, value: "" },
+];
 
 const state = {
   steps: [],
   activeId: null,
-  nextId: 1
+  nextId: 1,
+  globalControl: { vars: DEFAULT_GLOBAL_VARS.map((v) => ({ ...v })) }
 };
 
 const qs = new URLSearchParams(window.location.search);
@@ -25,6 +57,7 @@ const WF_TITLE_KEY = `adas_workflow_title_v1::${instanceId}`;
 const WF_SIDEBAR_W_KEY = `adas_workflow_sidebar_w_v1::${instanceId}`;
 const WF_SIDEBAR_COLLAPSED_KEY = `adas_workflow_sidebar_collapsed_v1::${instanceId}`;
 const WF_LAST_PATH_KEY = `adas_workflow_last_path_v1::${instanceId}`;
+const WF_GLOBAL_CTRL_KEY = `adas_workflow_global_ctrl_v1::${instanceId}`;
 const WF_AUTOSAVE_MS = 60 * 1000;
 const ZOOM_STORAGE_KEY = "adas_ui_zoom_pct";
 const ZOOM_MODE_KEY = "adas_zoom_mode";
@@ -182,6 +215,18 @@ window.addEventListener("message", (e) => {
   if (e?.data?.type === "adas:autosave-toggle") {
     autoSaveEnabled = !!e.data.enabled;
     try { localStorage.setItem(AUTOSAVE_KEY, autoSaveEnabled ? "1" : "0"); } catch {}
+    return;
+  }
+  if (e?.data?.type === "adas:dfm-tab-changed") {
+    const inst = e.data.inst;
+    const tab = e.data.tab;
+    if (inst && tab) {
+      const step = state.steps.find((s) => s.id === inst);
+      if (step) {
+        step.dfmTab = tab;
+        saveState();
+      }
+    }
   }
 });
 
@@ -226,13 +271,115 @@ function setSidebarCollapsed(collapsed) {
   try { localStorage.setItem(WF_SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0"); } catch {}
 }
 
+function cloneDefaultGlobalVars() {
+  return DEFAULT_GLOBAL_VARS.map((v) => ({
+    key: v.key,
+    name: v.name,
+    type: normalizeGlobalVarType(v.type, v.key),
+    value: v.value || "",
+  }));
+}
+
+function normalizeGlobalControl(input) {
+  const obj = input && typeof input === "object" ? input : {};
+  let vars = null;
+
+  if (Array.isArray(obj.vars)) {
+    vars = obj.vars;
+  } else if ("project" in obj || "reservingClass" in obj) {
+    const project = typeof obj.project === "string" ? obj.project : "";
+    const reservingClass = typeof obj.reservingClass === "string" ? obj.reservingClass : "";
+    vars = cloneDefaultGlobalVars().map((v) => {
+      if (v.key === "project") return { ...v, value: project };
+      if (v.key === "reservingClass") return { ...v, value: reservingClass };
+      return v;
+    });
+  } else {
+    vars = cloneDefaultGlobalVars();
+  }
+
+  const cleaned = [];
+  for (const v of vars) {
+    if (!v || typeof v !== "object") continue;
+    const key = typeof v.key === "string" ? v.key.trim() : "";
+    const name = typeof v.name === "string"
+      ? v.name.trim()
+      : (key === "project" ? "Project" : key === "reservingClass" ? "Reserving Class" : "");
+    const type = normalizeGlobalVarType(v.type, key);
+    const value = v.value == null ? "" : String(v.value);
+    if (!key && !name && !value) continue;
+    cleaned.push({ key, name, type, value });
+  }
+
+  const required = [
+    { key: "project", name: "Project", type: GLOBAL_VAR_TYPE_PROJECT },
+    { key: "reservingClass", name: "Reserving Class", type: GLOBAL_VAR_TYPE_RESERVING_CLASS },
+  ];
+
+  const ordered = [];
+  for (const req of required) {
+    const found = cleaned.find((v) => v.key === req.key);
+    if (found) {
+      ordered.push({
+        ...found,
+        name: found.name || req.name,
+        type: normalizeGlobalVarType(found.type, req.key),
+      });
+    } else {
+      ordered.push({ key: req.key, name: req.name, type: req.type, value: "" });
+    }
+  }
+  for (const v of cleaned) {
+    if (required.some((r) => r.key === v.key)) continue;
+    ordered.push(v);
+  }
+
+  return { vars: ordered };
+}
+
+function loadGlobalControlFromStorage() {
+  try {
+    const raw = localStorage.getItem(WF_GLOBAL_CTRL_KEY) || "";
+    if (!raw) return normalizeGlobalControl(null);
+    const parsed = JSON.parse(raw);
+    return normalizeGlobalControl(parsed);
+  } catch {
+    return normalizeGlobalControl(null);
+  }
+}
+
+function saveGlobalControlToStorage(value) {
+  try {
+    const payload = normalizeGlobalControl(value);
+    localStorage.setItem(WF_GLOBAL_CTRL_KEY, JSON.stringify(payload));
+  } catch {
+    // ignore
+  }
+}
+
+function broadcastGlobalControlChange() {
+  const payload = normalizeGlobalControl(state.globalControl);
+  const msg = { type: "adas:workflow-global-changed", globalControl: payload, wf: instanceId };
+  for (const [, frame] of dfmEmbedCache) {
+    if (!frame || !frame.contentWindow) continue;
+    try { frame.contentWindow.postMessage(msg, "*"); } catch { /* ignore */ }
+  }
+  for (const [, frame] of datasetEmbedCache) {
+    if (!frame || !frame.contentWindow) continue;
+    try { frame.contentWindow.postMessage(msg, "*"); } catch { /* ignore */ }
+  }
+}
+
 function saveState() {
   try {
+    enforceSingleGlobalControlStep(state.activeId || "");
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       steps: state.steps,
       activeId: state.activeId,
       nextId: state.nextId,
+      globalControl: normalizeGlobalControl(state.globalControl),
     }));
+    saveGlobalControlToStorage(state.globalControl);
     if (!suppressDirty) markWorkflowDirty();
   } catch {}
 }
@@ -357,9 +504,39 @@ async function collectDatasetSettings(step) {
   return getDatasetSettingsFromStorage(step.id);
 }
 
+function requestDfmSettingsFromIframe(stepId) {
+  return new Promise((resolve) => {
+    const iframe = dfmEmbedCache.get(stepId);
+    if (!iframe || !iframe.contentWindow) {
+      resolve(null);
+      return;
+    }
+    const requestId = `dfm-settings-${stepId}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const onMsg = (e) => {
+      if (e?.data?.type !== "adas:dfm-settings") return;
+      if (e.data.requestId !== requestId) return;
+      window.removeEventListener("message", onMsg);
+      resolve(e.data.settings || null);
+    };
+    window.addEventListener("message", onMsg);
+    iframe.contentWindow.postMessage({ type: "adas:get-dfm-settings", requestId }, "*");
+    setTimeout(() => {
+      window.removeEventListener("message", onMsg);
+      resolve(null);
+    }, 800);
+  });
+}
+
+async function collectDfmSettings(step) {
+  const fromIframe = await requestDfmSettingsFromIframe(step.id);
+  if (fromIframe) return fromIframe;
+  return step.dfmSettings || null;
+}
+
 async function buildWorkflowSnapshot() {
   const steps = await Promise.all(state.steps.map(async (s) => {
     const datasetSettings = s.mode === "dataset" ? await collectDatasetSettings(s) : null;
+    const dfmSettings = s.mode === "dfm" ? await collectDfmSettings(s) : null;
     return {
       id: s.id,
       name: s.name,
@@ -370,6 +547,8 @@ async function buildWorkflowSnapshot() {
       datasetId: s.datasetId || "",
       params: s.params || {},
       datasetSettings,
+      dfmSettings,
+      dfmTab: s.dfmTab || "",
     };
   }));
 
@@ -379,12 +558,18 @@ async function buildWorkflowSnapshot() {
     updatedAt: new Date().toISOString(),
     sidebarWidth: getSidebarWidth(),
     steps,
+    globalControl: normalizeGlobalControl(state.globalControl),
   };
 }
 
 async function saveWorkflowToDefaultDir({ force = false, source = "auto" } = {}) {
   if (!force && !workflowDirty) return;
   if (saveInFlight) return;
+
+  /* Tell all embedded DFM iframes to save their method settings to local JSON */
+  for (const [, frame] of dfmEmbedCache) {
+    try { frame?.contentWindow?.postMessage({ type: "adas:dfm-save" }, "*"); } catch {}
+  }
 
   const snapshot = await buildWorkflowSnapshot();
   const signature = JSON.stringify(snapshot);
@@ -423,7 +608,7 @@ async function saveWorkflowToDefaultDir({ force = false, source = "auto" } = {})
 
 async function saveWorkflowAs() {
   const snapshot = await buildWorkflowSnapshot();
-  const filename = sanitizeFilename(snapshot.name) + ".adaswf";
+    const filename = sanitizeFilename(snapshot.name) + ".arcwf";
   const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
 
   const hostApi = getHostApi();
@@ -463,7 +648,7 @@ async function saveWorkflowAs() {
     try {
       const handle = await window.showSaveFilePicker({
         suggestedName: filename,
-        types: [{ description: "Workflow", accept: { "application/json": [".adaswf", ".json"] } }],
+        types: [{ description: "Workflow", accept: { "application/json": [".arcwf", ".json"] } }],
       });
       const writable = await handle.createWritable();
       await writable.write(blob);
@@ -519,6 +704,8 @@ function normalizeLoadedStep(step, index) {
     datasetId: step?.datasetId || "",
     params: step?.params || {},
     datasetSettings: step?.datasetSettings || null,
+    dfmSettings: step?.dfmSettings || null,
+    dfmTab: step?.dfmTab || "",
   };
 }
 
@@ -569,6 +756,10 @@ async function loadWorkflowSnapshot(data) {
     state.steps = steps;
     state.activeId = data.activeId || (steps[0]?.id ?? null);
     state.nextId = data.nextId || computeNextId(steps);
+    enforceSingleGlobalControlStep(state.activeId || "");
+    state.globalControl = normalizeGlobalControl(data.globalControl);
+    saveGlobalControlToStorage(state.globalControl);
+    broadcastGlobalControlChange();
 
     if (data.name) setWorkflowTitle(String(data.name));
 
@@ -629,6 +820,8 @@ function loadState() {
     state.steps = [];
     state.activeId = null;
     state.nextId = 1;
+    state.globalControl = normalizeGlobalControl(null);
+    saveGlobalControlToStorage(state.globalControl);
     saveState();
     return;
   }
@@ -640,6 +833,9 @@ function loadState() {
     state.steps = s.steps;
     state.activeId = s.activeId || (s.steps[0]?.id ?? null);
     state.nextId = s.nextId || (s.steps.length + 1);
+    enforceSingleGlobalControlStep(state.activeId || "");
+    state.globalControl = normalizeGlobalControl(s.globalControl || loadGlobalControlFromStorage());
+    saveGlobalControlToStorage(state.globalControl);
   } catch {}
 }
 
@@ -649,6 +845,39 @@ function getActiveStep() {
 
 function setHint(txt) {
   if (wsHintEl) wsHintEl.textContent = txt || "";
+}
+
+function getStepLabel(step) {
+  const idx = state.steps.indexOf(step);
+  return `Step (${idx + 1})`;
+}
+
+function findGlobalControlStep(excludeStepId = "") {
+  for (const s of state.steps) {
+    if (!s || s.mode !== "global_control") continue;
+    if (excludeStepId && s.id === excludeStepId) continue;
+    return s;
+  }
+  return null;
+}
+
+function enforceSingleGlobalControlStep(preferredStepId = "") {
+  let keeper = null;
+  if (preferredStepId) {
+    keeper = state.steps.find((s) => s?.id === preferredStepId && s.mode === "global_control") || null;
+  }
+  let changed = false;
+  for (const s of state.steps) {
+    if (!s || s.mode !== "global_control") continue;
+    if (!keeper) {
+      keeper = s;
+      continue;
+    }
+    if (s.id === keeper.id) continue;
+    s.mode = "picker";
+    changed = true;
+  }
+  return changed;
 }
 
 function clearWorkspace() {
@@ -676,16 +905,27 @@ function ensureEmbedHost() {
 
 function renderPickerCards(step) {
   clearWorkspace();
-  setHint(`${step.name} — select an object`);
+  setHint(`${getStepLabel(step)} — select an object`);
 
   const wrap = document.createElement("div");
   wrap.className = "cards";
 
-  const mkCard = (title, desc, onClick) => {
+  const mkCard = (title, desc, onClick, opts = {}) => {
+    const disabled = !!opts.disabled;
     const c = document.createElement("div");
-    c.className = "card clickable";
+    c.className = disabled ? "card" : "card clickable";
     c.innerHTML = `<h3>${title}</h3><div class="muted">${desc}</div>`;
-    c.addEventListener("click", onClick);
+    if (disabled) {
+      c.style.opacity = "0.55";
+      c.style.cursor = "not-allowed";
+    }
+    c.addEventListener("click", () => {
+      if (disabled) {
+        if (typeof opts.onDisabledClick === "function") opts.onDisabledClick();
+        return;
+      }
+      onClick();
+    });
     return c;
   };
 
@@ -727,12 +967,39 @@ function renderPickerCards(step) {
     )
   );
 
+  // 4) global control
+  const existingGlobalControl = findGlobalControlStep(step.id);
+  wrap.appendChild(
+    mkCard(
+      "Global Control",
+      existingGlobalControl
+        ? `Already configured in ${getStepLabel(existingGlobalControl)}.`
+        : "Set default project and reserving class for the workflow.",
+      () => {
+        const occupied = findGlobalControlStep(step.id);
+        if (occupied) {
+          setHint(`Global Control already exists in ${getStepLabel(occupied)}.`);
+          return;
+        }
+        step.mode = "global_control";
+        renderWorkspaceForStep(step);
+        saveState();
+      },
+      {
+        disabled: !!existingGlobalControl,
+        onDisabledClick: () => {
+          setHint(`Global Control already exists in ${getStepLabel(existingGlobalControl)}.`);
+        },
+      }
+    )
+  );
+
   workspaceEl.appendChild(wrap);
 }
 
 function renderEmbeddedDataset(step) {
   clearWorkspace();
-  setHint(`Step: ${step.name} — dataset (${step.datasetId || ""})`);
+  setHint(`${getStepLabel(step)} \u2014 View Dataset`);
 
   const host = ensureEmbedHost();
   if (!host) return;
@@ -769,7 +1036,7 @@ function renderEmbeddedDataset(step) {
 
 function renderEmbeddedDfm(step) {
   clearWorkspace();
-  setHint(`Step: ${step.name} â€” DFM`);
+  setHint(`${getStepLabel(step)} \u2014 Development Factor Method`);
 
   const host = ensureEmbedHost();
   if (!host) return;
@@ -781,7 +1048,16 @@ function renderEmbeddedDfm(step) {
     iframe.className = "embedFrame";
     const params = new URLSearchParams();
     params.set("inst", step.id || "step");
+    params.set("wf", instanceId);
     if (step.datasetId) params.set("ds", step.datasetId);
+    if (step.dfmTab) params.set("tab", step.dfmTab);
+    const gc = state.globalControl?.vars || [];
+    const proj = step.dfmSettings?.project || gc.find(v => v.key === "project")?.value || "";
+    const rc = step.dfmSettings?.reservingClass || gc.find(v => v.key === "reservingClass")?.value || "";
+    const outputType = step.dfmSettings?.outputType || "";
+    if (proj) params.set("project", proj);
+    if (rc) params.set("class", rc);
+    if (outputType) params.set("output_type", outputType);
     iframe.src = `/ui/DFM.html?${params.toString()}`;
     iframe.addEventListener("load", () => {
       try {
@@ -815,7 +1091,7 @@ function renderEmbeddedDfm(step) {
 
 function renderPlaceholder(step, title) {
   clearWorkspace();
-  setHint(`Step: ${step.name} — ${title}`);
+  setHint(`${getStepLabel(step)} — ${title}`);
 
   const box = document.createElement("div");
   box.className = "card";
@@ -829,6 +1105,340 @@ function renderPlaceholder(step, title) {
   workspaceEl.appendChild(box);
 
   box.querySelector("#backToPickerBtn")?.addEventListener("click", () => {
+    step.mode = "picker";
+    renderWorkspaceForStep(step);
+    saveState();
+  });
+}
+
+/* ============================================================
+   Reserving-class tree picker (floating draggable window)
+   ============================================================ */
+
+async function openReservingClassTree(projectName, targetInput, anchorElement = null) {
+  await openLazyReservingClassPicker({
+    projectName,
+    initialPath: targetInput?.value || "",
+    anchorElement: anchorElement || targetInput || null,
+    setStatus: setHint,
+    title: "Reserving Class",
+    onError: (err) => {
+      console.error("Failed to load reserving class paths:", err);
+      setHint("Error loading reserving class paths.");
+    },
+    onSelect: (path) => {
+      if (targetInput) targetInput.value = path;
+    },
+  });
+}
+
+async function openProjectNameTree(targetInput, anchorElement = null) {
+  await openProjectNameTreePicker({
+    initialProject: targetInput?.value || "",
+    anchorElement: anchorElement || targetInput || null,
+    setStatus: setHint,
+    title: "Select a Project",
+    onError: (err) => {
+      console.error("Failed to load project tree:", err);
+      setHint("Error loading project tree.");
+    },
+    onSelect: (projectName) => {
+      if (!targetInput) return;
+      targetInput.value = String(projectName || "").trim();
+    },
+  });
+}
+
+function renderGlobalControl(step) {
+  clearWorkspace();
+  setHint("Global Control - defaults for this workflow");
+
+  const box = document.createElement("div");
+  box.className = "card wide";
+  box.innerHTML = `
+    <h3>Global Control</h3>
+    <div class="muted">Set defaults for new DFM steps in this workflow.</div>
+    <table class="gc-table">
+      <thead>
+        <tr>
+          <th style="width: 30%;">Variable</th>
+          <th style="width: 22%;">Type</th>
+          <th>Value</th>
+          <th style="width: 70px;"></th>
+        </tr>
+      </thead>
+      <tbody id="gcTableBody"></tbody>
+    </table>
+    <div class="gc-actions">
+      <button id="gcAddRowBtn">Add Row</button>
+      <button id="gcSaveBtn">Save Defaults</button>
+      <button id="gcClearBtn">Clear Values</button>
+      <button id="gcBackBtn">Back</button>
+    </div>
+    <div class="gc-hint">These defaults apply to new DFM steps in this workflow.</div>
+  `;
+  workspaceEl.appendChild(box);
+
+  const tbody = box.querySelector("#gcTableBody");
+  const defaults = normalizeGlobalControl(state.globalControl);
+  const rows = Array.isArray(defaults.vars) ? defaults.vars : [];
+
+  const defaultNameForKey = (key) => {
+    if (key === "project") return "Project";
+    if (key === "reservingClass") return "Reserving Class";
+    return "";
+  };
+
+  /* ---- fetch project names for dropdown ---- */
+  let _projectNames = [];
+  const _projectNamesReady = fetch("/adas/projects")
+    .then((r) => r.ok ? r.json() : { projects: [] })
+    .then((d) => { _projectNames = (d.projects || []).slice().reverse(); })
+    .catch(() => { _projectNames = []; });
+
+  /** Build a custom filterable combo-box and return the wrapper element. */
+  function buildProjectCombo(initialValue) {
+    const wrap = document.createElement("div");
+    wrap.className = "gc-combo";
+
+    const inp = document.createElement("input");
+    inp.className = "gc-value";
+    inp.type = "text";
+    inp.autocomplete = "off";
+    inp.placeholder = "Loading...";
+
+    const arrow = document.createElement("span");
+    arrow.className = "gc-combo-arrow";
+    arrow.textContent = "\u25BC";
+
+    const ul = document.createElement("ul");
+    ul.className = "gc-combo-list";
+
+    const pickerBtn = document.createElement("button");
+    pickerBtn.type = "button";
+    pickerBtn.className = "gc-tree-icon gc-project-tree-btn";
+    pickerBtn.title = "Browse projects";
+    pickerBtn.textContent = "...";
+
+    wrap.appendChild(inp);
+    wrap.appendChild(arrow);
+    wrap.appendChild(ul);
+    wrap.appendChild(pickerBtn);
+
+    let activeIdx = -1;
+
+    const populateList = (filter) => {
+      ul.innerHTML = "";
+      activeIdx = -1;
+      const q = (filter || "").toLowerCase();
+      const filtered = q
+        ? _projectNames.filter((p) => p.toLowerCase().includes(q))
+        : _projectNames;
+      filtered.forEach((p) => {
+        const li = document.createElement("li");
+        li.textContent = p;
+        li.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          inp.value = p;
+          wrap.classList.remove("open");
+        });
+        ul.appendChild(li);
+      });
+    };
+
+    const open = () => { populateList(inp.value); wrap.classList.add("open"); };
+    const close = () => { wrap.classList.remove("open"); activeIdx = -1; };
+
+    inp.addEventListener("focus", open);
+    inp.addEventListener("input", () => { populateList(inp.value); wrap.classList.add("open"); });
+    inp.addEventListener("blur", () => setTimeout(close, 150));
+    inp.addEventListener("keydown", (e) => {
+      const items = ul.querySelectorAll("li");
+      if (!items.length) return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        activeIdx = Math.min(activeIdx + 1, items.length - 1);
+        items.forEach((li, i) => li.classList.toggle("active", i === activeIdx));
+        items[activeIdx]?.scrollIntoView({ block: "nearest" });
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        activeIdx = Math.max(activeIdx - 1, 0);
+        items.forEach((li, i) => li.classList.toggle("active", i === activeIdx));
+        items[activeIdx]?.scrollIntoView({ block: "nearest" });
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (activeIdx >= 0 && items[activeIdx]) {
+          inp.value = items[activeIdx].textContent;
+        }
+        close();
+      } else if (e.key === "Escape") {
+        close();
+      }
+    });
+
+    /* clicking the arrow toggles */
+    arrow.style.pointerEvents = "auto";
+    arrow.style.cursor = "pointer";
+    arrow.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      if (wrap.classList.contains("open")) close(); else { inp.focus(); open(); }
+    });
+    pickerBtn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+      void openProjectNameTree(inp, inp);
+    });
+
+    _projectNamesReady.then(() => {
+      inp.placeholder = "";
+      if (initialValue && _projectNames.includes(initialValue)) {
+        inp.value = initialValue;
+      } else if (_projectNames.length) {
+        inp.value = _projectNames[0];
+      }
+    });
+
+    return wrap;
+  }
+
+  const renderRow = (row) => {
+    const tr = document.createElement("tr");
+    tr.dataset.key = row.key || "";
+
+    const typeOptionsHtml = GLOBAL_VAR_TYPE_OPTIONS
+      .map((opt) => `<option value="${opt.value}">${opt.label}</option>`)
+      .join("");
+
+    tr.innerHTML = `
+      <td><input class="gc-name" type="text" /></td>
+      <td><select class="gc-type">${typeOptionsHtml}</select></td>
+      <td class="gc-value-cell"></td>
+      <td><button class="gc-remove" type="button">Remove</button></td>
+    `;
+
+    const nameInput = tr.querySelector(".gc-name");
+    const typeSelect = tr.querySelector(".gc-type");
+    const valueCell = tr.querySelector(".gc-value-cell");
+    const removeBtn = tr.querySelector(".gc-remove");
+
+    if (nameInput) nameInput.value = row.name || defaultNameForKey(row.key);
+    if (typeSelect) {
+      typeSelect.value = normalizeGlobalVarType(row.type, row.key);
+    }
+
+    const getProjectInput = () => {
+      const byKey = tbody?.querySelector('tr[data-key="project"] .gc-value');
+      if (byKey) return byKey;
+      const trs = tbody ? Array.from(tbody.querySelectorAll("tr")) : [];
+      for (const rowEl of trs) {
+        const key = rowEl.dataset.key || "";
+        const type = normalizeGlobalVarType(rowEl.querySelector(".gc-type")?.value, key);
+        if (type !== GLOBAL_VAR_TYPE_PROJECT) continue;
+        const input = rowEl.querySelector(".gc-value");
+        if (input) return input;
+      }
+      return null;
+    };
+
+    const renderValueInput = () => {
+      if (!valueCell) return;
+      const currentValue = tr.querySelector(".gc-value")?.value || row.value || "";
+      const type = normalizeGlobalVarType(typeSelect?.value, row.key);
+      valueCell.innerHTML = "";
+
+      if (type === GLOBAL_VAR_TYPE_PROJECT) {
+        valueCell.appendChild(buildProjectCombo(currentValue));
+        return;
+      }
+
+      const valueInput = document.createElement("input");
+      valueInput.className = "gc-value";
+      valueInput.type = "text";
+      valueInput.value = currentValue;
+
+      if (type === GLOBAL_VAR_TYPE_RESERVING_CLASS) {
+        const wrap = document.createElement("div");
+        wrap.className = "gc-value-with-icon";
+        wrap.appendChild(valueInput);
+
+        const icon = document.createElement("button");
+        icon.type = "button";
+        icon.className = "gc-tree-icon";
+        icon.title = "Browse reserving classes";
+        icon.textContent = "...";
+        icon.addEventListener("click", () => {
+          const projInput = getProjectInput();
+          const projName = projInput ? projInput.value.trim() : "";
+          if (!projName) { setHint("Please select a project first."); return; }
+          openReservingClassTree(projName, valueInput, valueInput);
+        });
+        wrap.appendChild(icon);
+        valueCell.appendChild(wrap);
+        return;
+      }
+
+      valueCell.appendChild(valueInput);
+    };
+
+    renderValueInput();
+    typeSelect?.addEventListener("change", renderValueInput);
+
+    if (row.key) {
+      if (nameInput) {
+        nameInput.disabled = true;
+        nameInput.title = "System variable";
+      }
+      if (removeBtn) {
+        removeBtn.disabled = true;
+        removeBtn.style.visibility = "hidden";
+      }
+    } else if (removeBtn) {
+      removeBtn.addEventListener("click", () => tr.remove());
+    }
+
+    tbody?.appendChild(tr);
+  };
+
+  rows.forEach(renderRow);
+
+  const collectRows = () => {
+    const out = [];
+    const trs = tbody ? Array.from(tbody.querySelectorAll("tr")) : [];
+    for (const tr of trs) {
+      const key = tr.dataset.key || "";
+      const name = tr.querySelector(".gc-name")?.value?.trim() || "";
+      const type = normalizeGlobalVarType(tr.querySelector(".gc-type")?.value, key);
+      const value = tr.querySelector(".gc-value")?.value?.trim() || "";
+      if (!key && !name && !value) continue;
+      out.push({ key, name: key ? (name || defaultNameForKey(key)) : name, type, value });
+    }
+    return out;
+  };
+
+  const apply = () => {
+    const next = { vars: collectRows() };
+    state.globalControl = normalizeGlobalControl(next);
+    saveState();
+    broadcastGlobalControlChange();
+  };
+
+  box.querySelector("#gcAddRowBtn")?.addEventListener("click", () => {
+    renderRow({ key: "", name: "", type: GLOBAL_VAR_TYPE_STRING, value: "" });
+  });
+
+  box.querySelector("#gcSaveBtn")?.addEventListener("click", () => {
+    apply();
+    setHint("Global Control - defaults saved");
+  });
+
+  box.querySelector("#gcClearBtn")?.addEventListener("click", () => {
+    const inputs = tbody ? Array.from(tbody.querySelectorAll(".gc-value")) : [];
+    inputs.forEach((el) => { el.value = ""; });
+    apply();
+  });
+
+  box.querySelector("#gcBackBtn")?.addEventListener("click", () => {
     step.mode = "picker";
     renderWorkspaceForStep(step);
     saveState();
@@ -850,6 +1460,25 @@ function bindDatasetTitleUpdates() {
       return;
     }
 
+    if (e?.data?.type === "adas:update-active-tab-title") {
+      if (!e.data.userAction) return; // ignore sync/init, only react to user changes
+      const inst = e.data.inst;
+      const title = (e.data.title || "").trim();
+      if (!inst || !title) return;
+      const step = state.steps.find(s => s.id === inst);
+      if (!step || step.mode !== "dfm") return;
+      step.datasetTitle = title;
+      if (!step.isCustomName) {
+        step.displayName = title;
+      }
+      renderStepsList();
+      if (step.id === state.activeId) {
+        setHint(`${getStepLabel(step)} \u2014 Development Factor Method`);
+      }
+      saveState();
+      return;
+    }
+
     if (e?.data?.type !== "adas:update-workflow-step-title") return;
     const stepId = e.data.stepId;
     const title = (e.data.title || "").trim();
@@ -857,6 +1486,7 @@ function bindDatasetTitleUpdates() {
 
     const step = state.steps.find(s => s.id === stepId);
     if (!step) return;
+    if (step.mode === "dfm") return;
 
     step.datasetTitle = title;
     if (!step.isCustomName) {
@@ -975,6 +1605,16 @@ function renderWorkspaceForStep(step) {
   if (mode === "dataset") return renderEmbeddedDataset(step);
   if (mode === "dfm" || mode === "new_method") return renderEmbeddedDfm(step);
   if (mode === "result_selection") return renderPlaceholder(step, "Result Selection");
+  if (mode === "global_control") {
+    const occupied = findGlobalControlStep(step.id);
+    if (occupied) {
+      step.mode = "picker";
+      saveState();
+      setHint(`Global Control already exists in ${getStepLabel(occupied)}.`);
+      return renderPickerCards(step);
+    }
+    return renderGlobalControl(step);
+  }
   return renderPickerCards(step);
 }
 
@@ -1022,6 +1662,9 @@ function runStepCtxAction(action) {
     const id = `step_${state.nextId++}`;
     const clone = JSON.parse(JSON.stringify(step));
     clone.id = id;
+    if (clone.mode === "global_control") {
+      clone.mode = "picker";
+    }
     const base = (step.displayName || step.datasetTitle || step.name || "Step");
     clone.displayName = `${base} Copy`;
     clone.isCustomName = true;
@@ -1165,6 +1808,10 @@ function reorderStepsByIds(ids) {
     if (!next.some(x => x.id === s.id)) next.push(s);
   }
   state.steps = next;
+  // Renumber step names to match new positions
+  for (let i = 0; i < state.steps.length; i++) {
+    state.steps[i].name = `Step ${i + 1}`;
+  }
 }
 
 function wireStepDnD() {

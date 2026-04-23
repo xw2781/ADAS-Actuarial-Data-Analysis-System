@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AdaLab - Actuarial Data & Analytics</title>
+    <title>ArcRho - Actuarial Data & Analytics</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -128,6 +128,11 @@
             to { opacity: 1; transform: scale(1); }
         }
 
+        @keyframes fadeOut {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(0.95); }
+        }
+
         @keyframes aiPulse {
             0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
             50% { box-shadow: 0 0 0 15px rgba(99, 102, 241, 0); }
@@ -206,10 +211,18 @@
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 18px;
-            font-weight: 700;
             box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .logo-icon svg {
+            width: 22px;
+            height: 22px;
+            display: block;
+        }
+
+        .logo-icon rect {
+            fill: currentColor;
         }
 
         .logo:hover .logo-icon {
@@ -768,9 +781,11 @@
         /* AI Visualization Section */
         .ai-viz {
             padding: 120px 24px;
-            background: linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 100%);
+            background: linear-gradient(180deg, #f8fafc 0%, #f3f6fb 45%, #eef2f7 100%);
             position: relative;
             overflow: hidden;
+            border-top: 1px solid rgba(148, 163, 184, 0.2);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
         }
 
         .ai-viz::before {
@@ -781,8 +796,21 @@
             right: 0;
             bottom: 0;
             background:
-                radial-gradient(circle at 30% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
-                radial-gradient(circle at 70% 80%, rgba(168, 85, 247, 0.15) 0%, transparent 40%);
+                radial-gradient(circle at 18% 22%, rgba(30, 64, 175, 0.1) 0%, transparent 44%),
+                radial-gradient(circle at 82% 26%, rgba(14, 116, 144, 0.08) 0%, transparent 42%),
+                radial-gradient(circle at 64% 82%, rgba(15, 23, 42, 0.05) 0%, transparent 45%);
+            pointer-events: none;
+        }
+
+        .ai-viz::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(71, 85, 105, 0.06) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(71, 85, 105, 0.06) 1px, transparent 1px);
+            background-size: 36px 36px;
+            mask-image: radial-gradient(circle at 50% 40%, rgba(0, 0, 0, 0.75), transparent 80%);
             pointer-events: none;
         }
 
@@ -791,6 +819,8 @@
             margin: 0 auto;
             position: relative;
             z-index: 1;
+            --ai-two-col-gap: 28px;
+            --ai-two-col-max: 1100px;
         }
 
         .ai-viz .section-header {
@@ -798,27 +828,28 @@
         }
 
         .ai-viz .section-title {
-            color: white;
+            color: #0f172a;
         }
 
         .ai-viz .section-subtitle {
-            color: var(--gray-400);
+            color: #5f6b7e;
         }
 
         .ai-badge {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2));
+            background: linear-gradient(135deg, #ffffff, #f4f7fd);
             padding: 6px 14px;
             border-radius: 50px;
             font-size: 0.8rem;
             font-weight: 600;
-            color: #a5b4fc;
+            color: #35508a;
             margin-bottom: 16px;
-            border: 1px solid rgba(99, 102, 241, 0.3);
+            border: 1px solid #d3ddee;
             text-transform: uppercase;
             letter-spacing: 1px;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
         }
 
         .ai-badge svg {
@@ -828,9 +859,57 @@
 
         .ai-demo-container {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 40px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: var(--ai-two-col-gap);
+            align-items: stretch;
+            max-width: var(--ai-two-col-max);
+            margin: 0 auto;
+        }
+
+        .ai-steps-row {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: var(--ai-two-col-gap);
+            margin: 0 auto 22px;
+            max-width: var(--ai-two-col-max);
+        }
+
+        .ai-step-pill {
+            display: inline-flex;
             align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            border-radius: 999px;
+            border: 1px solid #d3ddea;
+            background: rgba(255, 255, 255, 0.88);
+            color: #475569;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            justify-content: center;
+            box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .ai-step-number {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4f46e5, #2563eb);
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 700;
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+        }
+
+        .ai-demo-workflow {
+            display: flex;
+            flex-direction: column;
         }
 
         .ai-demo-left {
@@ -839,6 +918,9 @@
             border-radius: 20px;
             padding: 24px;
             backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            min-height: 480px;
         }
 
         .ai-demo-header {
@@ -1035,9 +1117,11 @@
             border-radius: 20px;
             padding: 24px;
             backdrop-filter: blur(10px);
-            min-height: 400px;
+            min-height: 480px;
+            height: 100%;
             display: flex;
             flex-direction: column;
+            box-sizing: border-box;
         }
 
         .ai-chart-header {
@@ -1119,8 +1203,15 @@
             transition: stroke-dashoffset 0s;
         }
 
-        .chart-line.animate {
+        .chart-line.animate,
+        .chart-line-2.animate {
             animation: drawChart 1.8s ease forwards;
+        }
+
+        .chart-line-2 {
+            stroke-dasharray: 800;
+            stroke-dashoffset: 800;
+            transition: stroke-dashoffset 0s;
         }
 
         .chart-line-trend.animate {
@@ -1179,6 +1270,648 @@
         .legend-color-1 { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
         .legend-color-2 { background: linear-gradient(135deg, #22c55e, #10b981); }
         .legend-color-3 { background: linear-gradient(135deg, #f59e0b, #f97316); }
+
+        /* Floating AI Refine Chat */
+        .ai-refine-chat {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            border-radius: 12px;
+            padding: 12px 14px;
+            min-width: 260px;
+            max-width: 320px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.1);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+
+        .ai-refine-chat.visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .ai-refine-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #a5b4fc;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .ai-refine-header svg {
+            stroke: #a5b4fc;
+        }
+
+        .ai-refine-input {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 8px;
+            padding: 10px 12px;
+            min-height: 20px;
+            font-size: 13px;
+            color: #e2e8f0;
+            position: relative;
+        }
+
+        .ai-refine-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .ai-refine-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 14px;
+            background: #6366f1;
+            margin-left: 1px;
+            animation: blink 1s step-end infinite;
+            vertical-align: text-bottom;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        .ai-refine-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 8px;
+        }
+
+        .ai-refine-hint {
+            font-size: 10px;
+            color: #64748b;
+        }
+
+        .ai-refine-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            border: none;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            opacity: 0.5;
+        }
+
+        .ai-refine-btn.ready {
+            opacity: 1;
+        }
+
+        .ai-refine-btn.ready:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }
+
+        /* Click hint overlay */
+        .ai-click-hint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 20px;
+            color: #a5b4fc;
+            font-size: 12px;
+            font-weight: 500;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .ai-click-hint.visible {
+            opacity: 1;
+            visibility: visible;
+            animation: pulse-hint 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-hint {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.02); }
+        }
+
+        .ai-click-hint svg {
+            stroke: #a5b4fc;
+        }
+
+        /* Chart canvas click indicator */
+        .ai-chart-canvas.clickable {
+            cursor: pointer;
+        }
+
+        .ai-chart-canvas.clickable:hover {
+            background: rgba(99, 102, 241, 0.03);
+        }
+
+        /* Chart refinement pulse animation */
+        @keyframes refinePulse {
+            0% { filter: brightness(1); }
+            30% { filter: brightness(1.15); }
+            100% { filter: brightness(1); }
+        }
+
+        /* Workflow + Workspace Sequence */
+        .ai-workflow-stage {
+            background: rgba(10, 10, 18, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 20px;
+            position: relative;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            min-height: 480px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+
+        .ai-workflow-stage.visible {
+            border-color: rgba(99, 102, 241, 0.5);
+            box-shadow: 0 12px 30px rgba(12, 12, 24, 0.4);
+        }
+
+        .ai-workflow-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .ai-workflow-step {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            color: var(--gray-400);
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            transition: all 0.3s ease;
+        }
+
+        .ai-step-index {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: rgba(99, 102, 241, 0.2);
+            color: #c7d2fe;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        .ai-workflow-step.active {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: rgba(99, 102, 241, 0.6);
+            color: #fff;
+            box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.3);
+        }
+
+        .ai-workflow-step.complete {
+            background: rgba(34, 197, 94, 0.2);
+            border-color: rgba(34, 197, 94, 0.6);
+            color: #d1fae5;
+        }
+
+        .ai-workflow-step.complete .ai-step-index {
+            background: rgba(34, 197, 94, 0.8);
+            color: #052e16;
+        }
+
+        .ai-workflow-step.up-next {
+            color: #e2e8f0;
+            border-color: rgba(148, 163, 184, 0.35);
+        }
+
+        .ai-workflow-hint {
+            margin-top: 12px;
+            margin-bottom: 4px;
+            color: var(--gray-400);
+            font-size: 0.78rem;
+            line-height: 1.4;
+        }
+
+        .ai-workflow-body {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            margin-top: 14px;
+            flex: 1;
+        }
+
+        .ai-workspace {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.7), rgba(10, 15, 30, 0.8));
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 14px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .ai-workspace-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .ai-workspace-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ai-workspace-header-left span {
+            color: white;
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+
+        .ai-workspace-icon {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, var(--primary), #a855f7);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ai-workspace-icon svg {
+            width: 14px;
+            height: 14px;
+            color: white;
+        }
+
+        .ai-workspace-status {
+            font-size: 0.68rem;
+            color: var(--gray-400);
+            background: rgba(99, 102, 241, 0.15);
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .ai-workspace-status.added {
+            background: rgba(34, 197, 94, 0.15);
+            border-color: rgba(34, 197, 94, 0.4);
+            color: #86efac;
+        }
+
+        .ai-workspace-content {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex: 1;
+        }
+
+        .workspace-triangle {
+            display: grid;
+            gap: 2px;
+            font-size: 8px;
+            font-family: 'SF Mono', Monaco, monospace;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .workspace-triangle-row {
+            display: flex;
+            gap: 2px;
+        }
+
+        .workspace-cell {
+            background: rgba(255, 255, 255, 0.06);
+            padding: 4px 5px;
+            border-radius: 3px;
+            min-width: 32px;
+            text-align: right;
+            color: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.2s ease;
+        }
+
+        .workspace-cell.header {
+            background: rgba(99, 102, 241, 0.3);
+            color: #c7d2fe;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .ai-workspace-drop {
+            border: 2px dashed rgba(148, 163, 184, 0.3);
+            border-radius: 10px;
+            padding: 10px;
+            min-height: 120px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(10, 15, 30, 0.4);
+            position: relative;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .ai-workspace-drop.active {
+            border-color: rgba(99, 102, 241, 0.8);
+            border-style: solid;
+            background: rgba(99, 102, 241, 0.08);
+            box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.35), 0 0 20px rgba(99, 102, 241, 0.25);
+        }
+
+        .ai-workspace-drop.filled {
+            border-style: solid;
+            border-color: rgba(99, 102, 241, 0.3);
+            background: rgba(15, 23, 42, 0.5);
+            padding: 8px;
+        }
+
+        .ai-workspace-drop-label {
+            color: var(--gray-500);
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: opacity 0.3s ease;
+        }
+
+        .ai-workspace-chart {
+            opacity: 0;
+            transform: scale(0.95);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .ai-workspace-chart.visible {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .ai-workspace-drop.filled .ai-workspace-chart {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .ai-workspace-drop.filled .ai-workspace-drop-label {
+            display: none;
+        }
+
+        .workspace-chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 6px;
+            margin-bottom: 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .workspace-chart-title {
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .workspace-chart-canvas {
+            flex: 1;
+            min-height: 80px;
+            position: relative;
+        }
+
+        .workspace-chart-svg {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .ai-chart-chip,
+        .ai-drag-ghost {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(20, 30, 50, 0.9));
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            border-radius: 12px;
+            padding: 10px;
+            display: grid;
+            gap: 8px;
+            color: #e2e8f0;
+            box-shadow: 0 8px 24px rgba(8, 8, 20, 0.5);
+            width: fit-content;
+        }
+
+        .ai-chart-chip {
+            opacity: 0;
+            transform: translateY(12px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        .ai-chart-chip.visible {
+            opacity: 1;
+            transform: translateY(0);
+            animation: float 3.5s ease-in-out infinite;
+        }
+
+        .ai-chart-chip.ghosted {
+            opacity: 0.3;
+            animation: none;
+        }
+
+        .ai-chip-preview {
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            gap: 3px;
+            height: 40px;
+            padding: 6px 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(8, 8, 16, 0.7);
+        }
+
+        .ai-chip-bar {
+            width: 7px;
+            border-radius: 3px 3px 1px 1px;
+            background: linear-gradient(180deg, #8b5cf6, #6366f1);
+        }
+
+        .ai-chip-bar.alt {
+            background: linear-gradient(180deg, #a855f7, #7c3aed);
+        }
+
+        .ai-chip-line {
+            position: absolute;
+            left: 8px;
+            right: 8px;
+            top: 14px;
+            height: 2px;
+            background: linear-gradient(90deg, #f59e0b, #ef4444);
+            border-radius: 999px;
+            opacity: 0.9;
+        }
+
+        .ai-chip-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #e2e8f0;
+            text-align: center;
+        }
+
+        .ai-drag-ghost {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 6;
+            transform: translate3d(0, 0, 0) scale(0.98);
+            transition: opacity 0.2s ease;
+        }
+
+        .ai-drag-ghost.visible {
+            opacity: 1;
+        }
+
+        /* Drag Mouse Cursor */
+        .ai-drag-cursor {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            pointer-events: none;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+
+        .ai-drag-cursor.visible {
+            opacity: 1;
+        }
+
+        .ai-drag-cursor svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .ai-drag-cursor.dragging svg {
+            transform: rotate(-10deg);
+        }
+
+        /* Global Chart Ghost for cross-panel animation */
+        .ai-global-chart-ghost {
+            position: fixed;
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0;
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95));
+            border: 2px solid rgba(99, 102, 241, 0.5);
+            border-radius: 16px;
+            padding: 12px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4), 0 0 30px rgba(99, 102, 241, 0.3);
+            backdrop-filter: blur(10px);
+            transform-origin: center center;
+            transition: opacity 0.15s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        .ai-global-chart-ghost.visible {
+            opacity: 1;
+        }
+
+        .ai-global-chart-ghost.lifting {
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), 0 0 40px rgba(99, 102, 241, 0.4);
+            border-color: rgba(99, 102, 241, 0.7);
+        }
+
+        .global-ghost-chart {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .ghost-chart-svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .global-ghost-label {
+            font-size: clamp(0.6rem, 2.5vw, 0.85rem);
+            font-weight: 600;
+            color: #e2e8f0;
+            text-align: center;
+            padding: 4px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Global Drag Cursor */
+        .ai-global-drag-cursor {
+            position: fixed;
+            width: 28px;
+            height: 28px;
+            pointer-events: none;
+            z-index: 1001;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            filter: drop-shadow(0 3px 6px rgba(0,0,0,0.4));
+        }
+
+        .ai-global-drag-cursor.visible {
+            opacity: 1;
+        }
+
+        .ai-global-drag-cursor svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .ai-global-drag-cursor.dragging svg {
+            transform: rotate(-12deg);
+        }
 
         /* Placeholder state */
         .ai-chart-placeholder {
@@ -1316,6 +2049,11 @@
                 grid-template-columns: 1fr;
                 gap: 30px;
             }
+
+            .ai-steps-row {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
         }
 
         @media (max-width: 640px) {
@@ -1329,8 +2067,422 @@
                 flex-wrap: wrap;
                 gap: 12px;
             }
+
+            .ai-workflow-body {
+                grid-template-columns: 1fr;
+            }
+
+            .ai-workspace-content {
+                gap: 8px;
+            }
+
+            .ai-chart-chip {
+                width: 100%;
+            }
         }
 
+        /* Dataset-style AI visualization demo */
+        .ai-dataset-demo {
+            align-items: flex-start;
+        }
+
+        .ai-dataset-demo .ai-demo-left,
+        .ai-dataset-demo .ai-demo-right {
+            background: transparent;
+            border: none;
+            padding: 0;
+            min-height: auto;
+            backdrop-filter: none;
+        }
+
+        .ai-dataset-demo .small {
+            color: #5b6476;
+        }
+
+        .ai-prompt-workbench {
+            background: #ffffff;
+            border: 1px solid #d6dbe6;
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 14px;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
+        }
+
+        .ai-prompt-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+            min-height: 30px;
+        }
+
+        .ai-style-pill {
+            border: 1px solid #c7d2fe;
+            background: #eef2ff;
+            color: #4338ca;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            padding: 4px 10px;
+        }
+
+        .ai-prompt-preview {
+            min-height: 74px;
+            border: 1px solid #d9dee9;
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font: 13px/1.5 Consolas, "SF Mono", "Courier New", monospace;
+            color: #1f2937;
+            margin-bottom: 10px;
+            white-space: pre-wrap;
+        }
+
+        .ai-prompt-caret {
+            display: inline-block;
+            width: 2px;
+            height: 14px;
+            background: #4f46e5;
+            margin-left: 1px;
+            animation: blink 1s step-end infinite;
+            vertical-align: text-bottom;
+        }
+
+        .ai-apply-style-btn {
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #f8fafc;
+            color: #1f2937;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 8px 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .ai-apply-style-btn:hover {
+            border-color: #8aa8ff;
+            background: #eef4ff;
+        }
+
+        .ai-apply-style-btn.is-working {
+            background: #e0e7ff;
+            border-color: #a5b4fc;
+            color: #3730a3;
+        }
+
+        .ai-dataset-panel {
+            background: #ffffff;
+            border: 1px solid #d4d8e2;
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+        }
+
+        #aiTableMetaRow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .ai-muted {
+            color: #7b879c !important;
+        }
+
+        #aiTableWrap {
+            width: 100%;
+            overflow: auto;
+        }
+
+        #aiTableWrap table {
+            border-collapse: separate;
+            border-spacing: 0;
+            width: max-content;
+            min-width: 100%;
+            table-layout: fixed;
+            font-size: 13px;
+            color: #1f2937;
+        }
+
+        #aiTableWrap th,
+        #aiTableWrap td {
+            border: 0;
+            border-right: 1px solid #dde3ec;
+            border-bottom: 1px solid #dde3ec;
+            min-width: 68px;
+            height: 24px;
+            line-height: 24px;
+            padding: 0 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            box-sizing: border-box;
+        }
+
+        #aiTableWrap thead th {
+            text-align: center;
+            font-weight: 500;
+            background: #f3f5f9;
+            position: sticky;
+            top: 0;
+            z-index: 3;
+            border-top: 1px solid #dde3ec;
+        }
+
+        #aiTableWrap tbody td:not(:first-child) {
+            text-align: right;
+        }
+
+        #aiTableWrap th:first-child,
+        #aiTableWrap td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: #f3f5f9;
+            border-left: 1px solid #dde3ec;
+            box-shadow: 1px 0 0 #dde3ec;
+            text-align: center;
+            min-width: 76px;
+            max-width: 94px;
+        }
+
+        #aiTableWrap thead th:first-child {
+            z-index: 4;
+        }
+
+        #aiTableWrap td.na {
+            background: #f8fafc;
+            color: transparent;
+            border-color: #eef2f7;
+        }
+
+        #aiChartPanel {
+            height: 460px;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+
+        #aiChartPanel .chartHeader {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 12px;
+            margin-bottom: 10px;
+            min-height: 30px;
+        }
+
+        #aiChartPanel .chartRow {
+            flex: 1 1 auto;
+            min-height: 0;
+            display: flex;
+            gap: 8px;
+            align-items: stretch;
+        }
+
+        #aiChartPanel .chartCanvasWrap {
+            flex: 1 1 auto;
+            min-width: 0;
+            position: relative;
+            border: 1px solid #e4e8f0;
+            border-radius: 10px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            padding: 4px;
+            overflow: hidden;
+        }
+
+        #aiChartPanel .chartLegend {
+            width: 72px;
+            flex: 0 0 72px;
+            max-height: 100%;
+            overflow-y: auto;
+            border-left: 1px solid #e5e7eb;
+            padding-left: 6px;
+            box-sizing: border-box;
+        }
+
+        #aiChartPanel .legendItem {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 1px 2px;
+            color: #374151;
+            font-size: 12px;
+        }
+
+        #aiChartPanel .legendSwatch {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            flex: 0 0 auto;
+        }
+
+        #aiChartPanel .legendLabel {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .ai-style-chart {
+            position: absolute;
+            inset: 8px;
+            width: calc(100% - 16px);
+            height: calc(100% - 16px);
+            opacity: 0;
+            transform: translateY(8px);
+            transition: opacity 0.35s ease, transform 0.35s ease;
+            pointer-events: none;
+        }
+
+        .ai-style-chart.is-active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .ai-style-chart .ai-grid-line {
+            stroke: #e8edf5;
+            stroke-width: 1;
+        }
+
+        .ai-style-chart .ai-axis-line {
+            stroke: #d5dce8;
+            stroke-width: 1.1;
+        }
+
+        .ai-style-chart .ai-axis-label {
+            fill: #6b7280;
+            font-size: 11px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .ai-style-chart .ai-axis-title {
+            fill: #4b5563;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .ai-style-chart .ai-series {
+            fill: none;
+            stroke-width: 2.4;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-dasharray: 720;
+            stroke-dashoffset: 720;
+        }
+
+        .ai-style-chart .ai-point {
+            opacity: 0;
+            transform: scale(0.6);
+            transform-origin: center center;
+        }
+
+        .ai-style-chart.is-active .ai-series {
+            animation: aiSeriesDraw 0.9s ease forwards;
+        }
+
+        .ai-style-chart.is-active .ai-point {
+            animation: aiPointPop 0.35s ease forwards;
+        }
+
+        .ai-style-chart.is-active .ai-point:nth-of-type(2n) {
+            animation-delay: 0.05s;
+        }
+
+        .ai-style-chart.is-active .ai-point:nth-of-type(3n) {
+            animation-delay: 0.1s;
+        }
+
+        .ai-style-transition {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0;
+            background: linear-gradient(110deg, rgba(59, 130, 246, 0) 10%, rgba(59, 130, 246, 0.18) 50%, rgba(59, 130, 246, 0) 90%);
+        }
+
+        .ai-style-transition.run {
+            animation: aiStyleSweep 0.55s ease;
+        }
+
+        .ai-style-note {
+            margin-top: 10px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: #eef4ff;
+            border: 1px solid #d7e4ff;
+            color: #264487;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        @keyframes aiSeriesDraw {
+            to { stroke-dashoffset: 0; }
+        }
+
+        @keyframes aiPointPop {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes aiStyleSweep {
+            0% {
+                opacity: 0;
+                transform: translateX(-35%);
+            }
+            15% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+                transform: translateX(35%);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            #aiChartPanel {
+                height: auto;
+                min-height: 420px;
+            }
+
+            #aiChartPanel .chartRow {
+                flex-direction: column;
+            }
+
+            #aiChartPanel .chartLegend {
+                width: 100%;
+                flex: 0 0 auto;
+                border-left: none;
+                border-top: 1px solid #e5e7eb;
+                padding: 8px 0 0;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 4px 10px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            #aiTableWrap th,
+            #aiTableWrap td {
+                min-width: 58px;
+                font-size: 11px;
+                padding: 0 4px;
+            }
+
+            #aiChartPanel .chartCanvasWrap {
+                min-height: 250px;
+            }
+
+            .ai-prompt-preview {
+                min-height: 86px;
+            }
+        }
         /* Stochastic Simulation Section */
         .stochastic {
             padding: 120px 24px;
@@ -2571,8 +3723,17 @@
     <nav id="navbar">
         <div class="nav-container">
             <a href="#" class="logo">
-                <div class="logo-icon">A</div>
-                AdaLab
+                <div class="logo-icon" aria-label="ArcRho logo">
+                    <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                        <rect x="3" y="3" width="5" height="5" rx="1.2"></rect>
+                        <rect x="10" y="3" width="5" height="5" rx="1.2"></rect>
+                        <rect x="17" y="3" width="5" height="5" rx="1.2"></rect>
+                        <rect x="3" y="10" width="5" height="5" rx="1.2"></rect>
+                        <rect x="10" y="10" width="5" height="5" rx="1.2"></rect>
+                        <rect x="3" y="17" width="5" height="5" rx="1.2"></rect>
+                    </svg>
+                </div>
+                ArcRho
             </a>
             <ul class="nav-links">
                 <li><a href="#features">Features</a></li>
@@ -2619,7 +3780,7 @@
                                 <span></span>
                                 <span></span>
                             </div>
-                            <span class="app-title">AdaLab - Loss Triangle Analysis</span>
+                            <span class="app-title">ArcRho - Loss Triangle Analysis</span>
                         </div>
                         <div class="app-content">
                             <div class="triangle-chart">
@@ -2676,7 +3837,7 @@
                                         <div class="chart-bar"></div>
                                         <div class="chart-bar"></div>
                                     </div>
-                                    <div class="chart-label">Dev Factors</div>
+                                    <div class="chart-label">Ultimate Loss</div>
                                 </div>
                             </div>
                         </div>
@@ -2702,8 +3863,11 @@
                             <path d="M3 9h18M9 21V9"/>
                         </svg>
                     </div>
-                    <h3>Triangle Analysis</h3>
-                    <p>Interactive development triangles with automatic ratio calculations, custom averages, and visual development curves.</p>
+                    <h3>Core Tools</h3>
+                    <p>
+                        Essential tools for reserving analysis in one place. 
+                        Built-in standard actuarial methods and models, with seamless data loading and validation.
+                    </p>
                 </div>
                 <div class="feature-card animate-on-scroll animate-delay-2">
                     <div class="feature-icon">
@@ -2712,8 +3876,11 @@
                             <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
                         </svg>
                     </div>
-                    <h3>Excel Integration</h3>
-                    <p>Seamless read/write to Excel workbooks. Preserve formulas, formatting, and work with your existing templates.</p>
+                    <h3>Integration</h3>
+                    <p>
+                        Native support for reading and writing in Excel workbooks or SQL databases.
+                        Preserve existing templates and processes.
+                    </p>
                 </div>
                 <div class="feature-card animate-on-scroll animate-delay-3">
                     <div class="feature-icon">
@@ -2723,7 +3890,7 @@
                         </svg>
                     </div>
                     <h3>Workflow Automation</h3>
-                    <p>Create multi-step workflows with drag-and-drop simplicity. Automate repetitive tasks and ensure consistency.</p>
+                    <p>Create multi-step workflows with drag-and-drop simplicity. Unlock the power of scripting and automation using the built-in coding module.</p>
                 </div>
                 <div class="feature-card animate-on-scroll animate-delay-1">
                     <div class="feature-icon">
@@ -2734,7 +3901,7 @@
                         </svg>
                     </div>
                     <h3>Project Management</h3>
-                    <p>Organize projects in folders with a familiar tree view. Quick access to all your reserving analyses in one place.</p>
+                    <p>Organize projects in a user-friendly front end interface. Quick access to all your reserving analyses in one place.</p>
                 </div>
                 <div class="feature-card animate-on-scroll animate-delay-2">
                     <div class="feature-icon">
@@ -2760,14 +3927,8 @@
         </div>
     </section>
 
-    <!-- AI Visualization Section -->
+        <!-- AI Visualization Section -->
     <section class="ai-viz" id="ai-viz">
-        <!-- Sparkle decorations -->
-        <div class="ai-sparkle"><svg viewBox="0 0 24 24"><path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z"/></svg></div>
-        <div class="ai-sparkle"><svg viewBox="0 0 24 24"><path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z"/></svg></div>
-        <div class="ai-sparkle"><svg viewBox="0 0 24 24"><path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z"/></svg></div>
-        <div class="ai-sparkle"><svg viewBox="0 0 24 24"><path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z"/></svg></div>
-
         <div class="ai-viz-container">
             <div class="section-header animate-on-scroll" style="text-align: center;">
                 <div class="ai-badge">
@@ -2776,467 +3937,239 @@
                     </svg>
                     Experimental Feature
                 </div>
-                <h2 class="section-title">AI-Powered Data Visualization</h2>
-                <p class="section-subtitle">Describe the chart you want in plain English. Our AI generates beautiful, customized loss development curves instantly.</p>
+                <h2 class="section-title">A Radically New Way to Build Visualizations</h2>
+                <p class="section-subtitle">Use AI prompts to switch chart styles instantly. This demo mirrors the dataset viewer table and chart layout, then applies style prompts between By Column and By Row modes.</p>
             </div>
 
-            <div class="ai-demo-container">
-                <!-- Left: Data + Prompt -->
-                <div class="ai-demo-left animate-on-scroll">
-                    <div class="ai-demo-header">
-                        <div class="ai-demo-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                <path d="M3 9h18M9 21V9"/>
-                            </svg>
+            <div class="ai-steps-row animate-on-scroll">
+                <div class="ai-step-pill">
+                    <span class="ai-step-number">1</span>
+                    Prompt
+                </div>
+                <div class="ai-step-pill">
+                    <span class="ai-step-number">2</span>
+                    Style Update
+                </div>
+            </div>
+
+            <div class="ai-demo-container ai-dataset-demo animate-on-scroll">
+                <div class="ai-demo-left">
+                    <div class="ai-prompt-workbench">
+                        <div class="ai-prompt-toolbar">
+                            <span class="small">Prompt to AI Chart Styler</span>
+                            <span class="ai-style-pill" id="aiPromptBadge">Style 1</span>
                         </div>
-                        <div>
-                            <div class="ai-demo-title">Loss Triangle Data</div>
-                            <div class="ai-demo-subtitle">Commercial Auto - Paid Losses</div>
-                        </div>
+                        <div class="ai-prompt-preview" id="aiPromptPreview"></div>
+                        <button class="ai-apply-style-btn" id="aiApplyStyleBtn" type="button">Update</button>
                     </div>
 
-                    <!-- Mini Triangle 8x8 -->
-                    <div class="ai-triangle">
-                        <div class="ai-triangle-grid">
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">AY</div>
-                                <div class="ai-triangle-cell header">12</div>
-                                <div class="ai-triangle-cell header">24</div>
-                                <div class="ai-triangle-cell header">36</div>
-                                <div class="ai-triangle-cell header">48</div>
-                                <div class="ai-triangle-cell header">60</div>
-                                <div class="ai-triangle-cell header">72</div>
-                                <div class="ai-triangle-cell header">84</div>
-                                <div class="ai-triangle-cell header">96</div>
-                            </div>
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">2016</div>
-                                <div class="ai-triangle-cell active">1,124</div>
-                                <div class="ai-triangle-cell active">2,456</div>
-                                <div class="ai-triangle-cell active">3,234</div>
-                                <div class="ai-triangle-cell active">3,789</div>
-                                <div class="ai-triangle-cell active">4,123</div>
-                                <div class="ai-triangle-cell active">4,345</div>
-                                <div class="ai-triangle-cell active">4,489</div>
-                                <div class="ai-triangle-cell active">4,567</div>
-                            </div>
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">2017</div>
-                                <div class="ai-triangle-cell active">1,245</div>
-                                <div class="ai-triangle-cell active">2,678</div>
-                                <div class="ai-triangle-cell active">3,456</div>
-                                <div class="ai-triangle-cell active">4,012</div>
-                                <div class="ai-triangle-cell active">4,378</div>
-                                <div class="ai-triangle-cell active">4,612</div>
-                                <div class="ai-triangle-cell active">4,756</div>
-                                <div class="ai-triangle-cell"></div>
-                            </div>
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">2018</div>
-                                <div class="ai-triangle-cell active">1,389</div>
-                                <div class="ai-triangle-cell active">2,890</div>
-                                <div class="ai-triangle-cell active">3,678</div>
-                                <div class="ai-triangle-cell active">4,234</div>
-                                <div class="ai-triangle-cell active">4,589</div>
-                                <div class="ai-triangle-cell active">4,823</div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                            </div>
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">2019</div>
-                                <div class="ai-triangle-cell active">1,456</div>
-                                <div class="ai-triangle-cell active">3,102</div>
-                                <div class="ai-triangle-cell active">3,923</div>
-                                <div class="ai-triangle-cell active">4,512</div>
-                                <div class="ai-triangle-cell active">4,867</div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                            </div>
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">2020</div>
-                                <div class="ai-triangle-cell active">1,567</div>
-                                <div class="ai-triangle-cell active">3,345</div>
-                                <div class="ai-triangle-cell active">4,156</div>
-                                <div class="ai-triangle-cell active">4,789</div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                            </div>
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">2021</div>
-                                <div class="ai-triangle-cell active">1,678</div>
-                                <div class="ai-triangle-cell active">3,567</div>
-                                <div class="ai-triangle-cell active">4,389</div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                            </div>
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">2022</div>
-                                <div class="ai-triangle-cell active">1,823</div>
-                                <div class="ai-triangle-cell active">3,789</div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                            </div>
-                            <div class="ai-triangle-row">
-                                <div class="ai-triangle-cell header">2023</div>
-                                <div class="ai-triangle-cell active">1,956</div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                                <div class="ai-triangle-cell"></div>
-                            </div>
+                    <div class="ai-dataset-panel" id="aiTriPanel">
+                        <div id="aiTableMetaRow">
+                            <div class="small"><b>Paid Loss Triangle</b></div>
+                            <div class="small ai-muted">Commercial Auto</div>
                         </div>
-                    </div>
-
-                    <!-- Animated Mouse Cursor -->
-                    <div class="ai-mouse-cursor" id="aiMouseCursor">
-                        <svg viewBox="0 0 24 24" fill="white" stroke="#333" stroke-width="1">
-                            <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.48 0 .72-.58.38-.92L6.35 2.85a.5.5 0 0 0-.85.36Z"/>
-                        </svg>
-                    </div>
-
-                    <!-- AI Prompt Input -->
-                    <div class="ai-prompt-container">
-                        <div class="ai-prompt-label">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                            </svg>
-                            Describe your visualization
-                        </div>
-                        <div class="ai-prompt-text" id="aiPromptText"></div>
-                        <div class="ai-prompt-footer">
-                            <span class="ai-model-tag">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <path d="M12 6v6l4 2"/>
-                                </svg>
-                                Powered by AI
-                            </span>
-                            <button class="ai-generate-btn" id="aiGenerateBtn">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                                </svg>
-                                Generate
-                            </button>
+                        <div id="aiTableWrap">
+                            <table aria-label="Triangle data preview">
+                                <thead>
+                                    <tr>
+                                        <th>AY</th>
+                                        <th>12</th>
+                                        <th>24</th>
+                                        <th>36</th>
+                                        <th>48</th>
+                                        <th>60</th>
+                                        <th>72</th>
+                                        <th>84</th>
+                                        <th>96</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <th>2016</th>
+                                        <td class="cell">1,124</td>
+                                        <td class="cell">2,456</td>
+                                        <td class="cell">3,234</td>
+                                        <td class="cell">4,289</td>
+                                        <td class="cell">4,123</td>
+                                        <td class="cell">4,345</td>
+                                        <td class="cell">4,489</td>
+                                        <td class="cell">4,567</td>
+                                    </tr>
+                                    <tr>
+                                        <th>2017</th>
+                                        <td class="cell">1,245</td>
+                                        <td class="cell">2,678</td>
+                                        <td class="cell">3,456</td>
+                                        <td class="cell">4,012</td>
+                                        <td class="cell">4,378</td>
+                                        <td class="cell">4,612</td>
+                                        <td class="cell">4,756</td>
+                                        <td class="na"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>2018</th>
+                                        <td class="cell">1,389</td>
+                                        <td class="cell">2,890</td>
+                                        <td class="cell">3,678</td>
+                                        <td class="cell">4,234</td>
+                                        <td class="cell">4,589</td>
+                                        <td class="cell">4,823</td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>2019</th>
+                                        <td class="cell">1,456</td>
+                                        <td class="cell">3,102</td>
+                                        <td class="cell">3,923</td>
+                                        <td class="cell">4,512</td>
+                                        <td class="cell">4,867</td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>2020</th>
+                                        <td class="cell">1,567</td>
+                                        <td class="cell">3,345</td>
+                                        <td class="cell">4,156</td>
+                                        <td class="cell">4,789</td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>2021</th>
+                                        <td class="cell">1,678</td>
+                                        <td class="cell">3,567</td>
+                                        <td class="cell">4,389</td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>2022</th>
+                                        <td class="cell">1,823</td>
+                                        <td class="cell">3,789</td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>2023</th>
+                                        <td class="cell">1,956</td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                        <td class="na"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
 
-                <!-- Right: Generated Chart -->
-                <div class="ai-demo-right animate-on-scroll animate-delay-2">
-                    <div class="ai-chart-container">
-                        <div class="ai-chart-header">
-                            <span class="ai-chart-title">AI Generated Visualization</span>
-                            <div class="ai-chart-actions">
-                                <button class="ai-chart-action" title="Download">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                                    </svg>
-                                </button>
-                                <button class="ai-chart-action" title="Fullscreen">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="15 3 21 3 21 9"/>
-                                        <polyline points="9 21 3 21 3 15"/>
-                                        <line x1="21" y1="3" x2="14" y2="10"/>
-                                        <line x1="3" y1="21" x2="10" y2="14"/>
-                                    </svg>
-                                </button>
-                            </div>
+                <div class="ai-demo-right animate-delay-2">
+                    <div class="ai-dataset-panel" id="aiChartPanel">
+                        <div class="chartHeader">
+                            <span class="small"><b id="aiChartTitle">Development Curves</b></span>
                         </div>
 
-                        <div class="ai-chart-canvas" id="aiChartCanvas">
-                            <!-- Placeholder -->
-                            <div class="ai-chart-placeholder" id="chartPlaceholder">
-                                <div class="ai-chart-placeholder-icon">
-                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                        <line x1="18" y1="20" x2="18" y2="10"/>
-                                        <line x1="12" y1="20" x2="12" y2="4"/>
-                                        <line x1="6" y1="20" x2="6" y2="14"/>
-                                    </svg>
-                                </div>
-                                <p>Enter a prompt and click Generate<br/>to create your visualization</p>
+                        <div class="chartRow">
+                            <div class="chartCanvasWrap">
+                                <div class="ai-style-transition" id="aiStyleTransition"></div>
+
+                                <svg class="ai-style-chart is-active" id="aiStyleChartByCol" viewBox="0 0 520 300" aria-label="By column chart style">
+                                    <line class="ai-grid-line" x1="56" y1="32" x2="472" y2="32"></line>
+                                    <line class="ai-grid-line" x1="56" y1="72" x2="472" y2="72"></line>
+                                    <line class="ai-grid-line" x1="56" y1="112" x2="472" y2="112"></line>
+                                    <line class="ai-grid-line" x1="56" y1="152" x2="472" y2="152"></line>
+                                    <line class="ai-grid-line" x1="56" y1="192" x2="472" y2="192"></line>
+                                    <line class="ai-grid-line" x1="56" y1="232" x2="472" y2="232"></line>
+                                    <line class="ai-axis-line" x1="56" y1="232" x2="472" y2="232"></line>
+                                    <line class="ai-axis-line" x1="56" y1="32" x2="56" y2="232"></line>
+
+                                    <path class="ai-series" stroke="#0ea5e9" d="M74 196 L126 188 L178 180 L230 172 L282 164 L334 156 L386 149 L438 142"></path>
+                                    <path class="ai-series" stroke="#8b5cf6" d="M74 181 L126 171 L178 162 L230 152 L282 144 L334 136 L386 128 L438 121"></path>
+                                    <path class="ai-series" stroke="#22c55e" d="M74 167 L126 156 L178 146 L230 136 L282 127 L334 119 L386 112 L438 106"></path>
+                                    <path class="ai-series" stroke="#f59e0b" d="M74 152 L126 141 L178 130 L230 120 L282 111 L334 103 L386 96 L438 90"></path>
+
+                                    <circle class="ai-point" cx="74" cy="196" r="3" fill="#0ea5e9"></circle>
+                                    <circle class="ai-point" cx="230" cy="172" r="3" fill="#0ea5e9"></circle>
+                                    <circle class="ai-point" cx="438" cy="142" r="3" fill="#0ea5e9"></circle>
+                                    <circle class="ai-point" cx="74" cy="181" r="3" fill="#8b5cf6"></circle>
+                                    <circle class="ai-point" cx="282" cy="144" r="3" fill="#8b5cf6"></circle>
+                                    <circle class="ai-point" cx="438" cy="121" r="3" fill="#8b5cf6"></circle>
+                                    <circle class="ai-point" cx="74" cy="167" r="3" fill="#22c55e"></circle>
+                                    <circle class="ai-point" cx="334" cy="119" r="3" fill="#22c55e"></circle>
+                                    <circle class="ai-point" cx="438" cy="106" r="3" fill="#22c55e"></circle>
+                                    <circle class="ai-point" cx="74" cy="152" r="3" fill="#f59e0b"></circle>
+                                    <circle class="ai-point" cx="334" cy="103" r="3" fill="#f59e0b"></circle>
+                                    <circle class="ai-point" cx="438" cy="90" r="3" fill="#f59e0b"></circle>
+
+                                    <text class="ai-axis-label" x="74" y="252">2016</text>
+                                    <text class="ai-axis-label" x="126" y="252">2017</text>
+                                    <text class="ai-axis-label" x="178" y="252">2018</text>
+                                    <text class="ai-axis-label" x="230" y="252">2019</text>
+                                    <text class="ai-axis-label" x="282" y="252">2020</text>
+                                    <text class="ai-axis-label" x="334" y="252">2021</text>
+                                    <text class="ai-axis-label" x="386" y="252">2022</text>
+                                    <text class="ai-axis-label" x="438" y="252">2023</text>
+                                    <text class="ai-axis-label ai-axis-title" x="270" y="276" text-anchor="middle">Origin Year</text>
+                                </svg>
+
+                                <svg class="ai-style-chart" id="aiStyleChartByRow" viewBox="0 0 520 300" aria-label="By row chart style">
+                                    <line class="ai-grid-line" x1="56" y1="32" x2="472" y2="32"></line>
+                                    <line class="ai-grid-line" x1="56" y1="72" x2="472" y2="72"></line>
+                                    <line class="ai-grid-line" x1="56" y1="112" x2="472" y2="112"></line>
+                                    <line class="ai-grid-line" x1="56" y1="152" x2="472" y2="152"></line>
+                                    <line class="ai-grid-line" x1="56" y1="192" x2="472" y2="192"></line>
+                                    <line class="ai-grid-line" x1="56" y1="232" x2="472" y2="232"></line>
+                                    <line class="ai-axis-line" x1="56" y1="232" x2="472" y2="232"></line>
+                                    <line class="ai-axis-line" x1="56" y1="32" x2="56" y2="232"></line>
+
+                                    <path class="ai-series" stroke="#6366f1" d="M74 194 L126 170 L178 144 L230 120 L282 101 L334 86 L386 74 L438 66"></path>
+                                    <path class="ai-series" stroke="#0ea5e9" d="M74 188 L126 164 L178 140 L230 116 L282 97 L334 84 L386 72"></path>
+                                    <path class="ai-series" stroke="#22c55e" d="M74 180 L126 156 L178 132 L230 109 L282 93 L334 81"></path>
+                                    <path class="ai-series" stroke="#f97316" d="M74 172 L126 148 L178 126 L230 104 L282 89"></path>
+
+                                    <circle class="ai-point" cx="74" cy="194" r="3" fill="#6366f1"></circle>
+                                    <circle class="ai-point" cx="230" cy="120" r="3" fill="#6366f1"></circle>
+                                    <circle class="ai-point" cx="438" cy="66" r="3" fill="#6366f1"></circle>
+                                    <circle class="ai-point" cx="74" cy="188" r="3" fill="#0ea5e9"></circle>
+                                    <circle class="ai-point" cx="230" cy="116" r="3" fill="#0ea5e9"></circle>
+                                    <circle class="ai-point" cx="386" cy="72" r="3" fill="#0ea5e9"></circle>
+                                    <circle class="ai-point" cx="74" cy="180" r="3" fill="#22c55e"></circle>
+                                    <circle class="ai-point" cx="178" cy="132" r="3" fill="#22c55e"></circle>
+                                    <circle class="ai-point" cx="334" cy="81" r="3" fill="#22c55e"></circle>
+                                    <circle class="ai-point" cx="74" cy="172" r="3" fill="#f97316"></circle>
+                                    <circle class="ai-point" cx="178" cy="126" r="3" fill="#f97316"></circle>
+                                    <circle class="ai-point" cx="282" cy="89" r="3" fill="#f97316"></circle>
+
+                                    <text class="ai-axis-label" x="74" y="252">12</text>
+                                    <text class="ai-axis-label" x="126" y="252">24</text>
+                                    <text class="ai-axis-label" x="178" y="252">36</text>
+                                    <text class="ai-axis-label" x="230" y="252">48</text>
+                                    <text class="ai-axis-label" x="282" y="252">60</text>
+                                    <text class="ai-axis-label" x="334" y="252">72</text>
+                                    <text class="ai-axis-label" x="386" y="252">84</text>
+                                    <text class="ai-axis-label" x="438" y="252">96</text>
+                                    <text class="ai-axis-label ai-axis-title" x="270" y="276" text-anchor="middle">Development Period</text>
+                                </svg>
                             </div>
-
-                            <!-- Chart Type 1: Development Curves (hidden initially) - All 8 AYs -->
-                            <svg class="ai-chart-svg" id="aiChartSvg1" viewBox="0 0 400 250" style="display: none;">
-                                <defs>
-                                    <!-- Gradients for all 8 accident years -->
-                                    <linearGradient id="gradientAY2016" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#6366f1"/>
-                                        <stop offset="100%" style="stop-color:#8b5cf6"/>
-                                    </linearGradient>
-                                    <linearGradient id="gradientAY2017" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#8b5cf6"/>
-                                        <stop offset="100%" style="stop-color:#a855f7"/>
-                                    </linearGradient>
-                                    <linearGradient id="gradientAY2018" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#22c55e"/>
-                                        <stop offset="100%" style="stop-color:#10b981"/>
-                                    </linearGradient>
-                                    <linearGradient id="gradientAY2019" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#14b8a6"/>
-                                        <stop offset="100%" style="stop-color:#06b6d4"/>
-                                    </linearGradient>
-                                    <linearGradient id="gradientAY2020" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#f59e0b"/>
-                                        <stop offset="100%" style="stop-color:#f97316"/>
-                                    </linearGradient>
-                                    <linearGradient id="gradientAY2021" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#ef4444"/>
-                                        <stop offset="100%" style="stop-color:#f43f5e"/>
-                                    </linearGradient>
-                                    <linearGradient id="gradientAY2022" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#ec4899"/>
-                                        <stop offset="100%" style="stop-color:#d946ef"/>
-                                    </linearGradient>
-                                    <linearGradient id="gradientAY2023" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#64748b"/>
-                                        <stop offset="100%" style="stop-color:#94a3b8"/>
-                                    </linearGradient>
-                                    <linearGradient id="areaGradient1" x1="0%" y1="0%" x2="0%" y2="100%">
-                                        <stop offset="0%" style="stop-color:#6366f1;stop-opacity:0.2"/>
-                                        <stop offset="100%" style="stop-color:#6366f1;stop-opacity:0"/>
-                                    </linearGradient>
-                                </defs>
-
-                                <!-- Grid lines -->
-                                <line class="chart-grid-line" x1="50" y1="30" x2="380" y2="30"/>
-                                <line class="chart-grid-line" x1="50" y1="72" x2="380" y2="72"/>
-                                <line class="chart-grid-line" x1="50" y1="114" x2="380" y2="114"/>
-                                <line class="chart-grid-line" x1="50" y1="156" x2="380" y2="156"/>
-                                <line class="chart-grid-line" x1="50" y1="198" x2="380" y2="198"/>
-
-                                <!-- Y-axis labels -->
-                                <text class="chart-axis-label" x="40" y="35" text-anchor="end">5,000</text>
-                                <text class="chart-axis-label" x="40" y="77" text-anchor="end">4,000</text>
-                                <text class="chart-axis-label" x="40" y="119" text-anchor="end">3,000</text>
-                                <text class="chart-axis-label" x="40" y="161" text-anchor="end">2,000</text>
-                                <text class="chart-axis-label" x="40" y="203" text-anchor="end">1,000</text>
-
-                                <!-- X-axis labels -->
-                                <text class="chart-axis-label" x="60" y="218">12</text>
-                                <text class="chart-axis-label" x="100" y="218">24</text>
-                                <text class="chart-axis-label" x="140" y="218">36</text>
-                                <text class="chart-axis-label" x="180" y="218">48</text>
-                                <text class="chart-axis-label" x="220" y="218">60</text>
-                                <text class="chart-axis-label" x="260" y="218">72</text>
-                                <text class="chart-axis-label" x="300" y="218">84</text>
-                                <text class="chart-axis-label" x="340" y="218">96</text>
-                                <text class="chart-axis-label" x="200" y="238" text-anchor="middle" style="font-size: 10px;">Development Period (Months)</text>
-
-                                <!-- Area fill for AY 2016 (oldest, most complete) -->
-                                <path class="chart-area" id="chartArea1" fill="url(#areaGradient1)"
-                                    d="M60,178 L100,128 L140,98 L180,78 L220,63 L260,53 L300,46 L340,42 L340,198 L60,198 Z"/>
-
-                                <!-- Lines - Loss Development Curves for all 8 AYs -->
-                                <!-- AY 2016: 8 points (complete) -->
-                                <path class="chart-line chart-line-1" stroke="url(#gradientAY2016)" fill="none" stroke-width="2.5"
-                                    d="M60,178 L100,128 L140,98 L180,78 L220,63 L260,53 L300,46 L340,42"/>
-                                <!-- AY 2017: 7 points -->
-                                <path class="chart-line chart-line-1" stroke="url(#gradientAY2017)" fill="none" stroke-width="2.5"
-                                    d="M60,175 L100,122 L140,92 L180,72 L220,58 L260,50 L300,44"/>
-                                <!-- AY 2018: 6 points -->
-                                <path class="chart-line chart-line-1" stroke="url(#gradientAY2018)" fill="none" stroke-width="2.5"
-                                    d="M60,172 L100,118 L140,88 L180,68 L220,55 L260,48"/>
-                                <!-- AY 2019: 5 points -->
-                                <path class="chart-line chart-line-1" stroke="url(#gradientAY2019)" fill="none" stroke-width="2.5"
-                                    d="M60,168 L100,112 L140,82 L180,64 L220,52"/>
-                                <!-- AY 2020: 4 points -->
-                                <path class="chart-line chart-line-1" stroke="url(#gradientAY2020)" fill="none" stroke-width="2.5"
-                                    d="M60,165 L100,108 L140,78 L180,60"/>
-                                <!-- AY 2021: 3 points -->
-                                <path class="chart-line chart-line-1" stroke="url(#gradientAY2021)" fill="none" stroke-width="2.5"
-                                    d="M60,162 L100,105 L140,76"/>
-                                <!-- AY 2022: 2 points -->
-                                <path class="chart-line chart-line-1" stroke="url(#gradientAY2022)" fill="none" stroke-width="2.5"
-                                    d="M60,158 L100,102"/>
-                                <!-- AY 2023: 1 point (just a dot, shown below) -->
-
-                                <!-- Data points for all AYs -->
-                                <!-- AY 2016 dots (purple) -->
-                                <circle class="chart-dot chart-dot-1" cx="60" cy="178" r="4" fill="#6366f1"/>
-                                <circle class="chart-dot chart-dot-1" cx="100" cy="128" r="4" fill="#6366f1"/>
-                                <circle class="chart-dot chart-dot-1" cx="140" cy="98" r="4" fill="#6366f1"/>
-                                <circle class="chart-dot chart-dot-1" cx="180" cy="78" r="4" fill="#6366f1"/>
-                                <circle class="chart-dot chart-dot-1" cx="220" cy="63" r="4" fill="#6366f1"/>
-                                <circle class="chart-dot chart-dot-1" cx="260" cy="53" r="4" fill="#6366f1"/>
-                                <circle class="chart-dot chart-dot-1" cx="300" cy="46" r="4" fill="#6366f1"/>
-                                <circle class="chart-dot chart-dot-1" cx="340" cy="42" r="4" fill="#6366f1"/>
-
-                                <!-- AY 2017 dots (violet) -->
-                                <circle class="chart-dot chart-dot-1" cx="60" cy="175" r="4" fill="#8b5cf6"/>
-                                <circle class="chart-dot chart-dot-1" cx="100" cy="122" r="4" fill="#8b5cf6"/>
-                                <circle class="chart-dot chart-dot-1" cx="140" cy="92" r="4" fill="#8b5cf6"/>
-                                <circle class="chart-dot chart-dot-1" cx="180" cy="72" r="4" fill="#8b5cf6"/>
-                                <circle class="chart-dot chart-dot-1" cx="220" cy="58" r="4" fill="#8b5cf6"/>
-                                <circle class="chart-dot chart-dot-1" cx="260" cy="50" r="4" fill="#8b5cf6"/>
-                                <circle class="chart-dot chart-dot-1" cx="300" cy="44" r="4" fill="#8b5cf6"/>
-
-                                <!-- AY 2018 dots (green) -->
-                                <circle class="chart-dot chart-dot-1" cx="60" cy="172" r="4" fill="#22c55e"/>
-                                <circle class="chart-dot chart-dot-1" cx="100" cy="118" r="4" fill="#22c55e"/>
-                                <circle class="chart-dot chart-dot-1" cx="140" cy="88" r="4" fill="#22c55e"/>
-                                <circle class="chart-dot chart-dot-1" cx="180" cy="68" r="4" fill="#22c55e"/>
-                                <circle class="chart-dot chart-dot-1" cx="220" cy="55" r="4" fill="#22c55e"/>
-                                <circle class="chart-dot chart-dot-1" cx="260" cy="48" r="4" fill="#22c55e"/>
-
-                                <!-- AY 2019 dots (teal) -->
-                                <circle class="chart-dot chart-dot-1" cx="60" cy="168" r="4" fill="#14b8a6"/>
-                                <circle class="chart-dot chart-dot-1" cx="100" cy="112" r="4" fill="#14b8a6"/>
-                                <circle class="chart-dot chart-dot-1" cx="140" cy="82" r="4" fill="#14b8a6"/>
-                                <circle class="chart-dot chart-dot-1" cx="180" cy="64" r="4" fill="#14b8a6"/>
-                                <circle class="chart-dot chart-dot-1" cx="220" cy="52" r="4" fill="#14b8a6"/>
-
-                                <!-- AY 2020 dots (orange) -->
-                                <circle class="chart-dot chart-dot-1" cx="60" cy="165" r="4" fill="#f59e0b"/>
-                                <circle class="chart-dot chart-dot-1" cx="100" cy="108" r="4" fill="#f59e0b"/>
-                                <circle class="chart-dot chart-dot-1" cx="140" cy="78" r="4" fill="#f59e0b"/>
-                                <circle class="chart-dot chart-dot-1" cx="180" cy="60" r="4" fill="#f59e0b"/>
-
-                                <!-- AY 2021 dots (red) -->
-                                <circle class="chart-dot chart-dot-1" cx="60" cy="162" r="4" fill="#ef4444"/>
-                                <circle class="chart-dot chart-dot-1" cx="100" cy="105" r="4" fill="#ef4444"/>
-                                <circle class="chart-dot chart-dot-1" cx="140" cy="76" r="4" fill="#ef4444"/>
-
-                                <!-- AY 2022 dots (pink) -->
-                                <circle class="chart-dot chart-dot-1" cx="60" cy="158" r="4" fill="#ec4899"/>
-                                <circle class="chart-dot chart-dot-1" cx="100" cy="102" r="4" fill="#ec4899"/>
-
-                                <!-- AY 2023 dot (gray - single point) -->
-                                <circle class="chart-dot chart-dot-1" cx="60" cy="155" r="4" fill="#64748b"/>
-                            </svg>
-
-                            <!-- Chart Type 2: Ultimate Losses by Accident Year (hidden initially) -->
-                            <svg class="ai-chart-svg" id="aiChartSvg2" viewBox="0 0 400 250" style="display: none;">
-                                <defs>
-                                    <linearGradient id="barGradient1" x1="0%" y1="0%" x2="0%" y2="100%">
-                                        <stop offset="0%" style="stop-color:#8b5cf6"/>
-                                        <stop offset="100%" style="stop-color:#6366f1"/>
-                                    </linearGradient>
-                                    <linearGradient id="barGradient2" x1="0%" y1="0%" x2="0%" y2="100%">
-                                        <stop offset="0%" style="stop-color:#a855f7"/>
-                                        <stop offset="100%" style="stop-color:#7c3aed"/>
-                                    </linearGradient>
-                                    <linearGradient id="lineGradientUlt" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" style="stop-color:#f59e0b"/>
-                                        <stop offset="100%" style="stop-color:#ef4444"/>
-                                    </linearGradient>
-                                </defs>
-
-                                <!-- Grid lines -->
-                                <line class="chart-grid-line" x1="50" y1="30" x2="380" y2="30"/>
-                                <line class="chart-grid-line" x1="50" y1="75" x2="380" y2="75"/>
-                                <line class="chart-grid-line" x1="50" y1="120" x2="380" y2="120"/>
-                                <line class="chart-grid-line" x1="50" y1="165" x2="380" y2="165"/>
-
-                                <!-- Y-axis labels -->
-                                <text class="chart-axis-label" x="40" y="35" text-anchor="end">5,000</text>
-                                <text class="chart-axis-label" x="40" y="80" text-anchor="end">4,000</text>
-                                <text class="chart-axis-label" x="40" y="125" text-anchor="end">3,000</text>
-                                <text class="chart-axis-label" x="40" y="170" text-anchor="end">2,000</text>
-
-                                <!-- X-axis labels - Accident Years -->
-                                <text class="chart-axis-label" x="75" y="210">2016</text>
-                                <text class="chart-axis-label" x="115" y="210">2017</text>
-                                <text class="chart-axis-label" x="155" y="210">2018</text>
-                                <text class="chart-axis-label" x="195" y="210">2019</text>
-                                <text class="chart-axis-label" x="235" y="210">2020</text>
-                                <text class="chart-axis-label" x="275" y="210">2021</text>
-                                <text class="chart-axis-label" x="315" y="210">2022</text>
-                                <text class="chart-axis-label" x="355" y="210">2023</text>
-                                <text class="chart-axis-label" x="210" y="235" text-anchor="middle" style="font-size: 11px;">Accident Year</text>
-
-                                <!-- Bars - Ultimate Loss by AY -->
-                                <rect class="chart-bar-rect" x="65" y="55" width="28" height="135" rx="4" fill="url(#barGradient1)"/>
-                                <rect class="chart-bar-rect" x="105" y="50" width="28" height="140" rx="4" fill="url(#barGradient1)"/>
-                                <rect class="chart-bar-rect" x="145" y="45" width="28" height="145" rx="4" fill="url(#barGradient1)"/>
-                                <rect class="chart-bar-rect" x="185" y="40" width="28" height="150" rx="4" fill="url(#barGradient1)"/>
-                                <rect class="chart-bar-rect" x="225" y="48" width="28" height="142" rx="4" fill="url(#barGradient2)"/>
-                                <rect class="chart-bar-rect" x="265" y="60" width="28" height="130" rx="4" fill="url(#barGradient2)"/>
-                                <rect class="chart-bar-rect" x="305" y="75" width="28" height="115" rx="4" fill="url(#barGradient2)"/>
-                                <rect class="chart-bar-rect" x="345" y="95" width="28" height="95" rx="4" fill="url(#barGradient2)"/>
-
-                                <!-- Trend line -->
-                                <path class="chart-line chart-line-trend" id="chartLineTrend"
-                                    d="M79,55 L119,50 L159,45 L199,40 L239,48 L279,60 L319,75 L359,95"
-                                    fill="none" stroke="url(#lineGradientUlt)" stroke-width="3" stroke-dasharray="500" stroke-dashoffset="500"/>
-
-                                <!-- Data points on trend line -->
-                                <circle class="chart-dot chart-dot-2" cx="79" cy="55" r="5" fill="#f59e0b"/>
-                                <circle class="chart-dot chart-dot-2" cx="119" cy="50" r="5" fill="#f59e0b"/>
-                                <circle class="chart-dot chart-dot-2" cx="159" cy="45" r="5" fill="#f59e0b"/>
-                                <circle class="chart-dot chart-dot-2" cx="199" cy="40" r="5" fill="#f59e0b"/>
-                                <circle class="chart-dot chart-dot-2" cx="239" cy="48" r="5" fill="#ef4444"/>
-                                <circle class="chart-dot chart-dot-2" cx="279" cy="60" r="5" fill="#ef4444"/>
-                                <circle class="chart-dot chart-dot-2" cx="319" cy="75" r="5" fill="#ef4444"/>
-                                <circle class="chart-dot chart-dot-2" cx="359" cy="95" r="5" fill="#ef4444"/>
-                            </svg>
+                            <div id="aiDemoLegend" class="chartLegend" aria-label="Legend"></div>
                         </div>
 
-                        <!-- Legend for Chart 1 - All 8 AYs -->
-                        <div class="ai-chart-legend" id="aiChartLegend1" style="flex-wrap: wrap; gap: 10px 16px;">
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);"></span>
-                                2016
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #8b5cf6, #a855f7);"></span>
-                                2017
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #22c55e, #10b981);"></span>
-                                2018
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #14b8a6, #06b6d4);"></span>
-                                2019
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #f59e0b, #f97316);"></span>
-                                2020
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #ef4444, #f43f5e);"></span>
-                                2021
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #ec4899, #d946ef);"></span>
-                                2022
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #64748b, #94a3b8);"></span>
-                                2023
-                            </div>
-                        </div>
-
-                        <!-- Legend for Chart 2 -->
-                        <div class="ai-chart-legend" id="aiChartLegend2" style="display: none;">
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #8b5cf6, #6366f1);"></span>
-                                Actual Ultimate
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #a855f7, #7c3aed);"></span>
-                                Projected Ultimate
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: linear-gradient(135deg, #f59e0b, #ef4444);"></span>
-                                Trend Line
-                            </div>
-                        </div>
+                        <div class="ai-style-note" id="aiStyleNote">AI prompt applied: By Column style</div>
                     </div>
                 </div>
             </div>
@@ -3312,7 +4245,7 @@
                             </div>
                             <div>
                                 <div class="sim-title">Reserve Distribution</div>
-                                <div class="sim-subtitle">Lognormal simulation results</div>
+                                <div class="sim-subtitle">Simulation results</div>
                             </div>
                         </div>
                         <div class="sim-counter">
@@ -3388,6 +4321,200 @@
         </div>
     </section>
 
+    <!-- Workflow Automation Section -->
+    <section class="workflow-auto" id="workflow-auto">
+        <div class="workflow-auto-container">
+            <div class="section-header animate-on-scroll">
+                <p class="section-label">Workflow Automation</p>
+                <h2 class="section-title">Build. Script. <span class="gradient-text">Run.</span></h2>
+                <p class="section-subtitle">Create powerful automated workflows with drag-and-drop simplicity and built-in scripting.</p>
+            </div>
+
+            <div class="workflow-auto-content">
+                <!-- Workflow Demo Visual -->
+                <div class="workflow-demo animate-on-scroll" id="workflowDemo">
+                    <div class="workflow-demo-header">
+                        <div class="workflow-demo-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                            </svg>
+                            Workflow Designer
+                        </div>
+                        <div class="workflow-demo-actions">
+                            <button class="demo-run-btn" id="demoRunBtn">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <polygon points="5 3 19 12 5 21 5 3"/>
+                                </svg>
+                                Run All
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="workflow-demo-body">
+                        <!-- Demo Sidebar -->
+                        <div class="demo-sidebar">
+                            <div class="demo-sidebar-title">Steps</div>
+                            <div class="demo-step" id="demoStep1" data-step="1">
+                                <div class="demo-step-icon import">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                        <polyline points="7 10 12 15 17 10"/>
+                                        <line x1="12" y1="15" x2="12" y2="3"/>
+                                    </svg>
+                                </div>
+                                Import Data
+                            </div>
+                            <div class="demo-step" id="demoStep2" data-step="2">
+                                <div class="demo-step-icon transform">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="16 3 21 3 21 8"/>
+                                        <line x1="4" y1="20" x2="21" y2="3"/>
+                                        <polyline points="21 16 21 21 16 21"/>
+                                        <line x1="15" y1="15" x2="21" y2="21"/>
+                                        <line x1="4" y1="4" x2="9" y2="9"/>
+                                    </svg>
+                                </div>
+                                Transform
+                            </div>
+                            <div class="demo-step" id="demoStep3" data-step="3">
+                                <div class="demo-step-icon analyze">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="18" y1="20" x2="18" y2="10"/>
+                                        <line x1="12" y1="20" x2="12" y2="4"/>
+                                        <line x1="6" y1="20" x2="6" y2="14"/>
+                                    </svg>
+                                </div>
+                                Analyze
+                            </div>
+                            <div class="demo-step drop-target" id="demoStep4" data-step="4" style="opacity: 0;">
+                                <div class="demo-step-icon export">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                        <polyline points="17 8 12 3 7 8"/>
+                                        <line x1="12" y1="3" x2="12" y2="15"/>
+                                    </svg>
+                                </div>
+                                Export
+                            </div>
+                            <div class="demo-add-step" id="demoAddStep">+ Add Step</div>
+                        </div>
+
+                        <!-- Demo Workspace -->
+                        <div class="demo-workspace">
+                            <div class="demo-workspace-title">Script Editor</div>
+                            <div class="demo-script-editor">
+                                <div class="script-editor-header">
+                                    <div class="script-tab active">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="16 18 22 12 16 6"/>
+                                            <polyline points="8 6 2 12 8 18"/>
+                                        </svg>
+                                        workflow.py
+                                    </div>
+                                </div>
+                                <div class="script-editor-content" id="scriptContent">
+                                    <div class="script-line" data-line="1">
+                                        <span class="line-number">1</span>
+                                        <span class="line-content"><span class="code-comment"># Auto-generated workflow script</span></span>
+                                    </div>
+                                    <div class="script-line" data-line="2">
+                                        <span class="line-number">2</span>
+                                        <span class="line-content"><span class="code-keyword">import</span> ArcRho <span class="code-keyword">as</span> arc</span>
+                                    </div>
+                                    <div class="script-line" data-line="3">
+                                        <span class="line-number">3</span>
+                                        <span class="line-content"></span>
+                                    </div>
+                                    <div class="script-line" data-line="4">
+                                        <span class="line-number">4</span>
+                                        <span class="line-content"><span class="code-variable">data</span> = arc.<span class="code-function">import_triangle</span>(<span class="code-string">"loss_data.csv"</span>)</span>
+                                    </div>
+                                    <div class="script-line" data-line="5">
+                                        <span class="line-number">5</span>
+                                        <span class="line-content"><span class="code-variable">data</span> = arc.<span class="code-function">transform</span>(data, method=<span class="code-string">"incr_to_cum"</span>)</span>
+                                    </div>
+                                    <div class="script-line" data-line="6">
+                                        <span class="line-number">6</span>
+                                        <span class="line-content"><span class="code-variable">result</span> = arc.<span class="code-function">chain_ladder</span>(data)</span>
+                                    </div>
+                                    <div class="script-line" data-line="7">
+                                        <span class="line-number">7</span>
+                                        <span class="line-content">arc.<span class="code-function">export</span>(result, <span class="code-string">"CL_Ultimates.xlsx"</span>)</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="demo-output">
+                                <div class="output-header">
+                                    <span class="output-title">Output</span>
+                                    <span class="output-status" id="outputStatus">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="12" cy="12" r="10"/>
+                                        </svg>
+                                        Ready
+                                    </span>
+                                </div>
+                                <div class="output-content" id="outputContent">$ Workflow completed in 1.24s — Exported 8 accident years to reserves.xlsx</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Animated Cursor -->
+                    <div class="demo-cursor" id="demoCursor">
+                        <svg viewBox="0 0 24 24" fill="white" stroke="#333" stroke-width="1">
+                            <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.48 0 .72-.58.38-.92L6.35 2.85a.5.5 0 0 0-.85.36Z"/>
+                        </svg>
+                    </div>
+
+                    <!-- Progress dots -->
+                    <div class="workflow-progress">
+                        <div class="progress-dot" id="progDot1"></div>
+                        <div class="progress-dot" id="progDot2"></div>
+                        <div class="progress-dot" id="progDot3"></div>
+                    </div>
+                </div>
+
+                <!-- Info Section -->
+                <div class="workflow-auto-info animate-on-scroll animate-delay-1">
+                    <div class="auto-badge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                        </svg>
+                        Automation Engine
+                    </div>
+                    <h3>Visual Workflow Builder with Powerful Scripting</h3>
+                    <p>Design complex actuarial workflows visually, then fine-tune with our built-in scripting engine. Run everything with a single click.</p>
+
+                    <ul class="workflow-auto-features">
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            Drag-and-drop workflow designer
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            Built-in Python scripting
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            One-click execution with live output
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            Reusable workflow templates
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Workflow Section -->
     <section class="workflow" id="workflow">
         <div class="workflow-bg-pattern"></div>
@@ -3427,7 +4554,7 @@
         <div class="benefits-container">
             <div class="benefits-content">
                 <div class="section-header animate-on-scroll" style="text-align: left;">
-                    <p class="section-label">Why AdaLab</p>
+                    <p class="section-label">Why ArcRho</p>
                     <h2 class="section-title">Built for Real Actuarial Work</h2>
                 </div>
                 <ul class="benefits-list">
@@ -3508,10 +4635,10 @@
     <!-- CTA Section -->
     <section class="cta" id="contact">
         <div class="cta-container animate-on-scroll">
-            <h2>Ready to Streamline Your Reserving?</h2>
-            <p>See how AdaLab can transform your actuarial workflow. Request a personalized demo today.</p>
+            <h2>Ready to Streamline Your Workflow?</h2>
+            <p>See how ArcRho can transform your actuarial workflow. Request a personalized demo today.</p>
             <div class="cta-buttons">
-                <a href="mailto:demo@example.com?subject=AdaLab Demo Request" class="btn-primary">
+                <a href="mailto:xw2781@gmail.com?subject=ArcRho Demo Request" class="btn-primary">
                     Request a Demo
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M5 12h14M12 5l7 7-7 7"/>
@@ -3526,10 +4653,19 @@
     <footer>
         <div class="footer-container">
             <div class="footer-logo">
-                <div class="logo-icon">A</div>
-                AdaLab
+                <div class="logo-icon" aria-label="ArcRho logo">
+                    <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                        <rect x="3" y="3" width="5" height="5" rx="1.2"></rect>
+                        <rect x="10" y="3" width="5" height="5" rx="1.2"></rect>
+                        <rect x="17" y="3" width="5" height="5" rx="1.2"></rect>
+                        <rect x="3" y="10" width="5" height="5" rx="1.2"></rect>
+                        <rect x="10" y="10" width="5" height="5" rx="1.2"></rect>
+                        <rect x="3" y="17" width="5" height="5" rx="1.2"></rect>
+                    </svg>
+                </div>
+                ArcRho
             </div>
-            <p>&copy; 2025 AdaLab - Actuarial Data & Analytics. All rights reserved.</p>
+            <p>&copy; 2026 ArcRho - ArcRay Platform. All rights reserved.</p>
         </div>
     </footer>
 
@@ -3624,383 +4760,228 @@
             });
         });
 
-        // AI Visualization Demo Animation
-        const aiPromptText = document.getElementById('aiPromptText');
-        const aiGenerateBtn = document.getElementById('aiGenerateBtn');
-        const chartPlaceholder = document.getElementById('chartPlaceholder');
-        const aiChartSvg1 = document.getElementById('aiChartSvg1');
-        const aiChartSvg2 = document.getElementById('aiChartSvg2');
-        const aiChartLegend1 = document.getElementById('aiChartLegend1');
-        const aiChartLegend2 = document.getElementById('aiChartLegend2');
-        const aiMouseCursor = document.getElementById('aiMouseCursor');
-        const aiPromptContainer = document.querySelector('.ai-prompt-container');
-        const aiDemoLeft = document.querySelector('.ai-demo-left');
+                // AI Visualization Demo Animation
+        const aiPromptPreview = document.getElementById('aiPromptPreview');
+        const aiApplyStyleBtn = document.getElementById('aiApplyStyleBtn');
+        const aiPromptBadge = document.getElementById('aiPromptBadge');
+        const aiChartTitle = document.getElementById('aiChartTitle');
+        const aiStyleNote = document.getElementById('aiStyleNote');
+        const aiStyleTransition = document.getElementById('aiStyleTransition');
+        const aiStyleChartByCol = document.getElementById('aiStyleChartByCol');
+        const aiStyleChartByRow = document.getElementById('aiStyleChartByRow');
+        const aiDemoLegend = document.getElementById('aiDemoLegend');
 
-        // Two different prompts for alternating demos
-        const prompts = [
-            "Plot the loss development curve with gradient fills, showing all accident years in a modern style.",
-            "Show projected ultimate losses by accident year as a bar chart with accident years on the x-axis, include a trend line overlay with warm gradient colors"
-        ];
-
-        let currentPromptIndex = 0;
-        let aiDemoStarted = false;
-        let aiDemoComplete = false;
-        let aiDemoRunning = false;
-        let autoPlayInterval = null;
-        let cursorAnimationFrame = null;
-
-        // Typing animation
-        function typePrompt(text, element, speed = 25) {
-            return new Promise((resolve) => {
-                let i = 0;
-                element.innerHTML = '';
-                const cursor = document.createElement('span');
-                cursor.className = 'ai-typing-cursor';
-
-                function type() {
-                    if (i < text.length) {
-                        element.innerHTML = text.substring(0, i + 1);
-                        element.appendChild(cursor);
-                        i++;
-                        setTimeout(type, speed + Math.random() * 15);
-                    } else {
-                        cursor.remove();
-                        resolve();
-                    }
+        if (aiPromptPreview && aiApplyStyleBtn && aiStyleChartByCol && aiStyleChartByRow && aiDemoLegend) {
+            const aiStylePresets = [
+                {
+                    mode: 'byCol',
+                    badge: 'Style 1',
+                    title: 'Origin Curves',
+                    note: 'Chart template saved: By Column style',
+                    prompt: 'Use By Column style with development periods as line groups and origin years on the x-axis.',
+                    legend: [
+                        { label: '12', color: '#0ea5e9' },
+                        { label: '24', color: '#8b5cf6' },
+                        { label: '36', color: '#22c55e' },
+                        { label: '48', color: '#f59e0b' }
+                    ]
+                },
+                {
+                    mode: 'byRow',
+                    badge: 'Style 2',
+                    title: 'Development Curves',
+                    note: 'Chart template updated: By Row style',
+                    prompt: 'Switch to By Row style: one line per origin year with development period on the x-axis.',
+                    legend: [
+                        { label: '2019', color: '#6366f1' },
+                        { label: '2020', color: '#0ea5e9' },
+                        { label: '2021', color: '#22c55e' },
+                        { label: '2022', color: '#f97316' }
+                    ]
                 }
-                type();
-            });
-        }
+            ];
 
-        // Show generating state
-        function showGenerating() {
-            aiGenerateBtn.classList.add('generating');
-            aiGenerateBtn.innerHTML = `
-                <span class="dots">
-                    <span class="dot"></span>
-                    <span class="dot"></span>
-                    <span class="dot"></span>
-                </span>
-                Generating...
-            `;
-        }
+            let aiStyleIndex = 0;
+            let aiAutoPlay = false;
+            let aiCycleTimer = null;
+            let aiCycleToken = 0;
 
-        // Show generate button
-        function showGenerateReady() {
-            aiGenerateBtn.classList.remove('generating');
-            aiGenerateBtn.innerHTML = `
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                </svg>
-                Generate
-            `;
-        }
+            function sleep(ms) {
+                return new Promise((resolve) => setTimeout(resolve, ms));
+            }
 
-        // Animate mouse cursor to button
-        function animateMouseToButton() {
-            return new Promise((resolve) => {
-                const btnRect = aiGenerateBtn.getBoundingClientRect();
-                const containerRect = aiDemoLeft.getBoundingClientRect();
+            function setPromptText(text, withCaret = true) {
+                aiPromptPreview.textContent = text;
+                if (!withCaret) return;
+                const caret = document.createElement('span');
+                caret.className = 'ai-prompt-caret';
+                aiPromptPreview.appendChild(caret);
+            }
 
-                // Calculate target position relative to container
-                const targetX = btnRect.left - containerRect.left + btnRect.width / 2;
-                const targetY = btnRect.top - containerRect.top + btnRect.height / 2;
+            function renderLegend(items) {
+                aiDemoLegend.innerHTML = '';
+                items.forEach((item) => {
+                    const row = document.createElement('div');
+                    row.className = 'legendItem';
 
-                // Start position (from prompt area)
-                const startX = targetX - 100;
-                const startY = targetY - 80;
+                    const swatch = document.createElement('span');
+                    swatch.className = 'legendSwatch';
+                    swatch.style.background = item.color;
 
-                aiMouseCursor.style.left = startX + 'px';
-                aiMouseCursor.style.top = startY + 'px';
-                aiMouseCursor.classList.add('visible');
+                    const label = document.createElement('span');
+                    label.className = 'legendLabel';
+                    label.textContent = item.label;
 
-                // Animate to button
-                const duration = 800;
-                const startTime = performance.now();
+                    row.appendChild(swatch);
+                    row.appendChild(label);
+                    aiDemoLegend.appendChild(row);
+                });
+            }
 
-                function animate(currentTime) {
-                    const elapsed = currentTime - startTime;
-                    const progress = Math.min(elapsed / duration, 1);
-                    const easeOut = 1 - Math.pow(1 - progress, 3);
+            function triggerStyleTransition() {
+                aiStyleTransition.classList.remove('run');
+                void aiStyleTransition.offsetWidth;
+                aiStyleTransition.classList.add('run');
+            }
 
-                    const currentX = startX + (targetX - startX) * easeOut;
-                    const currentY = startY + (targetY - startY) * easeOut;
+            function applyStyle(index, opts = {}) {
+                const preset = aiStylePresets[index];
+                aiStyleIndex = index;
 
-                    aiMouseCursor.style.left = currentX + 'px';
-                    aiMouseCursor.style.top = currentY + 'px';
-
-                    if (progress < 1) {
-                        cursorAnimationFrame = requestAnimationFrame(animate);
-                    } else {
-                        // Click animation
-                        aiMouseCursor.classList.add('clicking');
-                        setTimeout(() => {
-                            aiMouseCursor.classList.remove('clicking');
-                            aiMouseCursor.classList.remove('visible');
-                            resolve();
-                        }, 300);
-                    }
+                if (opts.updatePrompt !== false) {
+                    setPromptText(preset.prompt, false);
                 }
 
-                requestAnimationFrame(animate);
-            });
-        }
+                if (aiPromptBadge) aiPromptBadge.textContent = preset.badge;
+                if (aiChartTitle) aiChartTitle.textContent = preset.title;
+                if (aiStyleNote) aiStyleNote.textContent = preset.note;
 
-        // Hide mouse cursor
-        function hideMouseCursor() {
-            if (cursorAnimationFrame) {
-                cancelAnimationFrame(cursorAnimationFrame);
-            }
-            aiMouseCursor.classList.remove('visible');
-            aiMouseCursor.classList.remove('clicking');
-        }
+                aiStyleChartByCol.classList.remove('is-active');
+                aiStyleChartByRow.classList.remove('is-active');
+                const targetChart = preset.mode === 'byCol' ? aiStyleChartByCol : aiStyleChartByRow;
+                void targetChart.offsetWidth;
+                targetChart.classList.add('is-active');
 
-        // Animate chart type 1 (development curves)
-        function animateChart1() {
-            chartPlaceholder.style.display = 'none';
-            aiChartSvg1.style.display = 'block';
-            aiChartSvg2.style.display = 'none';
-            aiChartLegend1.style.display = 'flex';
-            aiChartLegend2.style.display = 'none';
-            aiChartSvg1.style.animation = 'fadeInScale 0.5s ease forwards';
+                renderLegend(preset.legend);
 
-            // Animate lines with staggered delays
-            setTimeout(() => {
-                const lines = aiChartSvg1.querySelectorAll('.chart-line');
-                lines.forEach((line, index) => {
-                    setTimeout(() => {
-                        line.classList.add('animate');
-                    }, index * 120);
-                });
-            }, 300);
-
-            // Animate area
-            setTimeout(() => {
-                const area = document.getElementById('chartArea1');
-                if (area) area.classList.add('visible');
-            }, 600);
-
-            // Animate dots with staggered delays
-            setTimeout(() => {
-                aiChartSvg1.querySelectorAll('.chart-dot-1').forEach((dot, index) => {
-                    setTimeout(() => {
-                        dot.classList.add('visible');
-                    }, index * 40);
-                });
-            }, 1800);
-
-            // Animate legend
-            setTimeout(() => {
-                aiChartLegend1.querySelectorAll('.legend-item').forEach((item, index) => {
-                    setTimeout(() => {
-                        item.classList.add('visible');
-                    }, index * 80);
-                });
-            }, 2500);
-        }
-
-        // Animate chart type 2 (bar chart with AY on x-axis)
-        function animateChart2() {
-            chartPlaceholder.style.display = 'none';
-            aiChartSvg1.style.display = 'none';
-            aiChartSvg2.style.display = 'block';
-            aiChartLegend1.style.display = 'none';
-            aiChartLegend2.style.display = 'flex';
-            aiChartSvg2.style.animation = 'fadeInScale 0.5s ease forwards';
-
-            // Animate bars
-            setTimeout(() => {
-                aiChartSvg2.querySelectorAll('.chart-bar-rect').forEach((bar, index) => {
-                    setTimeout(() => {
-                        bar.classList.add('visible');
-                        bar.style.animation = `fadeInScale 0.4s ease forwards`;
-                    }, index * 100);
-                });
-            }, 300);
-
-            // Animate trend line
-            setTimeout(() => {
-                const trendLine = document.getElementById('chartLineTrend');
-                if (trendLine) trendLine.classList.add('animate');
-            }, 1200);
-
-            // Animate dots
-            setTimeout(() => {
-                aiChartSvg2.querySelectorAll('.chart-dot-2').forEach((dot, index) => {
-                    setTimeout(() => {
-                        dot.classList.add('visible');
-                    }, index * 80);
-                });
-            }, 1800);
-
-            // Animate legend
-            setTimeout(() => {
-                aiChartLegend2.querySelectorAll('.legend-item').forEach((item, index) => {
-                    setTimeout(() => {
-                        item.classList.add('visible');
-                    }, index * 150);
-                });
-            }, 2200);
-        }
-
-        // Reset all chart states
-        function resetCharts() {
-            chartPlaceholder.style.display = 'flex';
-            aiChartSvg1.style.display = 'none';
-            aiChartSvg2.style.display = 'none';
-
-            // Reset chart 1
-            aiChartSvg1.querySelectorAll('.chart-line').forEach(line => {
-                line.classList.remove('animate');
-                line.style.strokeDashoffset = '800';
-            });
-            const area1 = document.getElementById('chartArea1');
-            if (area1) area1.classList.remove('visible');
-            aiChartSvg1.querySelectorAll('.chart-dot-1').forEach(dot => dot.classList.remove('visible'));
-            aiChartLegend1.querySelectorAll('.legend-item').forEach(item => item.classList.remove('visible'));
-
-            // Reset chart 2
-            aiChartSvg2.querySelectorAll('.chart-bar-rect').forEach(bar => {
-                bar.classList.remove('visible');
-                bar.style.animation = '';
-            });
-            const trendLine = document.getElementById('chartLineTrend');
-            if (trendLine) {
-                trendLine.classList.remove('animate');
-                trendLine.style.strokeDashoffset = '800';
-            }
-            aiChartSvg2.querySelectorAll('.chart-dot-2').forEach(dot => dot.classList.remove('visible'));
-            aiChartLegend2.querySelectorAll('.legend-item').forEach(item => item.classList.remove('visible'));
-        }
-
-        let nextDemoTimeout = null;
-
-        // Schedule next demo after 4 seconds
-        function scheduleNextDemo() {
-            if (nextDemoTimeout) clearTimeout(nextDemoTimeout);
-            nextDemoTimeout = setTimeout(() => {
-                if (aiDemoComplete && !aiDemoRunning) {
-                    runAiDemo(true);
+                if (opts.transition !== false) {
+                    triggerStyleTransition();
                 }
-            }, 4000); // 4 second pause after completion
-        }
-
-        // Main demo sequence
-        async function runAiDemo(withCursor = true) {
-            if (aiDemoRunning) return;
-
-            // Clear any pending next demo
-            if (nextDemoTimeout) clearTimeout(nextDemoTimeout);
-
-            aiDemoRunning = true;
-            aiDemoStarted = true;
-            aiDemoComplete = false;
-
-            // Reset state
-            aiPromptText.innerHTML = '';
-            resetCharts();
-            showGenerateReady();
-            hideMouseCursor();
-
-            // Type prompt
-            await typePrompt(prompts[currentPromptIndex], aiPromptText);
-
-            // Animate mouse cursor to button (if enabled)
-            if (withCursor) {
-                await new Promise(resolve => setTimeout(resolve, 300));
-                await animateMouseToButton();
             }
 
-            // Show generating
-            await new Promise(resolve => setTimeout(resolve, 200));
-            showGenerating();
+            function getVariableTypingDelay(text, charIndex) {
+                const ch = text[charIndex] || '';
+                const progress = (charIndex + 1) / Math.max(text.length, 1);
 
-            // Wait and show chart
-            await new Promise(resolve => setTimeout(resolve, 1500));
+                // Oscillate speed to create visible fast/slow rhythm.
+                const wave = Math.sin(progress * Math.PI * 5);
+                let delay = wave >= 0
+                    ? 8 + Math.random() * 10
+                    : 18 + Math.random() * 16;
 
-            if (currentPromptIndex === 0) {
-                animateChart1();
-            } else {
-                animateChart2();
-            }
+                // Natural pauses around spaces/punctuation.
+                if (ch === ' ') delay += 18 + Math.random() * 14;
+                if (',.;:!?'.includes(ch)) delay += 80 + Math.random() * 90;
 
-            // Complete - wait for animation to fully render
-            setTimeout(() => {
-                showGenerateReady();
-                aiDemoComplete = true;
-                aiDemoRunning = false;
-
-                // Toggle to next prompt for next run
-                currentPromptIndex = (currentPromptIndex + 1) % prompts.length;
-
-                // Schedule next demo after 4 seconds
-                scheduleNextDemo();
-            }, 3500);
-        }
-
-        // Start auto-play cycle
-        function startAutoPlay() {
-            stopAutoPlay();
-            runAiDemo(true);
-        }
-
-        // Stop auto-play
-        function stopAutoPlay() {
-            if (autoPlayInterval) {
-                clearInterval(autoPlayInterval);
-                autoPlayInterval = null;
-            }
-            if (nextDemoTimeout) {
-                clearTimeout(nextDemoTimeout);
-                nextDemoTimeout = null;
-            }
-        }
-
-        // Click handler for generate button (manual trigger)
-        aiGenerateBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (!aiDemoRunning) {
-                stopAutoPlay();
-                runAiDemo(false); // No cursor animation for manual clicks
-            }
-        });
-
-        // Click on prompt area to restart animation with next prompt
-        aiPromptContainer.addEventListener('click', (e) => {
-            if (e.target === aiGenerateBtn || aiGenerateBtn.contains(e.target)) return;
-
-            if (!aiDemoRunning) {
-                stopAutoPlay();
-                currentPromptIndex = (currentPromptIndex + 1) % prompts.length; // Switch prompt
-                runAiDemo(true);
-            }
-        });
-
-        // Click on chart area to switch to next animation
-        const aiChartCanvas = document.getElementById('aiChartCanvas');
-        aiChartCanvas.addEventListener('click', (e) => {
-            if (!aiDemoRunning) {
-                stopAutoPlay();
-                currentPromptIndex = (currentPromptIndex + 1) % prompts.length; // Switch to next
-                runAiDemo(true);
-            }
-        });
-
-        // Auto-start demo when section is visible
-        const aiVizSection = document.querySelector('.ai-viz');
-        const aiVizObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting && !aiDemoStarted) {
-                    setTimeout(() => startAutoPlay(), 800);
-                } else if (!entry.isIntersecting) {
-                    // Pause when not visible
-                    stopAutoPlay();
-                    hideMouseCursor();
+                // Rare "thinking" micro-pause for human-like cadence.
+                if (charIndex > 3 && Math.random() < 0.06) {
+                    delay += 50 + Math.random() * 90;
                 }
-            });
-        }, { threshold: 0.3 });
 
-        aiVizObserver.observe(aiVizSection);
+                // Slight slowdown near the end.
+                if (progress > 0.88) delay += 14 + Math.random() * 14;
+
+                return Math.round(delay);
+            }
+
+            async function typePromptAnimated(text, token) {
+                for (let i = 1; i <= text.length; i += 1) {
+                    if (token !== aiCycleToken) return false;
+                    setPromptText(text.slice(0, i), true);
+                    await sleep(getVariableTypingDelay(text, i - 1));
+                }
+                setPromptText(text, false);
+                return token === aiCycleToken;
+            }
+
+            function queueNextCycle(delayMs = 0) {
+                if (!aiAutoPlay) return;
+                if (aiCycleTimer) clearTimeout(aiCycleTimer);
+                aiCycleTimer = setTimeout(() => {
+                    void runCycleStep();
+                }, delayMs);
+            }
+
+            async function runCycleStep() {
+                if (!aiAutoPlay) return;
+
+                const token = ++aiCycleToken;
+                const nextIndex = (aiStyleIndex + 1) % aiStylePresets.length;
+                const nextPreset = aiStylePresets[nextIndex];
+                const typed = await typePromptAnimated(nextPreset.prompt, token);
+                if (!typed || !aiAutoPlay || token !== aiCycleToken) return;
+
+                aiApplyStyleBtn.classList.add('is-working');
+                await sleep(260);
+                if (!aiAutoPlay || token !== aiCycleToken) return;
+
+                applyStyle(nextIndex, { updatePrompt: false });
+                aiApplyStyleBtn.classList.remove('is-working');
+
+                queueNextCycle(2200);
+            }
+
+            function startAutoCycle() {
+                if (aiAutoPlay) return;
+                aiAutoPlay = true;
+                queueNextCycle(900);
+            }
+
+            function stopAutoCycle() {
+                aiAutoPlay = false;
+                aiCycleToken += 1;
+                if (aiCycleTimer) {
+                    clearTimeout(aiCycleTimer);
+                    aiCycleTimer = null;
+                }
+                aiApplyStyleBtn.classList.remove('is-working');
+            }
+
+            aiApplyStyleBtn.addEventListener('click', async () => {
+                const nextIndex = (aiStyleIndex + 1) % aiStylePresets.length;
+                const token = ++aiCycleToken;
+                if (aiCycleTimer) clearTimeout(aiCycleTimer);
+
+                const typed = await typePromptAnimated(aiStylePresets[nextIndex].prompt, token);
+                if (!typed || token !== aiCycleToken) return;
+
+                aiApplyStyleBtn.classList.add('is-working');
+                await sleep(180);
+                if (token !== aiCycleToken) return;
+
+                applyStyle(nextIndex, { updatePrompt: false });
+                aiApplyStyleBtn.classList.remove('is-working');
+
+                if (aiAutoPlay) queueNextCycle(2400);
+            });
+
+            applyStyle(0, { transition: false, updatePrompt: true });
+
+            const aiVizSection = document.querySelector('.ai-viz');
+            if (aiVizSection) {
+                const aiVizObserver = new IntersectionObserver((entries) => {
+                    entries.forEach((entry) => {
+                        if (entry.isIntersecting) {
+                            startAutoCycle();
+                        } else {
+                            stopAutoCycle();
+                        }
+                    });
+                }, { threshold: 0.35 });
+
+                aiVizObserver.observe(aiVizSection);
+            }
+        }
 
         // ========================================
         // Stochastic Simulation Animation
@@ -4219,6 +5200,279 @@
         }, { threshold: 0.4 });
 
         stochasticObserver.observe(stochasticSection);
+
+        // ========================================
+        // Workflow Automation Animation
+        // ========================================
+        const workflowDemo = document.getElementById('workflowDemo');
+        const demoCursor = document.getElementById('demoCursor');
+        const demoRunBtn = document.getElementById('demoRunBtn');
+        const scriptContent = document.getElementById('scriptContent');
+        const outputStatus = document.getElementById('outputStatus');
+        const outputContent = document.getElementById('outputContent');
+        const demoStep4 = document.getElementById('demoStep4');
+        const demoAddStep = document.getElementById('demoAddStep');
+        const progDots = [
+            document.getElementById('progDot1'),
+            document.getElementById('progDot2'),
+            document.getElementById('progDot3')
+        ];
+
+        let wfAnimationRunning = false;
+        let wfAnimationPhase = 0;
+
+        // Animate cursor to element
+        function animateCursorTo(targetEl, duration = 600) {
+            return new Promise(resolve => {
+                const demoRect = workflowDemo.getBoundingClientRect();
+                const targetRect = targetEl.getBoundingClientRect();
+
+                const targetX = targetRect.left - demoRect.left + targetRect.width / 2;
+                const targetY = targetRect.top - demoRect.top + targetRect.height / 2;
+
+                const cursorStyle = window.getComputedStyle(demoCursor);
+                const startX = parseFloat(cursorStyle.left) || 200;
+                const startY = parseFloat(cursorStyle.top) || 200;
+
+                demoCursor.classList.add('visible');
+
+                const startTime = performance.now();
+
+                function animate(currentTime) {
+                    const elapsed = currentTime - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    const easeOut = 1 - Math.pow(1 - progress, 3);
+
+                    const currentX = startX + (targetX - startX) * easeOut;
+                    const currentY = startY + (targetY - startY) * easeOut;
+
+                    demoCursor.style.left = currentX + 'px';
+                    demoCursor.style.top = currentY + 'px';
+
+                    if (progress < 1) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        resolve();
+                    }
+                }
+
+                requestAnimationFrame(animate);
+            });
+        }
+
+        // Show script lines with typing effect
+        function showScriptLines() {
+            return new Promise(resolve => {
+                const lines = scriptContent.querySelectorAll('.script-line');
+                lines.forEach((line, index) => {
+                    setTimeout(() => {
+                        line.classList.add('visible');
+                        if (index === lines.length - 1) {
+                            setTimeout(resolve, 300);
+                        }
+                    }, index * 150);
+                });
+            });
+        }
+
+        // Hide all script lines
+        function hideScriptLines() {
+            const lines = scriptContent.querySelectorAll('.script-line');
+            lines.forEach(line => line.classList.remove('visible'));
+        }
+
+        // Set progress dot state
+        function setProgressDot(index, state) {
+            progDots.forEach((dot, i) => {
+                dot.classList.remove('active', 'complete');
+                if (i < index) dot.classList.add('complete');
+                else if (i === index) dot.classList.add('active');
+            });
+        }
+
+        // Run button animation
+        function animateRunButton() {
+            return new Promise(resolve => {
+                demoRunBtn.classList.add('running');
+                demoRunBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                    </svg>
+                    Running...
+                `;
+
+                outputStatus.classList.remove('success');
+                outputStatus.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                    </svg>
+                    Running...
+                `;
+                outputContent.classList.remove('visible');
+
+                setTimeout(() => {
+                    demoRunBtn.classList.remove('running');
+                    demoRunBtn.innerHTML = `
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        Run All
+                    `;
+
+                    outputStatus.classList.add('success');
+                    outputStatus.innerHTML = `
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        Success
+                    `;
+                    outputContent.classList.add('visible');
+
+                    resolve();
+                }, 2000);
+            });
+        }
+
+        // Reset workflow demo
+        function resetWorkflowDemo() {
+            demoCursor.classList.remove('visible');
+            demoCursor.style.left = '200px';
+            demoCursor.style.top = '200px';
+
+            hideScriptLines();
+
+            document.querySelectorAll('.demo-step').forEach(step => {
+                step.classList.remove('active', 'dragging', 'drop-target');
+            });
+            demoStep4.style.opacity = '0';
+            demoStep4.classList.add('drop-target');
+
+            outputStatus.classList.remove('success');
+            outputStatus.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                </svg>
+                Ready
+            `;
+            outputContent.classList.remove('visible');
+
+            demoRunBtn.classList.remove('running');
+            demoRunBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                Run All
+            `;
+
+            progDots.forEach(dot => dot.classList.remove('active', 'complete'));
+        }
+
+        // Phase 1: Drag and drop animation
+        async function runDragDropPhase() {
+            setProgressDot(0, 'active');
+
+            // Move cursor to add step button
+            await animateCursorTo(demoAddStep, 500);
+            await new Promise(r => setTimeout(r, 300));
+
+            // Show the export step with drop target style
+            demoStep4.style.opacity = '1';
+            demoStep4.classList.add('drop-target');
+
+            await new Promise(r => setTimeout(r, 400));
+
+            // Move cursor to step 4 and "drop" it
+            await animateCursorTo(demoStep4, 400);
+            await new Promise(r => setTimeout(r, 200));
+
+            demoStep4.classList.remove('drop-target');
+            demoStep4.classList.add('active');
+
+            await new Promise(r => setTimeout(r, 500));
+        }
+
+        // Phase 2: Script typing animation
+        async function runScriptPhase() {
+            setProgressDot(1, 'active');
+
+            // Activate steps in sequence
+            const steps = document.querySelectorAll('.demo-step:not(#demoStep4)');
+            for (let i = 0; i < steps.length; i++) {
+                steps[i].classList.add('active');
+                await new Promise(r => setTimeout(r, 200));
+            }
+
+            // Show script lines
+            await showScriptLines();
+            await new Promise(r => setTimeout(r, 500));
+        }
+
+        // Phase 3: Run animation
+        async function runExecutePhase() {
+            setProgressDot(2, 'active');
+
+            // Move cursor to run button
+            await animateCursorTo(demoRunBtn, 500);
+            await new Promise(r => setTimeout(r, 200));
+
+            // Run the workflow
+            await animateRunButton();
+
+            setProgressDot(3, 'complete');
+            await new Promise(r => setTimeout(r, 3000)); // Stay for 3 seconds
+        }
+
+        // Main workflow animation
+        async function runWorkflowAnimation() {
+            if (wfAnimationRunning) return;
+            wfAnimationRunning = true;
+
+            resetWorkflowDemo();
+            await new Promise(r => setTimeout(r, 500));
+
+            await runDragDropPhase();
+            await runScriptPhase();
+            await runExecutePhase();
+
+            wfAnimationRunning = false;
+        }
+
+        // Click handler for run button
+        demoRunBtn.addEventListener('click', () => {
+            if (!wfAnimationRunning) {
+                runWorkflowAnimation();
+            }
+        });
+
+        // Intersection observer for workflow section
+        const workflowAutoSection = document.querySelector('.workflow-auto');
+
+        const workflowAutoObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    if (!wfAnimationRunning) {
+                        resetWorkflowDemo();
+                        setTimeout(runWorkflowAnimation, 500);
+                    }
+                } else {
+                    if (!wfAnimationRunning) {
+                        resetWorkflowDemo();
+                    }
+                }
+            });
+        }, { threshold: 0.4 });
+
+        workflowAutoObserver.observe(workflowAutoSection);
+
+        // Add CSS for spin animation
+        const spinStyle = document.createElement('style');
+        spinStyle.textContent = `
+            @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(spinStyle);
     </script>
 </body>
 </html>

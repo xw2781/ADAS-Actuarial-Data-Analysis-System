@@ -17,7 +17,7 @@ def build_cmd(host: str, port: int, reload: bool) -> list[str]:
         sys.executable,
         "-m",
         "uvicorn",
-        "app:app",
+        "backend.main:app",
         "--host",
         host,
         "--port",
@@ -48,7 +48,7 @@ def terminate_process_tree(proc: subprocess.Popen) -> None:
 def ensure_env_defaults(env: dict[str, str]) -> dict[str, str]:
     env = dict(env)
     env.setdefault("TRI_DATA_DIR", str(BASE_DIR))
-    env.setdefault("ADAS_WORKFLOW_DIR", str(Path.home() / "Documents" / "ADAS" / "workflows"))
+    env.setdefault("ADAS_WORKFLOW_DIR", str(Path.home() / "Documents" / "ArcRho" / "workflows"))
     return env
 
 

@@ -1,0 +1,61 @@
+# Backend Domain: reserving_class
+
+## Purpose
+<!-- MANUAL:BEGIN -->
+Reserving class values/tree/preferences/types domain.
+<!-- MANUAL:END -->
+
+## Entry Points
+<!-- AUTO-GEN:BEGIN backend.reserving_class.entry_points -->
+| Method | Path | Handler | Request Model | Schema | Service Calls |
+| --- | --- | --- | --- | --- | --- |
+| `GET` | `/reserving_class_combinations` | `get_reserving_class_combinations` | `str` | - | - |
+| `GET` | `/reserving_class_filter_spec` | `get_reserving_class_filter_spec` | `str` | - | `reserving_class_service.get_filter_spec_for_project` |
+| `POST` | `/reserving_class_filter_spec` | `save_reserving_class_filter_spec` | `ReservingClassFilterSpecSaveRequest` | [`backend/schemas/reserving_class.py`](../../../backend/schemas/reserving_class.py) | `reserving_class_service.save_filter_spec_for_project` |
+| `GET` | `/reserving_class_hidden_paths` | `get_reserving_class_hidden_paths` | `str` | - | `reserving_class_service.get_hidden_paths_for_project` |
+| `POST` | `/reserving_class_hidden_paths` | `save_reserving_class_hidden_paths` | `ReservingClassHiddenPathsSaveRequest` | [`backend/schemas/reserving_class.py`](../../../backend/schemas/reserving_class.py) | `reserving_class_service.save_hidden_paths_for_project` |
+| `GET` | `/reserving_class_path_tree` | `get_reserving_class_path_tree` | `str` | - | - |
+| `GET` | `/reserving_class_path_tree/children` | `get_reserving_class_path_tree_children` | `str` | - | `reserving_class_service.get_reserving_class_path_tree_children` |
+| `GET` | `/reserving_class_types` | `get_reserving_class_types` | `str` | - | `reserving_class_service.refresh_reserving_class_types_json` |
+| `POST` | `/reserving_class_types` | `save_reserving_class_types` | `ReservingClassTypesSaveRequest` | [`backend/schemas/reserving_class.py`](../../../backend/schemas/reserving_class.py) | `audit_service.safe_append_project_audit_log`, `reserving_class_service.refresh_reserving_class_types_json` |
+| `POST` | `/reserving_class_types/import_local_file` | `import_local_reserving_class_types_file` | `ReservingClassTypesImportLocalFileRequest` | [`backend/schemas/reserving_class.py`](../../../backend/schemas/reserving_class.py) | `reserving_class_service.parse_local_reserving_class_types_file` |
+| `POST` | `/reserving_class_values/refresh` | `refresh_reserving_class_values` | `RefreshReservingClassValuesRequest` | [`backend/schemas/reserving_class.py`](../../../backend/schemas/reserving_class.py) | `reserving_class_service.refresh_reserving_class_values` |
+<!-- AUTO-GEN:END -->
+
+## Key Files
+<!-- AUTO-GEN:BEGIN backend.reserving_class.key_files -->
+- [`backend/api/reserving_class_router.py`](../../../backend/api/reserving_class_router.py) - Reserving-class routes for values/tree/preferences/types.
+- [`backend/services/reserving_class_service.py`](../../../backend/services/reserving_class_service.py) - Cache generation, refresh, and preference persistence.
+- [`backend/schemas/reserving_class.py`](../../../backend/schemas/reserving_class.py) - Reserving class request models.
+- [`reserving_class_lazy_picker.js`](../../../reserving_class_lazy_picker.js) - Frontend caller for reserving-class endpoints.
+<!-- AUTO-GEN:END -->
+
+## External Interfaces
+<!-- MANUAL:BEGIN -->
+- Consumed by dataset, DFM, and project settings features.
+- Exposes refresh and cache children endpoints.
+- `POST /reserving_class_types` now writes both `reserving_class_types.json` and a same-folder mirror workbook `reserving_class_types.xlsx` (same file columns, including `Source`).
+- `POST /reserving_class_types/import_local_file` parses local reserving-class-type `.json`/`.xlsx` files for Project Settings local load; parser accepts either UI columns (`Name`, `Level`, `Formula`, `EEX Formula`) or persisted file columns with trailing `Source`.
+- Source-derived reserving class type rows are generated independently per `(Name, Level)` pair (not deduped by `Name` only), so the same name can appear in multiple level groups when present in distinct source levels.
+- Reserving class `Source` expressions always wrap each resolved component in double quotes (including single-component formulas), and quoted tokens in `Formula` / `EEX Formula` are treated as atomic components so operator-normalization does not insert spaces inside quoted names or collapse user-entered spacing within quoted text (for example `/` in `"Affinity/Referral Partners"` or the double space in `"eSales -  Teachers"`).
+- `POST /reserving_class_types` rejects changed user-defined formulas when they reference a reserving class type name that does not exist in the submitted/current table, or when they reference a name containing `+`, `-`, `*`, or `/` without wrapping that full name in double quotes; invalid saves return `400` with the offending row/field details. Unchanged legacy rows are not revalidated on save, formulas may reference user-defined rows as well as source-derived rows, and quoted components are validated by exact name match, including repeated spaces inside the quotes.
+<!-- MANUAL:END -->
+
+## Data/State/Caches
+<!-- MANUAL:BEGIN -->
+- Uses multiple JSON cache files and AppData preference files with lock protection.
+- Reserving class types persistence uses paired JSON/XLSX writes with rollback-safe ordering (write XLSX then JSON, rollback XLSX on JSON failure).
+- `reserving_class_filter_spec.json` keeps `filter_spec` per project, while tree-view toggle preferences are shared globally across projects.
+- Legacy project-scoped toggle fields are auto-migrated/cleaned into `global_preferences` on filter-spec read/write.
+<!-- MANUAL:END -->
+
+## Common Change Tasks
+<!-- MANUAL:BEGIN -->
+1. Add a reserving-class endpoint: keep schema/service lock logic consistent.
+2. Change cache structure: update readers/writers and UI consumers together.
+<!-- MANUAL:END -->
+
+## Known Risks
+<!-- MANUAL:BEGIN -->
+- High route volume and file-lock contention make regression risk higher here.
+<!-- MANUAL:END -->

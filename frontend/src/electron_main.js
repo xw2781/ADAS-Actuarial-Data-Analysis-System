@@ -1,8 +1,20 @@
-const { app, BrowserWindow, dialog, ipcMain, screen } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, screen, shell } = require("electron");
 const path = require("path");
 const { spawn } = require("child_process");
 const fs = require("fs");
 const http = require("http");
+const os = require("os");
+
+// Detect Windows 11 (build number >= 22000)
+function isWindows11() {
+  if (process.platform !== "win32") return false;
+  const release = os.release(); // e.g., "10.0.22000"
+  const parts = release.split(".");
+  const build = parseInt(parts[2], 10);
+  return !isNaN(build) && build >= 22000;
+}
+
+const IS_WIN11 = isWindows11();
 
 const HOST = process.env.ADAS_HOST || "127.0.0.1";
 const PORT = parseInt(process.env.ADAS_PORT || "8000", 10);
@@ -10,13 +22,131 @@ const UI_VERSION = process.env.ADAS_UI_VERSION || String(Date.now());
 const URL = `http://${HOST}:${PORT}/ui/?v=${encodeURIComponent(UI_VERSION)}`;
 const START_BACKEND = process.env.ADAS_START_BACKEND !== "0";
 const PYTHON_EXE = process.env.PYTHON_EXE || process.env.PYTHON || "python";
+const MAIN_WINDOW_PREFS_FILE = "main_window_prefs.json";
+const SCRIPTING_SHORTCUTS_FILE = "scripting_shortcuts.json";
+const BACKEND_CONTROL_FLAGS = [
+  ".restart_app",
+  ".shutdown_app",
+  ".restart_electron",
+  ".shutdown_electron",
+];
+const BACKEND_STARTUP_TIMEOUT_MS = Math.max(
+  5000,
+  parseInt(process.env.ADAS_BACKEND_STARTUP_TIMEOUT_MS || "30000", 10) || 30000
+);
+const BACKEND_STARTUP_ATTEMPTS = Math.max(
+  1,
+  parseInt(process.env.ADAS_BACKEND_STARTUP_ATTEMPTS || "2", 10) || 2
+);
+
+function getBundledServerPath() {
+  // Check if running as packaged app
+  if (app.isPackaged) {
+    // In packaged app, server is in resources/adas_server/adas_server.exe
+    const resourcesPath = process.resourcesPath;
+    return path.join(resourcesPath, "adas_server", "adas_server.exe");
+  }
+  return null;
+}
 
 let win = null;
+let splashWin = null;
 let serverProc = null;
 let allowClose = false;
 let pseudoMaximized = false;
 let lastBounds = null;
+let serverSpawnError = null;
+let backendShutdownPromise = null;
 const extraWindows = new Set();
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getMainWindowPrefsPath() {
+  return path.join(getPrefsDir(), MAIN_WINDOW_PREFS_FILE);
+}
+
+function getPrefsDir() {
+  return path.join(app.getPath("appData"), "ArcRho", "WebUI", "prefs");
+}
+
+function getScriptingShortcutsPath() {
+  return path.join(getPrefsDir(), SCRIPTING_SHORTCUTS_FILE);
+}
+
+function loadMainWindowPrefs() {
+  try {
+    const prefPath = getMainWindowPrefsPath();
+    if (!fs.existsSync(prefPath)) return null;
+    const raw = fs.readFileSync(prefPath, "utf8");
+    const parsed = JSON.parse(raw);
+    const width = Math.round(Number(parsed?.width || 0));
+    const height = Math.round(Number(parsed?.height || 0));
+    if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+    if (width < 820 || height < 620) return null;
+    return { width, height };
+  } catch {
+    return null;
+  }
+}
+
+function saveMainWindowPrefs(sizeLike) {
+  try {
+    const width = Math.round(Number(sizeLike?.width || 0));
+    const height = Math.round(Number(sizeLike?.height || 0));
+    if (!Number.isFinite(width) || !Number.isFinite(height)) return;
+    if (width < 820 || height < 620) return;
+
+    const prefPath = getMainWindowPrefsPath();
+    fs.mkdirSync(path.dirname(prefPath), { recursive: true });
+
+    const payload = {
+      width,
+      height,
+      updated_at: new Date().toISOString(),
+    };
+    const tmpPath = `${prefPath}.tmp`;
+    fs.writeFileSync(tmpPath, JSON.stringify(payload, null, 2), "utf8");
+    fs.renameSync(tmpPath, prefPath);
+  } catch {
+    // ignore preference write failures
+  }
+}
+
+function createSplashWindow() {
+  splashWin = new BrowserWindow({
+    width: 500,
+    height: 400,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    center: true,
+    alwaysOnTop: false,
+    skipTaskbar: true,
+    webPreferences: {
+      preload: path.join(__dirname, "electron_preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  splashWin.loadFile(path.join(__dirname, "splash.html"));
+  return splashWin;
+}
+
+function updateSplashProgress(progress, text) {
+  if (splashWin && !splashWin.isDestroyed()) {
+    splashWin.webContents.send("splash-progress", { progress, text });
+  }
+}
+
+function closeSplash() {
+  if (splashWin && !splashWin.isDestroyed()) {
+    splashWin.close();
+    splashWin = null;
+  }
+}
 
 function httpPost(pathname) {
   return new Promise((resolve) => {
@@ -35,27 +165,100 @@ function httpPost(pathname) {
   });
 }
 
+function getBackendFlagRoots() {
+  const roots = new Set([__dirname]);
+  const bundledServer = getBundledServerPath();
+  if (bundledServer) roots.add(path.dirname(bundledServer));
+  return Array.from(roots);
+}
+
+function clearBackendControlFlags() {
+  for (const root of getBackendFlagRoots()) {
+    for (const flagName of BACKEND_CONTROL_FLAGS) {
+      const flagPath = path.join(root, flagName);
+      try {
+        if (fs.existsSync(flagPath)) fs.unlinkSync(flagPath);
+      } catch {
+        // ignore stale-flag cleanup failures
+      }
+    }
+  }
+}
+
+function isBackendProcAlive(proc) {
+  return !!proc && !proc.killed && proc.exitCode == null;
+}
+
+async function waitForProcExit(proc, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (isBackendProcAlive(proc) && Date.now() < deadline) {
+    await sleep(120);
+  }
+  return !isBackendProcAlive(proc);
+}
+
+function forceKillBackendProc(proc) {
+  if (!proc || !proc.pid || !isBackendProcAlive(proc)) return;
+  if (process.platform === "win32") {
+    spawn("taskkill", ["/PID", String(proc.pid), "/T", "/F"], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    return;
+  }
+  proc.kill("SIGTERM");
+}
+
 function startBackend() {
-  const appShell = path.join(__dirname, "app_shell.py");
-  const cmd = [appShell, "--host", HOST, "--port", String(PORT)];
-  const args = ["-u", cmd[0], ...cmd.slice(1)];
   const env = { ...process.env };
   env.TRI_DATA_DIR = env.TRI_DATA_DIR || __dirname;
   env.ADAS_WORKFLOW_DIR =
     env.ADAS_WORKFLOW_DIR ||
-    path.join(require("os").homedir(), "Documents", "ADAS", "workflows");
+    path.join(require("os").homedir(), "Documents", "ArcRho", "workflows");
+  serverSpawnError = null;
 
-  serverProc = spawn(PYTHON_EXE, args, {
-    cwd: __dirname,
-    env,
-    stdio: "ignore",
-    windowsHide: true,
+  const bundledServer = getBundledServerPath();
+
+  if (bundledServer && fs.existsSync(bundledServer)) {
+    // Use bundled server exe
+    const args = ["--host", HOST, "--port", String(PORT)];
+    serverProc = spawn(bundledServer, args, {
+      cwd: path.dirname(bundledServer),
+      env,
+      stdio: "ignore",
+      windowsHide: true,
+    });
+  } else {
+    // Development mode: use Python
+    const appShell = path.join(__dirname, "app_shell.py");
+    const cmd = [appShell, "--host", HOST, "--port", String(PORT)];
+    const args = ["-u", cmd[0], ...cmd.slice(1)];
+    serverProc = spawn(PYTHON_EXE, args, {
+      cwd: __dirname,
+      env,
+      stdio: "ignore",
+      windowsHide: true,
+    });
+  }
+
+  serverProc.once("error", (err) => {
+    serverSpawnError = err;
   });
 }
 
-async function waitForServer(timeoutMs = 15000) {
+async function waitForServer(timeoutMs = BACKEND_STARTUP_TIMEOUT_MS) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
+    if (serverSpawnError) {
+      const msg = String(serverSpawnError?.message || serverSpawnError);
+      throw new Error(`Backend spawn failed: ${msg}`);
+    }
+    if (serverProc && serverProc.exitCode != null) {
+      const signal = serverProc.signalCode || "none";
+      throw new Error(
+        `Backend process exited before readiness (code=${serverProc.exitCode}, signal=${signal})`
+      );
+    }
     try {
       await new Promise((resolve, reject) => {
         const req = http.get(URL, (res) => {
@@ -63,30 +266,90 @@ async function waitForServer(timeoutMs = 15000) {
           if (res.statusCode && res.statusCode >= 200 && res.statusCode < 500) resolve();
           else reject();
         });
+        req.setTimeout(1500, () => {
+          req.destroy(new Error("timeout"));
+        });
         req.on("error", reject);
       });
       return;
     } catch {
-      await new Promise((r) => setTimeout(r, 400));
+      await sleep(400);
     }
   }
   throw new Error("Server did not start in time");
 }
 
-function terminateBackend() {
-  if (!serverProc || serverProc.killed) return;
-  if (process.platform === "win32") {
-    spawn("taskkill", ["/PID", String(serverProc.pid), "/T", "/F"]);
+async function startBackendWithRetry() {
+  let lastErr = null;
+  for (let attempt = 1; attempt <= BACKEND_STARTUP_ATTEMPTS; attempt++) {
+    clearBackendControlFlags();
+    startBackend();
+    try {
+      await waitForServer(BACKEND_STARTUP_TIMEOUT_MS);
+      return;
+    } catch (err) {
+      lastErr = err;
+      console.error(`Backend startup attempt ${attempt}/${BACKEND_STARTUP_ATTEMPTS} failed:`, err);
+      await terminateBackend({ force: true });
+      if (attempt < BACKEND_STARTUP_ATTEMPTS) {
+        await sleep(700);
+      }
+    }
+  }
+  throw lastErr || new Error("Server did not start in time");
+}
+
+async function terminateBackend(options = {}) {
+  const { force = false, gracefulTimeoutMs = 1600 } = options;
+  const proc = serverProc;
+  if (!proc) return;
+
+  if (force) {
+    forceKillBackendProc(proc);
+    await waitForProcExit(proc, 900);
+    if (serverProc === proc) serverProc = null;
     return;
   }
-  serverProc.kill("SIGTERM");
+
+  const exitedGracefully = await waitForProcExit(proc, gracefulTimeoutMs);
+  if (!exitedGracefully) {
+    forceKillBackendProc(proc);
+    await waitForProcExit(proc, 900);
+  }
+  if (serverProc === proc) serverProc = null;
+}
+
+async function requestBackendShutdown() {
+  if (backendShutdownPromise) {
+    await backendShutdownPromise;
+    return;
+  }
+  backendShutdownPromise = (async () => {
+    await httpPost("/app/shutdown");
+    await terminateBackend();
+  })();
+  try {
+    await backendShutdownPromise;
+  } finally {
+    backendShutdownPromise = null;
+  }
 }
 
 function createWindow() {
+  const savedSize = loadMainWindowPrefs();
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const screenWidth = Math.round(Number(primaryDisplay?.size?.width || 0));
+  const screenHeight = Math.round(Number(primaryDisplay?.size?.height || 0));
+  const launchMaxWidth = screenWidth > 0 ? Math.max(320, Math.floor(screenWidth * 0.9)) : 1400;
+  const launchMaxHeight = screenHeight > 0 ? Math.max(320, Math.floor(screenHeight * 0.93)) : 900;
+  const launchWidth = Math.min(Math.round(savedSize?.width || 1400), launchMaxWidth);
+  const launchHeight = Math.min(Math.round(savedSize?.height || 900), launchMaxHeight);
   win = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: launchWidth,
+    height: launchHeight,
     frame: false,
+    thickFrame: true,  // Adds Windows border for resize handles and visibility on Win10
+    show: false,  // Hidden until splash closes
     backgroundColor: "#ffffff",
     webPreferences: {
       preload: path.join(__dirname, "electron_preload.js"),
@@ -124,11 +387,27 @@ function createWindow() {
     }
 
     allowClose = true;
-    await httpPost("/app/shutdown");
-    terminateBackend();
+    await requestBackendShutdown();
     setTimeout(() => {
       try { win.close(); } catch {}
     }, 0);
+  });
+
+  let windowSizeSaveTimer = null;
+  const scheduleWindowSizeSave = () => {
+    if (windowSizeSaveTimer) clearTimeout(windowSizeSaveTimer);
+    windowSizeSaveTimer = setTimeout(() => {
+      windowSizeSaveTimer = null;
+      if (!win || win.isDestroyed()) return;
+      if (win.isMinimized() || win.isMaximized() || win.isFullScreen() || pseudoMaximized) return;
+      const [width, height] = win.getSize();
+      saveMainWindowPrefs({ width, height });
+    }, 200);
+  };
+  win.on("resize", scheduleWindowSizeSave);
+  win.on("closed", () => {
+    if (windowSizeSaveTimer) clearTimeout(windowSizeSaveTimer);
+    windowSizeSaveTimer = null;
   });
 
   win.loadURL(URL);
@@ -277,35 +556,81 @@ ipcMain.handle("pick-open-workflow", async (_event, payload) => {
   const result = await dialog.showOpenDialog(win, {
     defaultPath: startDir || undefined,
     properties: ["openFile"],
-    filters: [{ name: "Workflow", extensions: ["adaswf", "json"] }],
+    filters: [{ name: "Workflow", extensions: ["arcwf", "json"] }],
+  });
+  if (result.canceled || !result.filePaths?.length) return "";
+  return result.filePaths[0];
+});
+
+ipcMain.handle("pick-open-table-file", async (_event, payload) => {
+  const startDir = payload?.startDir || "";
+  const result = await dialog.showOpenDialog(win, {
+    defaultPath: startDir || undefined,
+    properties: ["openFile"],
+    filters: [
+      { name: "Data Files", extensions: ["csv", "txt", "parquet", "xlsx", "xlsm", "xls"] },
+      { name: "All Files", extensions: ["*"] },
+    ],
   });
   if (result.canceled || !result.filePaths?.length) return "";
   return result.filePaths[0];
 });
 
 ipcMain.handle("pick-save-workflow", async (_event, payload) => {
-  const suggestedName = payload?.suggestedName || "workflow.adaswf";
+  const suggestedName = payload?.suggestedName || "workflow.arcwf";
   const startDir = payload?.startDir || "";
   const defaultPath = startDir ? path.join(startDir, suggestedName) : suggestedName;
   const result = await dialog.showSaveDialog(win, {
     defaultPath,
-    filters: [{ name: "Workflow", extensions: ["adaswf", "json"] }],
+    filters: [{ name: "Workflow", extensions: ["arcwf", "json"] }],
   });
   if (result.canceled || !result.filePath) return "";
   return result.filePath;
+});
+
+ipcMain.handle("pick-open-file", async (_event, payload) => {
+  const startDir = payload?.startDir || "";
+  const filters = Array.isArray(payload?.filters) && payload.filters.length
+    ? payload.filters
+    : [{ name: "All Files", extensions: ["*"] }];
+  const result = await dialog.showOpenDialog(win, {
+    defaultPath: startDir || undefined,
+    properties: ["openFile"],
+    filters,
+  });
+  if (result.canceled || !result.filePaths?.length) return "";
+  return result.filePaths[0];
+});
+
+ipcMain.handle("open-path", async (_event, payload) => {
+  const targetPath = String(payload?.path || "").trim();
+  if (!targetPath) return { ok: false, error: "Empty path." };
+  try {
+    if (!fs.existsSync(targetPath)) {
+      return { ok: false, error: `Path not found: ${targetPath}` };
+    }
+    const openErr = await shell.openPath(targetPath);
+    if (openErr) return { ok: false, error: String(openErr) };
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
+  }
 });
 
 ipcMain.handle("save-json-file", async (_event, payload) => {
   const data = payload?.data ?? null;
   const suggestedName = payload?.suggestedName || "data.json";
   const startDir = payload?.startDir || "";
+  const filters = Array.isArray(payload?.filters) && payload.filters.length
+    ? payload.filters
+    : [{ name: "JSON", extensions: ["json"] }];
   let filePath = payload?.path || "";
 
   if (!filePath) {
     const defaultPath = startDir ? path.join(startDir, suggestedName) : suggestedName;
     const result = await dialog.showSaveDialog(win, {
       defaultPath,
-      filters: [{ name: "JSON", extensions: ["json"] }],
+      filters,
     });
     if (result.canceled || !result.filePath) return { path: "", canceled: true };
     filePath = result.filePath;
@@ -322,45 +647,172 @@ ipcMain.handle("save-json-file", async (_event, payload) => {
   }
 });
 
-function formatJsonForSave(data) {
-  if (Array.isArray(data) && data.every((row) => Array.isArray(row))) {
-    return formatRowArrayJson(data);
+ipcMain.handle("save-text-file", async (_event, payload) => {
+  const data = payload?.data ?? "";
+  const suggestedName = payload?.suggestedName || "data.txt";
+  const startDir = payload?.startDir || "";
+  let filePath = payload?.path || "";
+
+  if (!filePath) {
+    const defaultPath = startDir ? path.join(startDir, suggestedName) : suggestedName;
+    const result = await dialog.showSaveDialog(win, { defaultPath });
+    if (result.canceled || !result.filePath) return { path: "", canceled: true };
+    filePath = result.filePath;
   }
-  if (data && typeof data === "object") {
-    const pattern = data.pattern;
-    const avgFormula = data["average formula"];
-    const avgIndex = data["average index"];
-    const hasPattern = Array.isArray(pattern) && pattern.every((row) => Array.isArray(row));
-    const hasAvgIndex = Array.isArray(avgIndex) && avgIndex.every((row) => Array.isArray(row));
-    const hasSelected = "selected" in data;
-    const hasAvgFormula = "average formula" in data;
-    if (hasPattern || hasAvgIndex || hasSelected || hasAvgFormula) {
-      const lines = [];
-      lines.push("{");
-      let wroteSection = false;
-      if (hasPattern) {
-        lines.push('  "pattern": [');
+
+  try {
+    const dir = path.dirname(filePath);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(filePath, String(data), "utf8");
+    return { path: filePath, canceled: false };
+  } catch (err) {
+    return { path: "", canceled: false, error: String(err?.message || err) };
+  }
+});
+
+  function formatJsonForSave(data) {
+    if (Array.isArray(data) && data.every((row) => Array.isArray(row))) {
+      return formatRowArrayJson(data);
+    }
+    if (data && typeof data === "object") {
+      const pattern = data.pattern;
+      const avgFormula = data["average formulas"] ?? data["average formula"];
+      const avgIndex = data["average index"];
+      const summaryRows = data["summary rows"];
+      const summaryHidden = data["summary hidden"];
+      const summaryOrder = data["summary order"];
+      const resultVector = data["result vector"];
+      const notes = data.notes;
+      const methodName = data.name ?? data["method name"];
+      const outputType = data["output type"] ?? data.outputType;
+      const inputTriangle = data["input triangle"];
+      const decimalPlaces = data["decimal places"];
+      const ultimateRatioDecimalPlaces = data["ultimate ratio decimal places"];
+      const ratioBasisDataset = data["ratio basis dataset"];
+      const hasPattern = Array.isArray(pattern) && pattern.every((row) => Array.isArray(row));
+      const hasAvgIndex = Array.isArray(avgIndex) && avgIndex.every((row) => Array.isArray(row));
+      const hasSelected = "selected" in data;
+      const hasAvgFormula = "average formulas" in data || "average formula" in data;
+      const hasSummaryRows = "summary rows" in data;
+      const hasSummaryHidden = "summary hidden" in data;
+      const hasSummaryOrder = "summary order" in data;
+      const hasResultVector = "result vector" in data;
+      const hasNotes = "notes" in data;
+      const hasMethodName = "name" in data || "method name" in data;
+      const hasOutputType = "output type" in data || "outputType" in data;
+      const hasInputTriangle = "input triangle" in data;
+      const hasDecimalPlaces = "decimal places" in data;
+      const hasUltimateRatioDecimalPlaces = "ultimate ratio decimal places" in data;
+      const hasRatioBasisDataset = "ratio basis dataset" in data;
+      const hasOriginLen = "originLen" in data;
+      const hasDevLen = "devLen" in data;
+      if (hasPattern || hasAvgIndex || hasSelected || hasAvgFormula || hasSummaryRows || hasSummaryHidden || hasSummaryOrder || hasResultVector || hasNotes || hasInputTriangle || hasDecimalPlaces || hasUltimateRatioDecimalPlaces || hasRatioBasisDataset || hasOriginLen || hasDevLen) {
+        const lines = [];
+        lines.push("{");
+        let wroteSection = false;
+        if (hasOriginLen) {
+          lines.push(`  "originLen": ${JSON.stringify(data.originLen)}`);
+          wroteSection = true;
+        }
+        if (hasDevLen) {
+          if (wroteSection) lines[lines.length - 1] += ",";
+          lines.push(`  "devLen": ${JSON.stringify(data.devLen)}`);
+          wroteSection = true;
+        }
+        if (hasPattern) {
+          lines.push('  "pattern": [');
         lines.push(formatRowArrayLines(pattern, "    "));
         lines.push("  ]");
         wroteSection = true;
       }
       if (hasAvgFormula) {
         if (wroteSection) lines[lines.length - 1] += ",";
-        lines.push(`  "average formula": ${JSON.stringify(avgFormula)}`);
+        lines.push(`  "average formulas": ${JSON.stringify(avgFormula)}`);
         wroteSection = true;
       }
       if (hasAvgIndex) {
         if (wroteSection) lines[lines.length - 1] += ",";
         lines.push('  "average index": [');
-        lines.push(formatRowArrayLines(avgIndex, "    "));
-        lines.push("  ]");
-        wroteSection = true;
-      }
-      if (hasSelected) {
-        if (wroteSection) lines[lines.length - 1] += ",";
-        lines.push(`  "selected": ${JSON.stringify(data.selected)}`);
-        wroteSection = true;
-      }
+          lines.push(formatRowArrayLines(avgIndex, "    "));
+          lines.push("  ]");
+          wroteSection = true;
+        }
+        if (hasSummaryRows) {
+          if (wroteSection) lines[lines.length - 1] += ",";
+          const rowsJson = JSON.stringify(summaryRows, null, 2).split("\n");
+          lines.push(`  "summary rows": ${rowsJson[0]}`);
+          for (let i = 1; i < rowsJson.length; i++) {
+            lines.push(`  ${rowsJson[i]}`);
+          }
+          wroteSection = true;
+        }
+        if (hasSummaryHidden) {
+          if (wroteSection) lines[lines.length - 1] += ",";
+          const hiddenJson = JSON.stringify(summaryHidden, null, 2).split("\n");
+          lines.push(`  "summary hidden": ${hiddenJson[0]}`);
+          for (let i = 1; i < hiddenJson.length; i++) {
+            lines.push(`  ${hiddenJson[i]}`);
+          }
+          wroteSection = true;
+        }
+        if (hasSummaryOrder) {
+          if (wroteSection) lines[lines.length - 1] += ",";
+          const orderJson = JSON.stringify(summaryOrder, null, 2).split("\n");
+          lines.push(`  "summary order": ${orderJson[0]}`);
+          for (let i = 1; i < orderJson.length; i++) {
+            lines.push(`  ${orderJson[i]}`);
+          }
+          wroteSection = true;
+        }
+        if (hasSelected) {
+          if (wroteSection) lines[lines.length - 1] += ",";
+          lines.push(`  "selected": ${JSON.stringify(data.selected)}`);
+          wroteSection = true;
+        }
+        if (hasResultVector) {
+          if (wroteSection) lines[lines.length - 1] += ",";
+          const vectorJson = JSON.stringify(resultVector, null, 2).split("\n");
+          lines.push(`  "result vector": ${vectorJson[0]}`);
+          for (let i = 1; i < vectorJson.length; i++) {
+            lines.push(`  ${vectorJson[i]}`);
+          }
+          wroteSection = true;
+        }
+        if (hasNotes) {
+          if (wroteSection) lines[lines.length - 1] += ",";
+          lines.push(`  "notes": ${JSON.stringify(typeof notes === "string" ? notes : "")}`);
+          wroteSection = true;
+        }
+        if (hasMethodName) {
+          if (wroteSection) lines[lines.length - 1] += ",";
+          lines.push(`  "name": ${JSON.stringify(typeof methodName === "string" ? methodName : "")}`);
+          wroteSection = true;
+        }
+        if (hasOutputType) {
+          if (wroteSection) lines[lines.length - 1] += ",";
+          lines.push(`  "output type": ${JSON.stringify(typeof outputType === "string" ? outputType : "")}`);
+          wroteSection = true;
+        }
+        if (hasInputTriangle) {
+          if (wroteSection) lines[lines.length - 1] += ",";
+          lines.push(`  "input triangle": ${JSON.stringify(typeof inputTriangle === "string" ? inputTriangle : "")}`);
+          wroteSection = true;
+        }
+        if (hasDecimalPlaces) {
+          if (wroteSection) lines[lines.length - 1] += ",";
+          lines.push(`  "decimal places": ${JSON.stringify(Number.isFinite(Number(decimalPlaces)) ? Number(decimalPlaces) : 4)}`);
+          wroteSection = true;
+        }
+        if (hasUltimateRatioDecimalPlaces) {
+          if (wroteSection) lines[lines.length - 1] += ",";
+          lines.push(`  "ultimate ratio decimal places": ${JSON.stringify(Number.isFinite(Number(ultimateRatioDecimalPlaces)) ? Number(ultimateRatioDecimalPlaces) : 2)}`);
+          wroteSection = true;
+        }
+        if (hasRatioBasisDataset) {
+          if (wroteSection) lines[lines.length - 1] += ",";
+          lines.push(`  "ratio basis dataset": ${JSON.stringify(typeof ratioBasisDataset === "string" ? ratioBasisDataset : "")}`);
+          wroteSection = true;
+        }
       lines.push("}");
       return `${lines.join("\n")}\n`;
     }
@@ -397,10 +849,50 @@ ipcMain.handle("read-json-file", async (_event, payload) => {
   }
 });
 
+ipcMain.handle("scripting-shortcuts-load", async () => {
+  const filePath = getScriptingShortcutsPath();
+  try {
+    if (!fs.existsSync(filePath)) return { exists: false };
+    const raw = fs.readFileSync(filePath, "utf8");
+    const parsed = JSON.parse(raw);
+    const bindings = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed.bindings && typeof parsed.bindings === "object" && !Array.isArray(parsed.bindings)
+        ? parsed.bindings
+        : parsed)
+      : null;
+    if (!bindings || typeof bindings !== "object" || Array.isArray(bindings)) {
+      return { exists: false, error: "Invalid shortcut settings format" };
+    }
+    return { exists: true, bindings };
+  } catch (err) {
+    return { exists: false, error: String(err?.message || err) };
+  }
+});
+
+ipcMain.handle("scripting-shortcuts-save", async (_event, payload) => {
+  const bindings = payload?.bindings;
+  if (!bindings || typeof bindings !== "object" || Array.isArray(bindings)) {
+    return { ok: false, error: "Invalid shortcuts payload" };
+  }
+  const filePath = getScriptingShortcutsPath();
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    const data = {
+      bindings,
+      updated_at: new Date().toISOString(),
+    };
+    const tmpPath = `${filePath}.tmp`;
+    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), "utf8");
+    fs.renameSync(tmpPath, filePath);
+    return { ok: true, path: filePath };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
+  }
+});
+
 ipcMain.handle("app-shutdown", async () => {
   allowClose = true;
-  await httpPost("/app/shutdown");
-  terminateBackend();
+  await requestBackendShutdown();
   app.quit();
   return true;
 });
@@ -421,6 +913,20 @@ ipcMain.handle("app-clear-cache-reload", async () => {
   return true;
 });
 
+ipcMain.handle("focus-window", () => {
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+});
+ipcMain.handle("get-documents-path", () => {
+  try {
+    return app.getPath("documents") || "";
+  } catch {
+    return "";
+  }
+});
+ipcMain.handle("is-windows-11", () => IS_WIN11);
 ipcMain.handle("window-minimize", () => win?.minimize());
 ipcMain.handle("window-maximize", () => win?.maximize());
 ipcMain.handle("window-restore-native", () => win?.restore());
@@ -484,15 +990,31 @@ ipcMain.handle("window-restore-to-last", () => {
 });
 
 ipcMain.handle("open-tab-window", (_e, payload) => {
-  const type = String(payload?.type || "");
-  if (type !== "dataset") return false;
-  const params = new URLSearchParams();
-  if (payload?.datasetId) params.set("ds", String(payload.datasetId));
-  if (payload?.dsInst) params.set("inst", String(payload.dsInst));
-  params.set("v", UI_VERSION);
-  const url = `http://${HOST}:${PORT}/ui/dataset_viewer.html?${params.toString()}`;
-  createDetachedWindow(url, payload?.title || "Dataset");
-  return true;
+  try {
+    let url = String(payload?.url || "").trim();
+
+    // Preferred: shell passes a relative pop-out URL.
+    if (url && url.startsWith("/")) {
+      url = `http://${HOST}:${PORT}${url}`;
+    }
+
+    // Backward-compatible fallback for older dataset payloads.
+    if (!url) {
+      const type = String(payload?.type || "");
+      if (type !== "dataset") return false;
+      const params = new URLSearchParams();
+      if (payload?.datasetId) params.set("ds", String(payload.datasetId));
+      if (payload?.dsInst) params.set("inst", String(payload.dsInst));
+      params.set("v", UI_VERSION);
+      url = `http://${HOST}:${PORT}/ui/dataset_viewer.html?${params.toString()}`;
+    }
+
+    createDetachedWindow(url, payload?.title || "Pop-out");
+    return true;
+  } catch (err) {
+    console.error("Failed to open tab window:", err);
+    return false;
+  }
 });
 
 ipcMain.handle("open-dfm-results-window", (_e, payload) => {
@@ -515,11 +1037,41 @@ ipcMain.handle("open-dfm-results-window", (_e, payload) => {
 });
 
 app.whenReady().then(async () => {
-  if (START_BACKEND) {
-    startBackend();
-    await waitForServer();
+  // Show splash screen first
+  createSplashWindow();
+
+  // Small delay to ensure splash is visible
+  await new Promise((r) => setTimeout(r, 300));
+
+  try {
+    if (START_BACKEND) {
+      updateSplashProgress(10, "Starting backend server...");
+      clearBackendControlFlags();
+
+      updateSplashProgress(30, "Waiting for server...");
+      await startBackendWithRetry();
+
+      updateSplashProgress(60, "Server connected");
+    }
+
+    updateSplashProgress(80, "Loading interface...");
+    createWindow();
+
+    // Wait for main window to be ready before closing splash
+    win.webContents.once("did-finish-load", () => {
+      updateSplashProgress(100, "Launching application...");
+      setTimeout(() => {
+        closeSplash();
+        win.show();
+        win.focus();
+      }, 400);
+    });
+
+  } catch (err) {
+    console.error("Startup error:", err);
+    closeSplash();
+    app.quit();
   }
-  createWindow();
 });
 
 app.on("window-all-closed", () => {
@@ -528,6 +1080,5 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", async () => {
   allowClose = true;
-  await httpPost("/app/shutdown");
-  terminateBackend();
+  await requestBackendShutdown();
 });

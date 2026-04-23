@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>AdaLab</title>
+  <title>ArcRho</title>
   <style>
     .menubar{
       height: 16px;
@@ -137,7 +137,12 @@
       -webkit-app-region: drag;
     }
     .host-nodrag { -webkit-app-region: no-drag; }
-    #titlebarTitle { flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #titlebarTitle { flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 8px; }
+    .titlebarLogo {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
     .titlebarControls {
       display: flex;
       gap: 6px;
@@ -200,6 +205,11 @@
       box-sizing: border-box;
       user-select: none;
     }
+    /* Extra borders for Windows 10 (disabled on Windows 11) */
+    body.win10-borders {
+      border: 1px solid #3f3f3f;
+      outline: 1px solid #100cf7;
+    }
     input, textarea, select, option, [contenteditable="true"] {
       user-select: text;
     }
@@ -216,7 +226,7 @@
     #appConfirmOverlay.open { display: flex; }
     #appConfirmBox {
       background: #f3f3f3;
-      border: 1px solid #c9c9c9;
+      border: 1px solid #57575798;
       border-radius: 8px;
       min-width: 320px;
       max-width: 420px;
@@ -347,6 +357,56 @@
       margin-top: 14px;
     }
 
+    #forceRebuildSettingsOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.18);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    #forceRebuildSettingsOverlay.open { display: flex; }
+    #forceRebuildSettingsBox {
+      background: #f3f3f3;
+      border: 1px solid #c9c9c9;
+      border-radius: 10px;
+      min-width: 460px;
+      max-width: 600px;
+      padding: 14px;
+      box-shadow: 0 12px 26px rgba(0,0,0,0.22);
+    }
+    #forceRebuildSettingsTitle {
+      font-weight: 700;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+    .forceRebuildRow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #2f2f2f;
+      user-select: none;
+    }
+    #forceRebuildToggle {
+      width: 15px;
+      height: 15px;
+      margin: 0;
+    }
+    #forceRebuildHint {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #666;
+      line-height: 1.35;
+    }
+    #forceRebuildSettingsButtons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
     #zoomToast {
       position: fixed;
       right: 12px;
@@ -390,7 +450,7 @@
     #globalTooltip.show { opacity: 1; }
     .topbar { display:flex; align-items:center; gap: var(--gap); border-top:none; border-bottom:none; padding-top:0px; padding-bottom:0px; }
     .brand { font-weight:700; }
-    .tabs { display:flex; gap:0; flex-wrap:wrap; position: relative; }
+    .tabs { display:flex; gap:0; flex-wrap:wrap; position: relative; align-items: flex-end; }
 
     .tab {
       display: flex;
@@ -403,7 +463,7 @@
 
       background: #f3f3f3;
       border: 1px solid #d0d0d0;
-      border-bottom: none;
+      border-bottom: 1px solid #d0d0d0;
 
       border-radius: 0;
 
@@ -423,7 +483,8 @@
       border-color: #c8c8c8;
       z-index: 2;
       border-bottom: none;
-      margin-bottom: -1px;
+      margin-bottom: 0;
+      transform: translateY(-1px);
       box-shadow: inset 0 2px 0 #2b6df6;
     }
     .tab.active::after {
@@ -565,7 +626,7 @@
 
     /* ===== Jupyter-like + tab ===== */
     .plusTab {
-      height: 18px;
+      height: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -582,6 +643,7 @@
       cursor: pointer;
       user-select: none;
       color: #333;
+      transform: translateY(1px);
     }
 
     .plusTab:hover { background: #eaeaea; }
@@ -642,6 +704,10 @@
       justify-content: space-between;
       gap: 28px;
     }
+    .menuDropdown .menuItem[hidden],
+    .menuDropdown .menuSep[hidden] {
+      display: none !important;
+    }
 
     .menuItem:hover { background: rgba(0,0,0,0.06); }
 
@@ -698,24 +764,28 @@
       flex: 0 0 var(--statusbar-h);
       height: var(--statusbar-h);
       border-top: 1px solid var(--border);
-      border-radius: 6px 6px 0 0;
+      /* border-radius: 6px 6px 0 0; */
       background: #e6e6e681;
       display: flex;
       align-items: center;
-      padding: 0 10px;
+      /* padding: 0 10px; */
       font-size: 12px;
       color: var(--muted);
       box-sizing: border-box;
       gap: 8px;
     }
     #statusText { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #statusBar.status-tone-error,
+    #statusText.status-tone-error { color: #b91c1c; }
+    #statusBar.status-tone-warn,
+    #statusText.status-tone-warn { color: #b45309; }
     #resizeHandle {
       margin-left: 6px;
       width: 78px;
       height: 16px;
       border: none;
       border-radius: 3px;
-      background: #ffffff;
+      background: transparent;
       color: #2b2b2b;
       font-size: 11.5px;
       display: flex;
@@ -787,19 +857,47 @@
     #resizeHandle .resizeIcon {
       width: 16px;
       height: 14px;
-      border-left: 1px solid #c7c7c7;
       margin-left: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
     }
+
+    /* === Option A: Dot grid (6 dots in triangle) === */
     #resizeHandle .resizeIcon::after {
       content: "";
       width: 10px;
       height: 10px;
-      background: repeating-linear-gradient(135deg, #9a9a9a 0 1px, transparent 1px 3px);
-      opacity: 0.9;
+      background-image:
+        radial-gradient(circle at 9px 1px, #999 1.1px, transparent 1.2px),
+        radial-gradient(circle at 5px 5px, #999 1.1px, transparent 1.2px),
+        radial-gradient(circle at 9px 5px, #999 1.1px, transparent 1.2px),
+        radial-gradient(circle at 1px 9px, #999 1.1px, transparent 1.2px),
+        radial-gradient(circle at 5px 9px, #999 1.1px, transparent 1.2px),
+        radial-gradient(circle at 9px 9px, #999 1.1px, transparent 1.2px);
+      background-size: 10px 10px;
+      background-repeat: no-repeat;
     }
+   
+
+    /* === Option C: Simple SVG-style arrow (use ↘ in HTML) ===
+    #resizeHandle .resizeIcon::after {
+      content: "↘";
+      font-size: 12px;
+      color: #888;
+    }
+    */
+
+    /* === Option D: Solid corner triangle ===
+    #resizeHandle .resizeIcon::after {
+      content: "";
+      width: 0;
+      height: 0;
+      border-style: solid;
+      border-width: 0 0 8px 8px;
+      border-color: transparent transparent #bbb transparent;
+    }
+    */
 
     body.is-resizing .content {
       opacity: 0.6;
@@ -808,13 +906,176 @@
       pointer-events: none;
       contain: layout paint;
     }
-    
+
+    /* ===== About Dialog ===== */
+    #aboutOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.28);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      backdrop-filter: blur(2px);
+    }
+    #aboutOverlay.open { display: flex; }
+
+    #aboutBox {
+      background: #fff;
+      border: 1px solid #c0c0c0;
+      border-radius: 16px;
+      width: 460px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.22), 0 0 0 1px rgba(255,255,255,0.1) inset;
+      animation: aboutFadeIn 280ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    }
+    @keyframes aboutFadeIn {
+      from { opacity: 0; transform: scale(0.96) translateY(8px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    #aboutHero {
+      position: relative;
+      height: 180px;
+      background: linear-gradient(135deg, #0c1445 0%, #1a237e 25%, #283593 45%, #0d47a1 60%, #0277bd 75%, #00838f 90%, #00695c 100%);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Decorative paint strokes */
+    #aboutHero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 220px 120px at 15% 80%, rgba(99,102,241,0.35) 0%, transparent 70%),
+        radial-gradient(ellipse 180px 100px at 80% 20%, rgba(56,189,248,0.3) 0%, transparent 70%),
+        radial-gradient(ellipse 140px 140px at 50% 50%, rgba(139,92,246,0.2) 0%, transparent 60%),
+        radial-gradient(ellipse 100px 200px at 90% 85%, rgba(6,182,212,0.25) 0%, transparent 60%),
+        radial-gradient(ellipse 160px 80px at 30% 15%, rgba(99,102,241,0.2) 0%, transparent 65%);
+      mix-blend-mode: screen;
+    }
+    #aboutHero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(160deg, transparent 30%, rgba(255,255,255,0.04) 50%, transparent 70%),
+        linear-gradient(220deg, transparent 40%, rgba(99,102,241,0.08) 60%, transparent 80%);
+    }
+
+    .aboutHeroStrokes {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    .aboutStroke {
+      position: absolute;
+      border-radius: 50%;
+      opacity: 0.12;
+    }
+    .aboutStroke:nth-child(1) {
+      width: 300px; height: 80px;
+      background: linear-gradient(90deg, #818cf8, transparent);
+      top: 20px; left: -40px;
+      transform: rotate(-12deg);
+    }
+    .aboutStroke:nth-child(2) {
+      width: 200px; height: 60px;
+      background: linear-gradient(90deg, transparent, #38bdf8, transparent);
+      top: 90px; right: -20px;
+      transform: rotate(8deg);
+    }
+    .aboutStroke:nth-child(3) {
+      width: 250px; height: 50px;
+      background: linear-gradient(90deg, #6366f1, transparent);
+      bottom: 20px; left: 60px;
+      transform: rotate(-5deg);
+    }
+    .aboutStroke:nth-child(4) {
+      width: 180px; height: 40px;
+      background: linear-gradient(90deg, transparent, #06b6d4);
+      bottom: 50px; right: 30px;
+      transform: rotate(15deg);
+    }
+
+    .aboutLogoWrap {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      filter: drop-shadow(0 8px 24px rgba(0,0,0,0.3));
+    }
+    .aboutLogoWrap svg {
+      width: 110px;
+      height: 110px;
+    }
+
+    #aboutBody {
+      padding: 24px 28px 20px;
+      text-align: center;
+    }
+    #aboutAppName {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1a1a2e;
+      letter-spacing: -0.3px;
+      margin-bottom: 4px;
+    }
+    #aboutVersion {
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 16px;
+    }
+    #aboutDesc {
+      font-size: 12.5px;
+      color: #9ca3af;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+    #aboutCloseBtn {
+      min-width: 90px;
+      height: 30px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      background: #f9fafb;
+      cursor: pointer;
+      font-size: 13px;
+      color: #374151;
+      transition: background 120ms ease, border-color 120ms ease;
+    }
+    #aboutCloseBtn:hover {
+      background: #f3f4f6;
+      border-color: #9ca3af;
+    }
+    #aboutCloseBtn:active {
+      background: #e5e7eb;
+    }
+
   </style>
 </head>
 
 <body>
   <div id="customTitlebar" class="host-drag-region">
-    <div id="titlebarTitle">Actuarial Data & Analytics System</div>
+    <div id="titlebarTitle">
+      <svg class="titlebarLogo" viewBox="0 0 512 512" aria-hidden="true">
+        <defs>
+          <linearGradient id="titlebarWingGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#0891b2"/>
+            <stop offset="45%" style="stop-color:#1d4ed8"/>
+            <stop offset="100%" style="stop-color:#8b5cf6"/>
+          </linearGradient>
+        </defs>
+        <rect x="32" y="32" width="448" height="448" rx="88" fill="#fafafa"/>
+        <path d="M 85 420 L 85 200 Q 170 120 360 70 L 85 420 Z" fill="url(#titlebarWingGrad)" opacity="0.88"/>
+        <path d="M 85 420 L 130 250 Q 200 180 400 120 L 85 420 Z" fill="url(#titlebarWingGrad)" opacity="0.5"/>
+        <path d="M 85 420 L 180 300 Q 240 250 430 180 L 85 420 Z" fill="url(#titlebarWingGrad)" opacity="0.25"/>
+      </svg>
+      ArcRho
+    </div>
     <div class="titlebarControls host-nodrag">
       
       <div class="titlebarBtn" id="titlebarMinBtn" title="Minimize" aria-label="Minimize">
@@ -852,7 +1113,7 @@
     <div class="menuSep"></div>
     <div class="menuItem" data-action="save"><span>Save</span><span class="menuShortcut">Ctrl+S</span></div>
     <div class="menuItem" data-action="save-as"><span>Save As...</span><span class="menuShortcut">Ctrl+Shift+S</span></div>
-    <div class="menuItem" data-action="import-workflow"><span>Import Workflow from...</span><span class="menuShortcut">Ctrl+O</span></div>
+    <div class="menuItem" data-action="import-workflow" data-page-scopes="workflow"><span>Import Workflow from...</span><span class="menuShortcut">Ctrl+O</span></div>
     <div class="menuSep"></div>
     <div class="menuItem" data-action="print"><span>Print...</span><span class="menuShortcut">Ctrl+P</span></div>
     <div class="menuSep"></div>
@@ -860,18 +1121,22 @@
     <div class="menuItem" data-action="shutdown-app"><span>Quit Application</span><span class="menuShortcut">Ctrl+Q</span></div>
   </div>
 
-  <div id="editMenuDropdown" class="menuDropdown">
-    <div class="menuItem" data-action="dfm-exclude-high"><span>Exclude Highest Ratio</span><span class="menuShortcut">Ctrl+H</span></div>
-    <div class="menuItem" data-action="dfm-exclude-low"><span>Exclude Lowest Ratio</span><span class="menuShortcut">Ctrl+L</span></div>
-    <div class="menuItem" data-action="dfm-include-all"><span>Include All Ratios</span><span class="menuShortcut">Ctrl+I</span></div>
+  <div id="editMenuDropdown" class="menuDropdown" data-requires-page-scope="1">
+    <div class="menuItem" data-action="dfm-exclude-high" data-page-scopes="dfm"><span>Exclude Highest Ratio</span><span class="menuShortcut">Ctrl+H</span></div>
+    <div class="menuItem" data-action="dfm-exclude-low" data-page-scopes="dfm"><span>Exclude Lowest Ratio</span><span class="menuShortcut">Ctrl+L</span></div>
+    <div class="menuItem" data-action="dfm-include-all" data-page-scopes="dfm"><span>Include All Ratios</span><span class="menuShortcut">Ctrl+I</span></div>
+    <div class="menuItem" data-action="render-all-markdown" data-page-scopes="scripting"><span>Render All Markdown Cells</span></div>
   </div>
 
-  <div id="viewMenuDropdown" class="menuDropdown">
-    <div class="menuItem" data-action="toggle-nav"><span>Hide/Show Navigation Panel</span><span class="menuShortcut">Ctrl+Shift+F</span></div>
+  <div id="viewMenuDropdown" class="menuDropdown" data-requires-page-scope="1">
+    <div class="menuItem" data-action="toggle-nav" data-page-scopes="workflow"><span>Hide/Show Navigation Panel</span><span class="menuShortcut">Ctrl+Shift+F</span></div>
+    <div class="menuItem" data-action="toggle-line-numbers" data-page-scopes="scripting"><span>Toggle Line Numbers</span><span class="menuShortcut">Ctrl+Shift+L</span></div>
+    <div class="menuItem" data-action="toggle-exec-time" data-page-scopes="scripting"><span>Toggle Execution Time</span><span class="menuShortcut">Ctrl+Shift+E</span></div>
   </div>
   <div id="settingsMenuDropdown" class="menuDropdown">
     <div class="menuItem" data-action="font-settings"><span>Font Settings...</span></div>
-    <div class="menuItem" data-action="root-path-settings"><span>Root Path Settings...</span></div>
+    <div class="menuItem" data-action="root-path-settings"><span>Server Connection</span></div>
+    <div class="menuItem" data-action="force-rebuild-settings"><span>Force Rebuild...</span></div>
     <div class="menuSep"></div>
     <div class="menuItem" data-action="clear-cache-reload"><span>Clear Cache & Reload</span></div>
   </div>
@@ -908,7 +1173,7 @@
     </div>
     <div id="resizeHandle" class="host-nodrag" title="Resize window">
       <span id="clockText">--:--:--</span>
-      <span class="resizeIcon">↘</span>
+      <span class="resizeIcon"></span>
     </div>
   </div>
 
@@ -957,7 +1222,7 @@
 
   <div id="rootPathSettingsOverlay" class="host-nodrag" role="dialog" aria-modal="true" aria-labelledby="rootPathSettingsTitle">
     <div id="rootPathSettingsBox">
-      <div id="rootPathSettingsTitle">Root Path Settings</div>
+      <div id="rootPathSettingsTitle">Server Connection</div>
       <div class="fontSettingsRow">
         <label for="rootPathInput">Root Path</label>
         <input id="rootPathInput" type="text" autocomplete="off" placeholder="E:\ADAS" />
@@ -972,10 +1237,70 @@
     </div>
   </div>
 
+  <div id="forceRebuildSettingsOverlay" class="host-nodrag" role="dialog" aria-modal="true" aria-labelledby="forceRebuildSettingsTitle">
+    <div id="forceRebuildSettingsBox">
+      <div id="forceRebuildSettingsTitle">Force Rebuild</div>
+      <label class="forceRebuildRow" for="forceRebuildToggle">
+        <input id="forceRebuildToggle" type="checkbox" />
+        <span>Always clear cached dataset and rebuild on run</span>
+      </label>
+      <div id="forceRebuildHint">
+        If enabled, backend always clears dataset cache and sends a fresh request before loading results.
+      </div>
+      <div id="forceRebuildSettingsButtons">
+        <button class="appConfirmBtn" id="forceRebuildCancelBtn" type="button">Cancel</button>
+        <button class="appConfirmBtn primary" id="forceRebuildApplyBtn" type="button">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="aboutOverlay" class="host-nodrag" role="dialog" aria-modal="true" aria-labelledby="aboutAppName">
+    <div id="aboutBox">
+      <div id="aboutHero">
+        <div class="aboutHeroStrokes">
+          <div class="aboutStroke"></div>
+          <div class="aboutStroke"></div>
+          <div class="aboutStroke"></div>
+          <div class="aboutStroke"></div>
+        </div>
+        <div class="aboutLogoWrap">
+          <svg viewBox="0 0 512 512" aria-hidden="true">
+            <defs>
+              <linearGradient id="aboutWingGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:#0891b2"/>
+                <stop offset="45%" style="stop-color:#1d4ed8"/>
+                <stop offset="100%" style="stop-color:#8b5cf6"/>
+              </linearGradient>
+            </defs>
+            <rect x="32" y="32" width="448" height="448" rx="88" fill="#fafafa"/>
+            <path d="M 85 420 L 85 200 Q 170 120 360 70 L 85 420 Z" fill="url(#aboutWingGrad)" opacity="0.88"/>
+            <path d="M 85 420 L 130 250 Q 200 180 400 120 L 85 420 Z" fill="url(#aboutWingGrad)" opacity="0.5"/>
+            <path d="M 85 420 L 180 300 Q 240 250 430 180 L 85 420 Z" fill="url(#aboutWingGrad)" opacity="0.25"/>
+          </svg>
+        </div>
+      </div>
+      <div id="aboutBody">
+        <div id="aboutAppName">ArcRho</div>
+        <div id="aboutVersion">Version 0.2.0</div>
+        <div id="aboutDesc">Actuarial Data & Analytics System</div>
+        <button id="aboutCloseBtn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div id="zoomToast" aria-live="polite">100%</div>
   <div id="globalTooltip"></div>
 
-  <script type="module" src="/ui/ui_shell.js?v=202601265"></script>
+  <script>
+    // Apply Win10 borders unless running on Windows 11
+    (async () => {
+      if (window.ADAHost?.isWindows11) {
+        const isWin11 = await window.ADAHost.isWindows11();
+        if (!isWin11) document.body.classList.add('win10-borders');
+      }
+    })();
+  </script>
+  <script type="module" src="/ui/ui_shell.js?v=20260302"></script>
 </body>
 </html>
 

@@ -41,7 +41,7 @@ def start_app(
     env.setdefault("TRI_DATA_DIR", str(project_dir))
     env.setdefault(
         "ADAS_WORKFLOW_DIR",
-        str(Path.home() / "Documents" / "ADAS" / "workflows"),
+        str(Path.home() / "Documents" / "ArcRho" / "workflows"),
     )
 
     print("Working dir:", project_dir)

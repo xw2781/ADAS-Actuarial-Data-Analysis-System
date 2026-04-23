@@ -4,17 +4,52 @@
  */
 
 const NA_BORDER_KEY = "adas_dfm_ratio_na_borders";
+let _storageInstanceId = "";
+
+function getResolvedProjectNameForStorage() {
+  try {
+    if (typeof window.ADA_GET_DFM_INPUTS === "function") {
+      const snap = window.ADA_GET_DFM_INPUTS();
+      const resolved = String(snap?.resolved?.project || "").trim();
+      if (resolved) return resolved;
+    }
+  } catch {
+    // ignore
+  }
+  return document.getElementById("projectSelect")?.value?.trim() || "";
+}
+
+/**
+ * Sets the instance ID used to scope all DFM storage keys.
+ * Must be called once during initialization before any storage operations.
+ * @param {string} id - The instance identifier (e.g., "step_1", "dfm_2")
+ */
+export function setStorageInstance(id) {
+  _storageInstanceId = id || "";
+}
 
 /**
  * Gets the base key for summary-related storage, based on current inputs.
+ * Scoped by instance ID so multiple DFM instances are independent.
  * @returns {string|null}
  */
 export function getSummaryKeyBase() {
+  const methodName = document.getElementById("dfmMethodName")?.value?.trim();
+  const project = getResolvedProjectNameForStorage();
+  const dev = document.getElementById("devLenSelect")?.value?.trim();
+  const origin = document.getElementById("originLenSelect")?.value?.trim();
+  if (!methodName || !project || !dev || !origin) return null;
+  const base = `${encodeURIComponent(methodName)}::${encodeURIComponent(project)}::d${encodeURIComponent(dev)}::o${encodeURIComponent(origin)}`;
+  return _storageInstanceId ? `${_storageInstanceId}::${base}` : base;
+}
+
+function getMethodNameScopeBase() {
   const path = document.getElementById("pathInput")?.value?.trim();
   const tri = document.getElementById("triInput")?.value?.trim();
   const origin = document.getElementById("originLenSelect")?.value?.trim();
   if (!path || !tri || !origin) return null;
-  return `${encodeURIComponent(path)}::${encodeURIComponent(tri)}::o${encodeURIComponent(origin)}`;
+  const base = `${encodeURIComponent(path)}::${encodeURIComponent(tri)}::o${encodeURIComponent(origin)}`;
+  return _storageInstanceId ? `${_storageInstanceId}::${base}` : base;
 }
 
 export function getSummaryOrderKey() {
@@ -33,7 +68,7 @@ export function getSummaryHiddenKey() {
 }
 
 export function getMethodNameKey() {
-  const base = getSummaryKeyBase();
+  const base = getMethodNameScopeBase();
   return base ? `adas_dfm_method_name::${base}` : null;
 }
 

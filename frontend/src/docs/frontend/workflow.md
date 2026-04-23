@@ -1,0 +1,75 @@
+# Frontend: Workflow
+
+## Purpose
+<!-- MANUAL:BEGIN -->
+Workflow editor page and save/load orchestration.
+<!-- MANUAL:END -->
+
+## Entry Points
+<!-- AUTO-GEN:BEGIN frontend.workflow.entry_points -->
+- `workflow.html`: external scripts `/ui/workflow_main.js?v=20260227`; inline imports _none_.
+
+Detected `fetch(...)` targets in key JS files:
+- `/adas/projects`
+- `/reserving_class_combinations?project_name=${encodeURIComponent(projectName)}`
+- `/reserving_class_filter_spec`
+- `/reserving_class_filter_spec?project_name=${encodeURIComponent(projectName)}`
+- `/reserving_class_hidden_paths`
+- `/reserving_class_hidden_paths?project_name=${encodeURIComponent(projectName)}`
+- `/reserving_class_types?project_name=${encodeURIComponent(projectName)}`
+- `/workflow/save`
+- `/workflow/save_as`
+
+Detected `adas:*` message types in key JS files:
+- `adas:close-active-tab`
+- `adas:close-shell-menus`
+- `adas:dfm-save`
+- `adas:get-dataset-settings`
+- `adas:get-dfm-settings`
+- `adas:hotkey`
+- `adas:set-app-font`
+- `adas:set-zoom`
+- `adas:tooltip`
+- `adas:update-workflow-tab-title`
+- `adas:workflow-dirty`
+- `adas:workflow-global-changed`
+- `adas:workflow-import`
+- `adas:workflow-saved`
+- `adas:zoom`
+<!-- AUTO-GEN:END -->
+
+## Key Files
+<!-- AUTO-GEN:BEGIN frontend.workflow.key_files -->
+- [`workflow.html`](../../workflow.html) - Workflow page layout and containers.
+- [`workflow_main.js`](../../workflow_main.js) - Workflow editing logic, save/load events.
+- [`menu_utils.js`](../../menu_utils.js) - Context menu helper utilities.
+- [`reserving_class_lazy_picker.js`](../../reserving_class_lazy_picker.js) - Shared reserving-class tree selector.
+<!-- AUTO-GEN:END -->
+
+## External Interfaces
+<!-- MANUAL:BEGIN -->
+- Calls `/workflow/*` backend routes.
+- Coordinates with shell and embedded dataset/DFM iframes via message bridge.
+- For DFM embeds, preserves optional `outputType` in step settings and forwards it as `output_type` URL param.
+<!-- MANUAL:END -->
+
+## Data/State/Caches
+<!-- MANUAL:BEGIN -->
+- Persists workflow tab state using per-instance storage keys.
+- Uses imported/exported `.arcwf` payloads.
+- Enforces a single `global_control` step per workflow; duplicate instances are blocked or normalized to `picker`.
+- Stores DFM step settings snapshots (including optional `outputType`) via `adas:get-dfm-settings` / `adas:dfm-settings`.
+- Reserving-class tree view toggle preferences (auto-expand/auto-close/double-click) are shared globally across projects.
+<!-- MANUAL:END -->
+
+## Common Change Tasks
+<!-- MANUAL:BEGIN -->
+1. Extend workflow payload: update `workflow_main.js`, backend schema/service, and save/load compatibility.
+2. Add sidebar behavior: update `workflow.html` + resize/collapse handlers.
+<!-- MANUAL:END -->
+
+## Known Risks
+<!-- MANUAL:BEGIN -->
+- Save/load compatibility regressions across older workflow files.
+- Dirty-state propagation to shell can become inconsistent.
+<!-- MANUAL:END -->

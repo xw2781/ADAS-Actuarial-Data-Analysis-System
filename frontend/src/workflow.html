@@ -338,6 +338,210 @@
       box-shadow: 0 3px 10px rgba(0,0,0,0.06);
     }
     .card h3 { margin: 0 0 8px 0; font-size: 16px; }
+    .card.wide { width: min(720px, 100%); }
+    .gc-table {
+      width: min(760px, 100%);
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+    .gc-table th,
+    .gc-table td {
+      border: 1px solid #e1e1e1;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: middle;
+    }
+    .gc-table th {
+      background: #f6f6f6;
+      font-weight: 600;
+    }
+    .gc-table input,
+    .gc-table select {
+      width: 100%;
+      height: 28px;
+      padding: 0 8px;
+      border: none;
+      border-radius: 0;
+      box-sizing: border-box;
+      background: transparent;
+      outline: none;
+    }
+    .gc-table .gc-type {
+      cursor: pointer;
+    }
+    /* custom project combo-box */
+    .gc-combo { position: relative; width: 100%; }
+    .gc-combo input {
+      width: 100%;
+      height: 28px;
+      padding: 0 52px 0 8px;
+      border: none;
+      border-radius: 0;
+      box-sizing: border-box;
+      background: transparent;
+      outline: none;
+      cursor: text;
+    }
+    .gc-combo .gc-combo-arrow {
+      position: absolute;
+      right: 30px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      font-size: 10px;
+      color: #888;
+    }
+    .gc-combo-list {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      max-height: 220px;
+      overflow-y: auto;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-top: none;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,.12);
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .gc-combo-list li {
+      padding: 5px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .gc-combo-list li:hover,
+    .gc-combo-list li.active {
+      background: #e8f0fe;
+    }
+    .gc-combo.open .gc-combo-list { display: block; }
+
+    .gc-value-with-icon {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .gc-value-with-icon .gc-value {
+      flex: 1 1 auto;
+      min-width: 0;
+      width: auto;
+    }
+    .gc-combo .gc-project-tree-btn {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    /* ---- Reserving-class tree picker ---- */
+    .gc-tree-icon,
+    .rc-tree-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px; height: 22px;
+      cursor: pointer;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fff;
+      flex-shrink: 0;
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1;
+      letter-spacing: 0.4px;
+      color: #555;
+    }
+    .gc-tree-icon:hover,
+    .rc-tree-icon:hover { background: #e8f0fe; border-color: #4285f4; }
+
+    /* Floating draggable window */
+    .rc-float-window {
+      position: fixed;
+      top: 120px; left: 50%;
+      transform: translateX(-50%);
+      width: 480px;
+      max-height: 70vh;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.18);
+      z-index: 5000;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .rc-float-titlebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: #f6f6f6;
+      border-bottom: 1px solid #e1e1e1;
+      cursor: grab;
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .rc-float-titlebar:active { cursor: grabbing; }
+    .rc-float-title { font-weight: 600; font-size: 14px; }
+    .rc-float-close {
+      width: 24px; height: 24px;
+      border: none; background: transparent;
+      cursor: pointer; font-size: 18px; line-height: 1;
+      color: #666; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .rc-float-close:hover { background: #e0e0e0; }
+    .rc-float-body {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    /* Tree nodes */
+    .rc-tree-node { user-select: none; }
+    .rc-tree-folder {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 8px;
+      cursor: pointer; border-radius: 4px;
+      transition: background 0.1s;
+    }
+    .rc-tree-folder:hover { background: #f0f4ff; }
+    .rc-tree-arrow {
+      width: 14px; height: 14px;
+      color: #888; flex-shrink: 0;
+      transition: transform 0.15s ease;
+    }
+    .rc-tree-arrow.expanded { transform: rotate(90deg); }
+    .rc-tree-arrow svg { width: 100%; height: 100%; }
+    .rc-tree-label { font-size: 13px; }
+    .rc-tree-level-label { font-size: 11px; color: #999; margin-left: auto; }
+    .rc-tree-children { display: none; padding-left: 20px; }
+    .rc-tree-children.expanded { display: block; }
+    .rc-tree-leaf {
+      display: flex; align-items: center; gap: 6px;
+      padding: 3px 8px 3px 22px;
+      cursor: pointer; font-size: 13px; border-radius: 4px;
+    }
+    .rc-tree-leaf:hover { background: #e8f0fe; }
+
+    .gc-remove {
+      padding: 4px 8px;
+      border: 1px solid #cfcfcf;
+      border-radius: 6px;
+      background: #f4f4f4;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .gc-remove:hover { background: #ececec; }
+    .gc-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .gc-hint { margin-top: 8px; font-size: 12px; color: #666; }
 
     /* embedded iframe */
 
@@ -414,6 +618,6 @@
     <div class="stepCtxItem" data-action="delete">Delete (D)</div>
   </div>
 
-  <script type="module" src="/ui/workflow_main.js?v=202601291"></script>
+  <script type="module" src="/ui/workflow_main.js?v=20260227"></script>
 </body>
 </html>

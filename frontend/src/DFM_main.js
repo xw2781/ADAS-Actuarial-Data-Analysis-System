@@ -1,6 +1,6 @@
 const params = new URL(import.meta.url).search;
-const ratiosUrl = new URL("./dfm_ratios.js", import.meta.url);
-ratiosUrl.search = params;
+const orchestratorUrl = new URL("./dfm_tabs_orchestrator.js", import.meta.url);
+orchestratorUrl.search = params;
 
-const { initDfmRatios } = await import(ratiosUrl.toString());
+const { initDfmRatios } = await import(orchestratorUrl.toString());
 initDfmRatios();
