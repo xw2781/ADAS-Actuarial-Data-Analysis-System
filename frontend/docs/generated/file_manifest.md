@@ -7,7 +7,7 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 ## Top-Level Counts
 | Top-Level Segment | File Count |
 | --- | --- |
-| `(root)` | 16 |
+| `(root)` | 15 |
 | `.claude` | 1 |
 | `app_server` | 47 |
 | `build` | 7 |
@@ -23,7 +23,6 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `.claude/settings.local.json` | 3555 |
 | `.gitignore` | 511 |
 | `AGENTS.md` | 3926 |
-| `XLToolBox.py` | 276 |
 | `app.py` | 200 |
 | `app_launcher.py` | 3058 |
 | `app_server/__init__.py` | 44 |
