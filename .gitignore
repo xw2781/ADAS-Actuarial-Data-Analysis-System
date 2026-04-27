@@ -58,9 +58,9 @@ tmp_data/
 .restart_electron
 .shutdown_electron
 
-# ArcRho runtime instance state
-backend/src/agent/instances/
-backend/src/master/instances/
+# ArcRho data-engine runtime instance state
+data-engine/src/agent/instances/
+data-engine/src/master/instances/
 
 # Editor and agent-local state
 .claude/

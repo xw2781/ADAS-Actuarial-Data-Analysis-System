@@ -4,7 +4,7 @@ This is the ArcRho monorepo root. Use one Git repository here for all ArcRho com
 
 ## Repository Layout
 - `frontend/`: current ArcRho desktop/web UI, Electron host, backend service code currently bundled with the frontend app, docs, release fragments, and frontend-specific agent rules.
-- `data-engine/`: reserved for the ArcRho data-engine component.
+- `data-engine/`: ArcRho data-engine component, including the legacy agent/master/shell Python services previously stored under `backend/`.
 - `tools/`: repository-level automation, including commit/push helpers for agents.
 
 ## Mandatory Read Before Editing

@@ -94,7 +94,7 @@ Dataset formulas are evaluated as arithmetic expressions over aligned triangle D
 
 ## Excel Add-in
 
-The ArcRho Excel Add-in exposes the data processing engine directly inside Excel through a set of worksheet functions (UDFs) and a custom **ADAS** ribbon tab. Actuaries work entirely within familiar Excel workflows — no scripting, no vendor GUI — while the Python backend handles all data retrieval and triangle construction transparently.
+The ArcRho Excel Add-in exposes the data processing engine directly inside Excel through a set of worksheet functions (UDFs) and a custom **ADAS** ribbon tab. Actuaries work entirely within familiar Excel workflows — no scripting, no vendor GUI — while the Python data engine handles all data retrieval and triangle construction transparently.
 
 ### Ribbon
 
@@ -109,7 +109,7 @@ The **ADAS** ribbon tab provides quick-access shortcuts for the two most common 
 | **Insert Function** | Inserts a UDF template into the active cell |
 | **Clear Formulas** | Removes all ADAS/Arc formulas from the active sheet |
 | **Calculate Workbook** | Forces a full recalculation |
-| **Refresh Database** | Reloads the source data cache on the backend |
+| **Refresh Database** | Reloads the source data cache on the data engine |
 
 ### Step 1 — Select a Reserving Class Path
 

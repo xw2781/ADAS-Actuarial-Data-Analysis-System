@@ -71,26 +71,32 @@ function Invoke-Git {
     [switch]$Capture
   )
 
-  if ($Capture) {
-    $output = & git @GitArgs 2>&1
+  $oldErrorActionPreference = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    if ($Capture) {
+      $output = & git @GitArgs 2>&1
+      $code = $LASTEXITCODE
+      if ($code -ne 0 -and -not $AllowFailure) {
+        throw "git $($GitArgs -join ' ') failed with exit code $code.`n$output"
+      }
+      return [pscustomobject]@{
+        Code = $code
+        Output = @($output)
+      }
+    }
+
+    & git @GitArgs
     $code = $LASTEXITCODE
     if ($code -ne 0 -and -not $AllowFailure) {
-      throw "git $($GitArgs -join ' ') failed with exit code $code.`n$output"
+      throw "git $($GitArgs -join ' ') failed with exit code $code."
     }
     return [pscustomobject]@{
       Code = $code
-      Output = @($output)
+      Output = @()
     }
-  }
-
-  & git @GitArgs
-  $code = $LASTEXITCODE
-  if ($code -ne 0 -and -not $AllowFailure) {
-    throw "git $($GitArgs -join ' ') failed with exit code $code."
-  }
-  return [pscustomobject]@{
-    Code = $code
-    Output = @()
+  } finally {
+    $ErrorActionPreference = $oldErrorActionPreference
   }
 }
 
@@ -131,7 +137,10 @@ if (
   throw "A rebase is in progress. Resolve it before committing."
 }
 
-$conflicts = (Invoke-Git -GitArgs @("diff", "--name-only", "--diff-filter=U") -Capture).Output
+$conflicts = @(
+  (Invoke-Git -GitArgs @("diff", "--name-only", "--diff-filter=U") -Capture).Output |
+    Where-Object { $_ -and ($_ -notmatch "^warning:") }
+)
 if ($conflicts.Count -gt 0) {
   throw "Unresolved merge conflicts are present:`n$($conflicts -join "`n")"
 }
@@ -201,7 +210,7 @@ switch ($StageMode) {
 
 if ($DryRun -and $StageMode -ne "none") {
   $statusArgs = @("status", "--porcelain", "--") + $Pathspec
-  $candidateChanges = (Invoke-Git -GitArgs $statusArgs -Capture).Output
+  $candidateChanges = @((Invoke-Git -GitArgs $statusArgs -Capture).Output)
   if ($candidateChanges.Count -eq 0 -and -not $AllowEmpty) {
     throw "No changes to commit. Use -AllowEmpty only when an empty commit is intentional."
   }
