@@ -21,8 +21,8 @@ Electron main entry: `electron_main.js`
 ## Key Files
 <!-- AUTO-GEN:BEGIN build.packaging.key_files -->
 - [`package.json`](../../package.json) - Build scripts, Electron builder config, installer metadata.
-- [`build/server.spec`](../../build/server.spec) - PyInstaller spec for Python backend executable.
-- [`build/server_entry.py`](../../build/server_entry.py) - PyInstaller entrypoint for the bundled backend server.
+- [`build/server.spec`](../../build/server.spec) - PyInstaller spec for Python app-server executable.
+- [`build/server_entry.py`](../../build/server_entry.py) - PyInstaller entrypoint for the bundled app server.
 - [`build/release_notes.py`](../../build/release_notes.py) - Release fragment validator and versioned release note generator.
 - [`electron_main.js`](../../electron_main.js) - Electron main process entry.
 - [`app_launcher.py`](../../app_launcher.py) - Python host launcher used by packaged runtime.

@@ -1,4 +1,4 @@
-﻿# Frontend: Project Settings
+# Frontend: Project Settings
 
 ## Purpose
 <!-- MANUAL:BEGIN -->
@@ -70,7 +70,7 @@ Detected `adas:*` message types in key JS files:
 - Dataset Types editor blocks enabling `Calculated` when the dataset type name is already used by a field in Field Mapping for the same project.
 - When the `Dataset Types` ribbon is active, shell `File` actions map to local export/import (`Save Dataset Types` / `Load Dataset Types`) using default folder `Documents\\ArcRho\\templates`; local load accepts both `.json` and `.xlsx` files.
 - When the `Reserving Class Types` ribbon is active, shell `File` actions replace default Save/Save As with local export/import (`Save Reserving Class Types As...` / `Load Reserving Class Types From...`) using default folder `Documents\\ArcRho\\templates`; local load accepts both `.json` and `.xlsx` files and then schedules normal project auto-save.
-- Local Dataset Types import uses an in-page custom dialog to choose merge vs overwrite (instead of browser `confirm`), except when imported rows are exactly identical to current UI rows (no prompt, no-op with status message). Merge keeps current behavior (update/add imported rows while preserving mapped-name rows). Overwrite removes existing rows not used by Field Mapping, then loads imported rows, and keeps mapped-name rows only when missing from imported content. For `.xlsx` local load, backend converts workbook data to the same JSON payload structure before merge/overwrite is applied.
+- Local Dataset Types import uses an in-page custom dialog to choose merge vs overwrite (instead of browser `confirm`), except when imported rows are exactly identical to current UI rows (no prompt, no-op with status message). Merge keeps current behavior (update/add imported rows while preserving mapped-name rows). Overwrite removes existing rows not used by Field Mapping, then loads imported rows, and keeps mapped-name rows only when missing from imported content. For `.xlsx` local load, the app server converts workbook data to the same JSON payload structure before merge/overwrite is applied.
 - Dataset Types save validation allows calculated formulas to save when their formula components are Dataset Type `Name` values, even if field-mapping source resolution is incomplete.
 - Dataset Types table renders grouped by `Category`, supports Name-header keyword search (space-delimited terms) against the `Name` column, supports multi-select dropdown filtering on `Data Format`, `Category`, and `Calculated` headers (with `Calculated` options shown as `Yes`/`No`), and with no options selected a column filter is treated as not applied (all rows remain visible for that column), does not auto-resize column widths during filter changes, keeps header filter icons right-aligned near each column's right border, uses single-triangle sort indicators (`U+25B2`/`U+25BC`) in headers to match Reserving Class Types, allows per-column sort toggles that apply within each category group, and provides left-side subgroup header buttons to collapse/expand each category.
 - Dataset Types error status shows an underlined `see more` action that opens a floating details window; details are formatted one error per line.
@@ -92,7 +92,7 @@ Detected `adas:*` message types in key JS files:
 - When `auto_generated` is `false`, table reload will not overwrite the 3 date values unless `project_name` in JSON mismatches the project folder name (stale duplicated settings).
 - Source Data date inputs auto-derive from table summary + field mapping when values are missing, stale mismatch is detected, or reload is requested while `auto_generated=true`.
 - Source Data table reload clears project-level `ADASHeaders*.csv` cache files under the project `data` folder before refreshing table summary.
-- Folder-node context menu supports `Create New Project`, prompts for a project name, creates an empty project folder (with `data` subfolder) via backend, then persists folder-tree mapping + blank project row with rollback on intermediate failures.
+- Folder-node context menu supports `Create New Project`, prompts for a project name, creates an empty project folder (with `data` subfolder) via the app server, then persists folder-tree mapping + blank project row with rollback on intermediate failures.
 <!-- MANUAL:END -->
 
 ## Common Change Tasks

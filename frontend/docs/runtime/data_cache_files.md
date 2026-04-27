@@ -2,7 +2,7 @@
 
 ## Purpose
 <!-- MANUAL:BEGIN -->
-Index cache/data files and refresh points used by backend services.
+Index cache/data files and refresh points used by app-server services.
 <!-- MANUAL:END -->
 
 ## Entry Points
@@ -18,7 +18,7 @@ Index cache/data files and refresh points used by backend services.
 
 ## Key Files
 <!-- AUTO-GEN:BEGIN runtime.data_cache_files.key_files -->
-- [`backend/config.py`](../../backend/config.py) - Cache/data file names and lock constants.
+- [`app_server/config.py`](../../app_server/config.py) - Cache/data file names and lock constants.
 
 Cache/lock constants detected:
 - `AUDIT_LOG_FILE`
@@ -48,7 +48,7 @@ Cache/lock constants detected:
 
 ## Data/State/Caches
 <!-- MANUAL:BEGIN -->
-- File names and limits are defined in `backend/config.py` constants.
+- File names and limits are defined in `app_server/config.py` constants.
 - Refresh endpoints can clear and rebuild cache files.
 <!-- MANUAL:END -->
 

@@ -23,7 +23,7 @@ ArcRho 自定义 Python 模块（`arcrho`）子项目计划
 2. 约束与设计原则
 
 必须遵守：
-1. 根目录来源必须是 `ui_config.json` / `backend.config`，禁止硬编码 `E:\\ADAS`。
+1. 根目录来源必须是 `ui_config.json` / `app_server.config`，禁止硬编码 `E:\\ADAS`。
 2. 代码分层保持 `router -> service -> config/schema`，不要把业务逻辑塞进 router。
 3. 对外接口默认向后兼容；新增能力优先增量，不直接重构旧行为。
 4. Scripting 会话隔离语义保持不变（不同会话变量互不污染）。
@@ -157,8 +157,8 @@ Phase 3：文档、测试与发布（1-2 天）
 
 7. 任务分解（执行清单）
 
-Backend
-1. 新增 `arcrho` 模块实现（建议放在 `backend/services` 邻近或独立 package）。
+App Server
+1. 新增 `arcrho` 模块实现（建议放在 `app_server/services` 邻近或独立 package）。
 2. 通过 service 层封装数据读写，不绕开 config 规则。
 3. 补充必要 schema（如新增专用接口时）。
 
@@ -202,7 +202,7 @@ QA
 9. 风险与应对
 
 风险 1：路径逻辑被写死，导致环境迁移失败。
-应对：统一通过 `backend.config` 取根路径，增加路径变更回归用例。
+应对：统一通过 `app_server.config` 取根路径，增加路径变更回归用例。
 
 风险 2：对象 API 与现有 service 语义不一致。
 应对：先定义 service 适配层，避免在对象层直接拼接文件读写。

@@ -37,7 +37,7 @@ Rule:
 ## Naming and Placement
 - All docs live under `docs/`.
 - Frontend indexes: `docs/frontend/`.
-- Backend indexes: `docs/backend/` and `docs/backend/domains/`.
+- App-server indexes: `docs/app_server/` and `docs/app_server/domains/`.
 - Runtime/config indexes: `docs/runtime/`.
 - Build indexes: `docs/build/`.
 - Generated inventories: `docs/generated/`.

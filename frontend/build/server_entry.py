@@ -24,7 +24,7 @@ os.environ.setdefault("TRI_DATA_DIR", str(EXE_DIR))
 os.environ.setdefault("ADAS_WORKFLOW_DIR", str(Path.home() / "Documents" / "ArcRho" / "workflows"))
 
 def main():
-    parser = argparse.ArgumentParser(description="ADAS Backend Server")
+    parser = argparse.ArgumentParser(description="ADAS App Server")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
@@ -35,7 +35,7 @@ def main():
     os.chdir(str(EXE_DIR))
 
     uvicorn.run(
-        "backend.main:app",
+        "app_server.main:app",
         host=args.host,
         port=args.port,
         log_level="info",

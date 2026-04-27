@@ -7,7 +7,7 @@ Document path/config setup and runtime path refresh behavior.
 
 ## Entry Points
 <!-- AUTO-GEN:BEGIN runtime.config_paths.entry_points -->
-- Path/config helper functions in `backend/config.py`:
+- Path/config helper functions in `app_server/config.py`:
   - `_find_existing_project_dir`
   - `_get_data_dir`
   - `_get_project_map_dir`
@@ -43,28 +43,28 @@ Document path/config setup and runtime path refresh behavior.
 
 ## Key Files
 <!-- AUTO-GEN:BEGIN runtime.config_paths.key_files -->
-- [`backend/config.py`](../../backend/config.py) - Primary runtime path + config module.
-- [`backend/api/ui_config_router.py`](../../backend/api/ui_config_router.py) - HTTP interface for root path updates.
+- [`app_server/config.py`](../../app_server/config.py) - Primary runtime path + config module.
+- [`app_server/api/ui_config_router.py`](../../app_server/api/ui_config_router.py) - HTTP interface for root path updates.
 - [`ui_config.json`](../../ui_config.json) - Persisted root path and subpath config.
-- [`backend/main.py`](../../backend/main.py) - App bootstrap and static path mounting.
+- [`app_server/main.py`](../../app_server/main.py) - App bootstrap and static path mounting.
 <!-- AUTO-GEN:END -->
 
 ## External Interfaces
 <!-- MANUAL:BEGIN -->
 - Frontend shell settings modal calls `/ui_config` routes.
-- Backend imports `backend.config` for runtime path resolution.
+- App-server modules import `app_server.config` for runtime path resolution.
 <!-- MANUAL:END -->
 
 ## Data/State/Caches
 <!-- MANUAL:BEGIN -->
 - `ui_config.json` is persistent source-of-truth for root/path mapping.
-- Runtime globals in `backend/config.py` are refreshed from config.
-- User-local fixed paths are also refreshed in `backend/config.py`, including workflow export path (`~/Documents/ArcRho/workflows`) and scripting notebook path (`~/Documents/ArcRho/scripts`).
+- Runtime globals in `app_server/config.py` are refreshed from config.
+- User-local fixed paths are also refreshed in `app_server/config.py`, including workflow export path (`~/Documents/ArcRho/workflows`) and scripting notebook path (`~/Documents/ArcRho/scripts`).
 <!-- MANUAL:END -->
 
 ## Common Change Tasks
 <!-- MANUAL:BEGIN -->
-1. Add a new configurable path: update `ui_config.json` contract + `backend/config.py` getters.
+1. Add a new configurable path: update `ui_config.json` contract + `app_server/config.py` getters.
 2. Change path refresh behavior: validate all services that depend on runtime globals.
 <!-- MANUAL:END -->
 

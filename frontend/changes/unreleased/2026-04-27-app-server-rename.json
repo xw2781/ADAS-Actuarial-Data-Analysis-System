@@ -1,0 +1,9 @@
+{
+  "type": "improvement",
+  "scope": "app server",
+  "audience": "internal",
+  "summary": "Renamed the frontend server package to app_server.",
+  "details": [
+    "The FastAPI package now lives under frontend/app_server, with imports, packaging entry points, and generated documentation paths updated to match."
+  ]
+}

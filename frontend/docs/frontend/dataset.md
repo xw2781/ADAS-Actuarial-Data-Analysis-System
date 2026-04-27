@@ -67,7 +67,7 @@ Detected `adas:*` message types in key JS files:
 
 ## External Interfaces
 <!-- MANUAL:BEGIN -->
-- Calls backend dataset/adas endpoints plus valid-value list endpoints (`/dataset_types`, `/reserving_class_*`, `/adas/projects`).
+- Calls app-server dataset/adas endpoints plus valid-value list endpoints (`/dataset_types`, `/reserving_class_*`, `/adas/projects`).
 - Uses `/scripting/preferences` to persist and restore the last resolved Project + Reserving Class pair in APPDATA.
 - Sends status/hotkey/close signals to parent shell.
 - Publishes dataset input updates and browsing-history updates to shell via `adas:dataset-settings-changed` and `adas:browsing-history-updated`.
@@ -93,7 +93,7 @@ Detected `adas:*` message types in key JS files:
 
 ## Common Change Tasks
 <!-- MANUAL:BEGIN -->
-1. Add a new backend call: update fetch call and API wrappers.
+1. Add a new app-server call: update fetch call and API wrappers.
 2. Change table behavior: update `dataset_main.js` render + patch flow together.
 <!-- MANUAL:END -->
 

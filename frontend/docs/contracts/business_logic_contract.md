@@ -1,14 +1,14 @@
 # Business Logic Contract
 
 ## Purpose
-Define non-negotiable domain behaviors for backend routes/services and frontend consumers.
+Define non-negotiable domain behaviors for app-server routes/services and frontend consumers.
 
 ## Scope
 This contract applies to:
-- `backend/api/*.py`
-- `backend/services/*.py`
-- `backend/schemas/*.py`
-- `backend/config.py`
+- `app_server/api/*.py`
+- `app_server/services/*.py`
+- `app_server/schemas/*.py`
+- `app_server/config.py`
 - `ui/workflow/workflow_main.js`
 - `ui/project_settings/project_settings.js`
 - `ui/dataset/dataset_main.js`
@@ -84,7 +84,7 @@ Verify:
 
 ## BL-5 Runtime Config and Path Resolution
 When:
-- Editing `ui_config` behavior or `backend/config.py` path logic.
+- Editing `ui_config` behavior or `app_server/config.py` path logic.
 
 MUST:
 - Keep `ui_config.json` as source of truth for root and configured subpaths.
@@ -134,6 +134,6 @@ Verify:
 ## Change Checklist
 Before finishing a business-logic change:
 1. State which BL-* rules were impacted.
-2. Update MANUAL sections in affected `docs/backend/*.md` and/or `docs/backend/domains/*.md`.
+2. Update MANUAL sections in affected `docs/app_server/*.md` and/or `docs/app_server/domains/*.md`.
 3. Run `python tools/docs_index_builder.py --write`.
 4. Run `python tools/docs_index_builder.py --check`.

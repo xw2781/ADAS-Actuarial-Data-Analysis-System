@@ -5,19 +5,19 @@ Capture critical architectural decisions that agents must preserve unless explic
 
 ## AR-1 Layer Boundaries
 MUST:
-- Keep backend layering as:
+- Keep app-server layering as:
   - router: transport and validation orchestration
   - service: business logic and persistence flow
   - schema: request/response model definitions
 - Keep routers thin; move non-trivial logic to services.
 
 MUST NOT:
-- Embed substantial business logic directly in `backend/api/*`.
+- Embed substantial business logic directly in `app_server/api/*`.
 - Bypass schemas for typed payload paths where schemas already exist.
 
 ## AR-2 Config as Single Source of Truth
 MUST:
-- Use `backend/config.py` for runtime path constants and path helper functions.
+- Use `app_server/config.py` for runtime path constants and path helper functions.
 - Keep environment/path derivation centralized.
 
 MUST NOT:
@@ -57,7 +57,7 @@ MUST NOT:
 MUST:
 - Evaluate blast radius across:
   - frontend consumers
-  - backend routes/services
+  - app-server routes/services
   - persisted files and compatibility
 - Update corresponding docs in same change.
 

@@ -260,7 +260,7 @@ export function createDatasetRunController(deps) {
     } else {
       const precheckResult = await precheckAdasTriCsv(triRequestInputs);
       if (precheckResult.ok && precheckResult?.data?.ok && precheckResult.data.need_request === true) {
-        // Show ASAP after backend decides a request must be sent.
+        // Show ASAP after the app server decides a request must be sent.
         showLoadingPopup();
       } else if (!precheckResult.ok && !precheckResult.skipped) {
         console.warn("ADASTri precheck failed.");

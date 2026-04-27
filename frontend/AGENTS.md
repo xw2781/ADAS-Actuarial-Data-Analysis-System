@@ -3,14 +3,14 @@
 This file defines mandatory guardrails for any code agent working in this repository.
   
 ## Mandatory Read Before Editing
-Before changing frontend, backend API behavior, or runtime architecture, read:
+Before changing frontend, app-server API behavior, or runtime architecture, read:
 1. `docs/contracts/frontend_behavior_contract.md`
 2. `docs/contracts/business_logic_contract.md`
 3. `docs/architecture/architecture_guardrails.md`
 
 These contracts are mandatory whenever a task touches:
 - Frontend shell or feature entry/coordinator files under `ui/` (for example shell, dataset, workflow, DFM, or project settings).
-- Backend API, service, or runtime config files under `backend/api/`, `backend/services/`, or `backend/config.py`.
+- App-server API, service, or runtime config files under `app_server/api/`, `app_server/services/`, or `app_server/config.py`.
 - Electron runtime bridge/host files such as `electron_main.js` or `electron_preload.js`.
 
 ## Hard Rules (MUST)

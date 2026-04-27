@@ -49,7 +49,7 @@ if not defined APP_VERSION (
 echo Building version %APP_VERSION%
 echo.
 
-echo Step 2: Building Python backend with PyInstaller...
+echo Step 2: Building Python app server with PyInstaller...
 echo ----------------------------------------
 call :run_pyinstaller
 if errorlevel 1 (
@@ -57,13 +57,13 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
-echo Python backend built successfully!
+echo Python app server built successfully!
 echo.
 
 echo Step 3: Building Electron app with electron-builder...
 echo ----------------------------------------
 if not exist "python_dist\adas_server\adas_server.exe" (
-    echo ERROR: Missing backend bundle: python_dist\adas_server\adas_server.exe
+    echo ERROR: Missing app-server bundle: python_dist\adas_server\adas_server.exe
     echo HINT: PyInstaller step did not produce the server executable.
     echo       Do not continue, otherwise installer may build fast but fail at launch.
     echo.

@@ -251,12 +251,12 @@ async function waitForServer(timeoutMs = BACKEND_STARTUP_TIMEOUT_MS) {
   while (Date.now() < deadline) {
     if (serverSpawnError) {
       const msg = String(serverSpawnError?.message || serverSpawnError);
-      throw new Error(`Backend spawn failed: ${msg}`);
+      throw new Error(`App server spawn failed: ${msg}`);
     }
     if (serverProc && serverProc.exitCode != null) {
       const signal = serverProc.signalCode || "none";
       throw new Error(
-        `Backend process exited before readiness (code=${serverProc.exitCode}, signal=${signal})`
+        `App server process exited before readiness (code=${serverProc.exitCode}, signal=${signal})`
       );
     }
     try {
@@ -289,7 +289,7 @@ async function startBackendWithRetry() {
       return;
     } catch (err) {
       lastErr = err;
-      console.error(`Backend startup attempt ${attempt}/${BACKEND_STARTUP_ATTEMPTS} failed:`, err);
+      console.error(`App server startup attempt ${attempt}/${BACKEND_STARTUP_ATTEMPTS} failed:`, err);
       await terminateBackend({ force: true });
       if (attempt < BACKEND_STARTUP_ATTEMPTS) {
         await sleep(700);
@@ -1045,7 +1045,7 @@ app.whenReady().then(async () => {
 
   try {
     if (START_BACKEND) {
-      updateSplashProgress(10, "Starting backend server...");
+      updateSplashProgress(10, "Starting app server...");
       clearBackendControlFlags();
 
       updateSplashProgress(30, "Waiting for server...");

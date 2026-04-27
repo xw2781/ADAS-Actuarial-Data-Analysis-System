@@ -216,8 +216,8 @@ def call_root_and_attrs(node: ast.AST) -> Tuple[str, Tuple[str, ...]]:
     return cur.id, tuple(attrs)
 
 
-def parse_backend_routes() -> List[RouteEntry]:
-    api_dir = REPO_ROOT / "backend" / "api"
+def parse_app_server_routes() -> List[RouteEntry]:
+    api_dir = REPO_ROOT / "app_server" / "api"
     if not api_dir.exists():
         return []
 
@@ -242,11 +242,11 @@ def parse_backend_routes() -> List[RouteEntry]:
                 continue
             module = node.module or ""
 
-            if module == "backend.services":
+            if module == "app_server.services":
                 for alias in node.names:
                     local = alias.asname or alias.name
                     service_aliases[local] = alias.name
-            elif module.startswith("backend.services."):
+            elif module.startswith("app_server.services."):
                 svc_mod = module.split(".")[-1]
                 for alias in node.names:
                     local = alias.asname or alias.name
@@ -255,11 +255,11 @@ def parse_backend_routes() -> List[RouteEntry]:
                     else:
                         service_aliases[local] = f"{svc_mod}.{alias.name}"
 
-            if module.startswith("backend.schemas."):
+            if module.startswith("app_server.schemas."):
                 schema_mod = module.split(".")[-1]
                 for alias in node.names:
                     local = alias.asname or alias.name
-                    schema_aliases[local] = f"backend/schemas/{schema_mod}.py"
+                    schema_aliases[local] = f"app_server/schemas/{schema_mod}.py"
 
         for node in tree.body:
             if not isinstance(node, ast.FunctionDef):
@@ -396,7 +396,7 @@ def collect_manifest() -> List[ManifestEntry]:
 
 
 def parse_config_signals() -> Tuple[List[str], List[str]]:
-    cfg = REPO_ROOT / "backend" / "config.py"
+    cfg = REPO_ROOT / "app_server" / "config.py"
     if not cfg.exists():
         return [], []
     text = read_text(cfg)
@@ -505,122 +505,122 @@ FRONTEND_DOC_META: Mapping[str, Dict[str, object]] = {
 
 BACKEND_DOMAIN_META: Mapping[str, Dict[str, object]] = {
     "workflow": {
-        "doc": "docs/backend/domains/workflow.md",
+        "doc": "docs/app_server/domains/workflow.md",
         "files": [
-            ("backend/api/workflow_router.py", "HTTP routes for workflow save/load/default dirs."),
-            ("backend/services/workflow_service.py", "Workflow file I/O operations."),
-            ("backend/schemas/workflow.py", "Workflow request models."),
+            ("app_server/api/workflow_router.py", "HTTP routes for workflow save/load/default dirs."),
+            ("app_server/services/workflow_service.py", "Workflow file I/O operations."),
+            ("app_server/schemas/workflow.py", "Workflow request models."),
         ],
     },
     "ui_config": {
-        "doc": "docs/backend/domains/ui_config.md",
+        "doc": "docs/app_server/domains/ui_config.md",
         "files": [
-            ("backend/api/ui_config_router.py", "Read/update root path config."),
-            ("backend/config.py", "Config loader and runtime path refresh."),
-            ("backend/schemas/ui_config.py", "UI config request model."),
+            ("app_server/api/ui_config_router.py", "Read/update root path config."),
+            ("app_server/config.py", "Config loader and runtime path refresh."),
+            ("app_server/schemas/ui_config.py", "UI config request model."),
             ("ui_config.json", "Persistent root/path configuration."),
         ],
     },
     "app_control": {
-        "doc": "docs/backend/domains/app_control.md",
+        "doc": "docs/app_server/domains/app_control.md",
         "files": [
-            ("backend/api/app_control_router.py", "Restart/shutdown control endpoints."),
-            ("backend/config.py", "Flag-file paths for app control."),
+            ("app_server/api/app_control_router.py", "Restart/shutdown control endpoints."),
+            ("app_server/config.py", "Flag-file paths for app control."),
             ("app_launcher.py", "Launcher process watching control flags."),
             ("electron_main.js", "Electron host restart/shutdown integration."),
         ],
     },
     "audit_log": {
-        "doc": "docs/backend/domains/audit_log.md",
+        "doc": "docs/app_server/domains/audit_log.md",
         "files": [
-            ("backend/api/audit_log_router.py", "Audit read/write routes."),
-            ("backend/services/audit_service.py", "Audit persistence helpers and locking."),
-            ("backend/schemas/audit_log.py", "Audit write payload schema."),
-            ("backend/config.py", "Audit file constants and lock objects."),
+            ("app_server/api/audit_log_router.py", "Audit read/write routes."),
+            ("app_server/services/audit_service.py", "Audit persistence helpers and locking."),
+            ("app_server/schemas/audit_log.py", "Audit write payload schema."),
+            ("app_server/config.py", "Audit file constants and lock objects."),
         ],
     },
     "dataset": {
-        "doc": "docs/backend/domains/dataset.md",
+        "doc": "docs/app_server/domains/dataset.md",
         "files": [
-            ("backend/api/dataset_router.py", "Dataset query/patch routes."),
-            ("backend/services/dataset_service.py", "Dataset in-memory operations."),
-            ("backend/schemas/dataset.py", "Dataset patch request model."),
+            ("app_server/api/dataset_router.py", "Dataset query/patch routes."),
+            ("app_server/services/dataset_service.py", "Dataset in-memory operations."),
+            ("app_server/schemas/dataset.py", "Dataset patch request model."),
             ("ui/shared/api.js", "Frontend client wrapper for dataset API."),
         ],
     },
     "book": {
-        "doc": "docs/backend/domains/book.md",
+        "doc": "docs/app_server/domains/book.md",
         "files": [
-            ("backend/api/book_router.py", "Workbook sheet/meta/patch routes."),
-            ("backend/services/book_service.py", "Workbook data read/write helpers."),
-            ("backend/schemas/book.py", "Workbook request schemas."),
+            ("app_server/api/book_router.py", "Workbook sheet/meta/patch routes."),
+            ("app_server/services/book_service.py", "Workbook data read/write helpers."),
+            ("app_server/schemas/book.py", "Workbook request schemas."),
         ],
     },
     "excel": {
-        "doc": "docs/backend/domains/excel.md",
+        "doc": "docs/app_server/domains/excel.md",
         "files": [
-            ("backend/api/excel_router.py", "Excel COM automation routes."),
-            ("backend/services/excel_service.py", "Excel process interaction logic."),
-            ("backend/schemas/excel.py", "Excel request payload schemas."),
+            ("app_server/api/excel_router.py", "Excel COM automation routes."),
+            ("app_server/services/excel_service.py", "Excel process interaction logic."),
+            ("app_server/schemas/excel.py", "Excel request payload schemas."),
         ],
     },
     "adas": {
-        "doc": "docs/backend/domains/adas.md",
+        "doc": "docs/app_server/domains/adas.md",
         "files": [
-            ("backend/api/adas_router.py", "ADAS tri/precheck/header endpoints."),
-            ("backend/services/adas_service.py", "ADAS processing and project listing."),
-            ("backend/schemas/adas.py", "ADAS request schemas."),
+            ("app_server/api/adas_router.py", "ADAS tri/precheck/header endpoints."),
+            ("app_server/services/adas_service.py", "ADAS processing and project listing."),
+            ("app_server/schemas/adas.py", "ADAS request schemas."),
         ],
     },
     "project_settings": {
-        "doc": "docs/backend/domains/project_settings.md",
+        "doc": "docs/app_server/domains/project_settings.md",
         "files": [
-            ("backend/api/project_settings_router.py", "Project settings CRUD and folder ops routes."),
-            ("backend/services/project_settings_service.py", "Project settings persistence service."),
-            ("backend/schemas/project_settings.py", "Project settings request schemas."),
+            ("app_server/api/project_settings_router.py", "Project settings CRUD and folder ops routes."),
+            ("app_server/services/project_settings_service.py", "Project settings persistence service."),
+            ("app_server/schemas/project_settings.py", "Project settings request schemas."),
             ("ui/project_settings/project_settings.js", "Frontend caller for project settings endpoints."),
         ],
     },
     "project_book": {
-        "doc": "docs/backend/domains/project_book.md",
+        "doc": "docs/app_server/domains/project_book.md",
         "files": [
-            ("backend/api/project_book_router.py", "Project workbook metadata/sheet/patch routes."),
-            ("backend/services/book_service.py", "Workbook patching implementation."),
-            ("backend/services/project_settings_service.py", "Project-folder path resolution."),
-            ("backend/schemas/book.py", "Project workbook patch schema."),
+            ("app_server/api/project_book_router.py", "Project workbook metadata/sheet/patch routes."),
+            ("app_server/services/book_service.py", "Workbook patching implementation."),
+            ("app_server/services/project_settings_service.py", "Project-folder path resolution."),
+            ("app_server/schemas/book.py", "Project workbook patch schema."),
         ],
     },
     "table_summary": {
-        "doc": "docs/backend/domains/table_summary.md",
+        "doc": "docs/app_server/domains/table_summary.md",
         "files": [
-            ("backend/api/table_summary_router.py", "Table summary read/refresh routes."),
-            ("backend/services/table_summary_service.py", "CSV summary generation and cache validity."),
-            ("backend/services/reserving_class_service.py", "Optional refresh chaining."),
-            ("backend/schemas/table_summary.py", "Table summary refresh schema."),
+            ("app_server/api/table_summary_router.py", "Table summary read/refresh routes."),
+            ("app_server/services/table_summary_service.py", "CSV summary generation and cache validity."),
+            ("app_server/services/reserving_class_service.py", "Optional refresh chaining."),
+            ("app_server/schemas/table_summary.py", "Table summary refresh schema."),
         ],
     },
     "field_mapping": {
-        "doc": "docs/backend/domains/field_mapping.md",
+        "doc": "docs/app_server/domains/field_mapping.md",
         "files": [
-            ("backend/api/field_mapping_router.py", "Field mapping read/save routes."),
-            ("backend/services/field_mapping_service.py", "Field mapping persistence and validation."),
-            ("backend/schemas/field_mapping.py", "Field mapping request schema."),
+            ("app_server/api/field_mapping_router.py", "Field mapping read/save routes."),
+            ("app_server/services/field_mapping_service.py", "Field mapping persistence and validation."),
+            ("app_server/schemas/field_mapping.py", "Field mapping request schema."),
         ],
     },
     "dataset_types": {
-        "doc": "docs/backend/domains/dataset_types.md",
+        "doc": "docs/app_server/domains/dataset_types.md",
         "files": [
-            ("backend/api/dataset_types_router.py", "Dataset type catalog read/save routes."),
-            ("backend/services/dataset_types_service.py", "Dataset type storage and normalization."),
-            ("backend/schemas/dataset_types.py", "Dataset type save schema."),
+            ("app_server/api/dataset_types_router.py", "Dataset type catalog read/save routes."),
+            ("app_server/services/dataset_types_service.py", "Dataset type storage and normalization."),
+            ("app_server/schemas/dataset_types.py", "Dataset type save schema."),
         ],
     },
     "reserving_class": {
-        "doc": "docs/backend/domains/reserving_class.md",
+        "doc": "docs/app_server/domains/reserving_class.md",
         "files": [
-            ("backend/api/reserving_class_router.py", "Reserving-class routes for values/tree/preferences/types."),
-            ("backend/services/reserving_class_service.py", "Cache generation, refresh, and preference persistence."),
-            ("backend/schemas/reserving_class.py", "Reserving class request models."),
+            ("app_server/api/reserving_class_router.py", "Reserving-class routes for values/tree/preferences/types."),
+            ("app_server/services/reserving_class_service.py", "Cache generation, refresh, and preference persistence."),
+            ("app_server/schemas/reserving_class.py", "Reserving class request models."),
             ("ui/shared/reserving_class_lazy_picker.js", "Frontend caller for reserving-class endpoints."),
         ],
     },
@@ -641,19 +641,19 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
                 System map:
                 - Electron host/runtime: `electron_main.js`, `electron_preload.js`, `app_shell.py`.
                 - Frontend pages/features: shell + dataset + DFM + workflow + project settings + pop-out.
-                - Backend API: FastAPI app in `backend/main.py` with domain routers in `backend/api`.
-                - Runtime/config state: path resolution and cache constants in `backend/config.py`.
+                - App-server API: FastAPI app in `app_server/main.py` with domain routers in `app_server/api`.
+                - Runtime/config state: path resolution and cache constants in `app_server/config.py`.
                 """
             ),
             "Entry Points": dedent(
                 """
                 | Question | Where to start |
                 | --- | --- |
-                | Add or modify a backend API endpoint | [`backend/INDEX.md`](backend/INDEX.md) |
-                | Trace a page to backend endpoints | [`frontend/INDEX.md`](frontend/INDEX.md) |
+                | Add or modify an app-server API endpoint | [`app_server/INDEX.md`](app_server/INDEX.md) |
+                | Trace a page to app-server endpoints | [`frontend/INDEX.md`](frontend/INDEX.md) |
                 | Update path/config behavior | [`runtime/config_paths.md`](runtime/config_paths.md) |
                 | Troubleshoot packaging/build | [`build/packaging.md`](build/packaging.md) |
-                | Inspect machine-generated inventories | [`generated/backend_routes.md`](generated/backend_routes.md), [`generated/frontend_entrypoints.md`](generated/frontend_entrypoints.md), [`generated/file_manifest.md`](generated/file_manifest.md) |
+                | Inspect machine-generated inventories | [`generated/app_server_routes.md`](generated/app_server_routes.md), [`generated/frontend_entrypoints.md`](generated/frontend_entrypoints.md), [`generated/file_manifest.md`](generated/file_manifest.md) |
                 """
             ),
             "External Interfaces": dedent(
@@ -675,8 +675,8 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
             "Common Change Tasks": dedent(
                 """
                 High-frequency workflows:
-                1. Add/modify API endpoint: [`backend/INDEX.md`](backend/INDEX.md) -> target domain file under `backend/domains/`.
-                2. Trace page -> API -> service: [`frontend/INDEX.md`](frontend/INDEX.md) then follow linked backend domain files.
+                1. Add/modify API endpoint: [`app_server/INDEX.md`](app_server/INDEX.md) -> target domain file under `app_server/domains/`.
+                2. Trace page -> API -> service: [`frontend/INDEX.md`](frontend/INDEX.md) then follow linked app-server domain files.
                 3. Update config/path behavior: [`runtime/config_paths.md`](runtime/config_paths.md).
                 4. Package/build troubleshooting: [`build/packaging.md`](build/packaging.md).
                 """
@@ -704,7 +704,7 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
             ),
             "External Interfaces": dedent(
                 """
-                - Backend HTTP interface via `fetch(...)` calls.
+                - App-server HTTP interface via `fetch(...)` calls.
                 - Cross-iframe messaging via `window.postMessage` (`adas:*` message types).
                 """
             ),
@@ -737,30 +737,30 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
         },
     )
 
-    specs["docs/backend/INDEX.md"] = ModuleDocSpec(
-        path="docs/backend/INDEX.md",
-        title="Backend Index",
+    specs["docs/app_server/INDEX.md"] = ModuleDocSpec(
+        path="docs/app_server/INDEX.md",
+        title="App Server Index",
         manual_sections={
             "Purpose": dedent(
                 """
-                Backend domain map for FastAPI routers, schemas, and services.
+                App-server domain map for FastAPI routers, schemas, and services.
                 """
             ),
             "External Interfaces": dedent(
                 """
-                - Public interface is HTTP routes mounted by `backend/main.py`.
+                - Public interface is HTTP routes mounted by `app_server/main.py`.
                 - Internal interface is router -> service -> filesystem/state helpers.
                 """
             ),
             "Data/State/Caches": dedent(
                 """
-                - Path and cache constants are centralized in `backend/config.py`.
+                - Path and cache constants are centralized in `app_server/config.py`.
                 - Several domains persist JSON caches under project folders or AppData.
                 """
             ),
             "Common Change Tasks": dedent(
                 """
-                1. Add route: update one router file under `backend/api`, schema under `backend/schemas`, and service under `backend/services`.
+                1. Add route: update one router file under `app_server/api`, schema under `app_server/schemas`, and service under `app_server/services`.
                 2. Change payload contract: update schema first, then router/service.
                 3. Change project path behavior: sync with [`../runtime/config_paths.md`](../runtime/config_paths.md).
                 """
@@ -773,24 +773,24 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
             ),
         },
         auto_sections={
-            "Entry Points": "backend.index.entry_points",
-            "Key Files": "backend.index.key_files",
+            "Entry Points": "app_server.index.entry_points",
+            "Key Files": "app_server.index.key_files",
         },
     )
 
     frontend_manual = {
         "shell": {
             "purpose": "Shell-level tab/iframe host for all feature pages.",
-            "external": "- Communicates with child iframes via `adas:*` postMessage events.\n- Invokes backend for workflow import helpers and configuration endpoints.",
+            "external": "- Communicates with child iframes via `adas:*` postMessage events.\n- Invokes app-server endpoints for workflow import helpers and configuration endpoints.",
             "data": "- Persists tab state, zoom, and toggles in `localStorage`.\n- Tracks popped-out tabs via `BroadcastChannel`.",
             "tasks": "1. Add a new tab type: update tab creation + iframe source logic in `ui_shell.js`.\n2. Add shell menu action: wire menu item + action handler + hotkey map.",
             "risks": "- DOM replacement in shell can invalidate iframe references.\n- Unsaved-state handling must stay consistent for close/close-all flows.",
         },
         "dataset": {
             "purpose": "Dataset editing/analysis page used inside shell tabs.",
-            "external": "- Calls backend dataset/book/adas endpoints.\n- Sends status/hotkey/close signals to parent shell.",
-            "data": "- Uses in-page mutable state for active dataset and selection.\n- Reads project metadata from backend endpoints.",
-            "tasks": "1. Add a new backend call: update fetch call and API wrappers.\n2. Change table behavior: update `dataset_main.js` render + patch flow together.",
+            "external": "- Calls app-server dataset/book/adas endpoints.\n- Sends status/hotkey/close signals to parent shell.",
+            "data": "- Uses in-page mutable state for active dataset and selection.\n- Reads project metadata from app_server endpoints.",
+            "tasks": "1. Add a new app-server call: update fetch call and API wrappers.\n2. Change table behavior: update `dataset_main.js` render + patch flow together.",
             "risks": "- Formula or patch changes can cause silent data drift.\n- Endpoint mismatches break runtime flows without compile-time safety.",
         },
         "dfm": {
@@ -802,9 +802,9 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
         },
         "workflow": {
             "purpose": "Workflow editor page and save/load orchestration.",
-            "external": "- Calls `/workflow/*` backend routes.\n- Coordinates with shell and embedded dataset/DFM iframes via message bridge.",
+            "external": "- Calls `/workflow/*` app-server routes.\n- Coordinates with shell and embedded dataset/DFM iframes via message bridge.",
             "data": "- Persists workflow tab state using per-instance storage keys.\n- Uses imported/exported `.arcwf` payloads.",
-            "tasks": "1. Extend workflow payload: update `workflow_main.js`, backend schema/service, and save/load compatibility.\n2. Add sidebar behavior: update `workflow.html` + resize/collapse handlers.",
+            "tasks": "1. Extend workflow payload: update `workflow_main.js`, app-server schema/service, and save/load compatibility.\n2. Add sidebar behavior: update `workflow.html` + resize/collapse handlers.",
             "risks": "- Save/load compatibility regressions across older workflow files.\n- Dirty-state propagation to shell can become inconsistent.",
         },
         "project_settings": {
@@ -844,7 +844,7 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
     backend_manual = {
         "workflow": (
             "Workflow file save/load domain.",
-            "- Consumed primarily by `workflow_main.js`.\n- Uses typed request models in `backend/schemas/workflow.py`.",
+            "- Consumed primarily by `workflow_main.js`.\n- Uses typed request models in `app_server/schemas/workflow.py`.",
             "- Reads/writes workflow files under configured workflow directory.",
             "1. Add a workflow route: update router + schema + service.\n2. Keep backward compatibility when changing saved payload shape.",
             "- File I/O errors and path permissions are common failure modes.",
@@ -944,9 +944,9 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
 
     for domain in BACKEND_DOMAIN_META:
         purpose, external, data_state, tasks, risks = backend_manual[domain]
-        specs[f"docs/backend/domains/{domain}.md"] = ModuleDocSpec(
-            path=f"docs/backend/domains/{domain}.md",
-            title=f"Backend Domain: {domain}",
+        specs[f"docs/app_server/domains/{domain}.md"] = ModuleDocSpec(
+            path=f"docs/app_server/domains/{domain}.md",
+            title=f"App Server Domain: {domain}",
             manual_sections={
                 "Purpose": purpose,
                 "External Interfaces": external,
@@ -955,8 +955,8 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
                 "Known Risks": risks,
             },
             auto_sections={
-                "Entry Points": f"backend.{domain}.entry_points",
-                "Key Files": f"backend.{domain}.key_files",
+                "Entry Points": f"app_server.{domain}.entry_points",
+                "Key Files": f"app_server.{domain}.key_files",
             },
         )
 
@@ -965,9 +965,9 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
         title="Runtime: Config and Path Resolution",
         manual_sections={
             "Purpose": "Document path/config setup and runtime path refresh behavior.",
-            "External Interfaces": "- Frontend shell settings modal calls `/ui_config` routes.\n- Backend imports `backend.config` for runtime path resolution.",
-            "Data/State/Caches": "- `ui_config.json` is persistent source-of-truth for root/path mapping.\n- Runtime globals in `backend/config.py` are refreshed from config.",
-            "Common Change Tasks": "1. Add a new configurable path: update `ui_config.json` contract + `backend/config.py` getters.\n2. Change path refresh behavior: validate all services that depend on runtime globals.",
+            "External Interfaces": "- Frontend shell settings modal calls `/ui_config` routes.\n- App-server modules import `app_server.config` for runtime path resolution.",
+            "Data/State/Caches": "- `ui_config.json` is persistent source-of-truth for root/path mapping.\n- Runtime globals in `app_server/config.py` are refreshed from config.",
+            "Common Change Tasks": "1. Add a new configurable path: update `ui_config.json` contract + `app_server/config.py` getters.\n2. Change path refresh behavior: validate all services that depend on runtime globals.",
             "Known Risks": "- Path changes affect every filesystem-backed domain.\n- Environment-specific path assumptions can break packaged deployments.",
         },
         auto_sections={
@@ -980,9 +980,9 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
         path="docs/runtime/data_cache_files.md",
         title="Runtime: Data and Cache Files",
         manual_sections={
-            "Purpose": "Index cache/data files and refresh points used by backend services.",
+            "Purpose": "Index cache/data files and refresh points used by app-server services.",
             "External Interfaces": "- Cache refresh is exposed via route endpoints and service calls.\n- Several caches are project-folder scoped; others are user AppData scoped.",
-            "Data/State/Caches": "- File names and limits are defined in `backend/config.py` constants.\n- Refresh endpoints can clear and rebuild cache files.",
+            "Data/State/Caches": "- File names and limits are defined in `app_server/config.py` constants.\n- Refresh endpoints can clear and rebuild cache files.",
             "Common Change Tasks": "1. Add cache file constant: update config, service readers/writers, and this index.\n2. Change refresh logic: verify endpoint side effects and lock behavior.",
             "Known Risks": "- Cache invalidation bugs can surface as stale or mismatched UI data.\n- File locking can fail writes under concurrent access.",
         },
@@ -997,9 +997,9 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
         title="Build and Packaging",
         manual_sections={
             "Purpose": "Document Electron + Python packaging inputs and scripts.",
-            "External Interfaces": "- Node scripts from `package.json` drive build orchestration.\n- PyInstaller spec (`build/server.spec`) builds backend executable artifacts.\n- `build/release_notes.py` validates unreleased change fragments and generates versioned release notes in `docs/releases/`.",
+            "External Interfaces": "- Node scripts from `package.json` drive build orchestration.\n- PyInstaller spec (`build/server.spec`) builds app-server executable artifacts.\n- `build/release_notes.py` validates unreleased change fragments and generates versioned release notes in `docs/releases/`.",
             "Data/State/Caches": "- Build outputs: `dist/`, `python_build/`, `python_dist/`.\n- Installer settings live in `package.json` and `build/installer.nsh`.\n- Release tracking data lives under `changes/unreleased/`, `changes/archive/`, and `docs/releases/`.",
-            "Common Change Tasks": "1. Update app packaging metadata: edit `package.json` `build` block.\n2. Update bundled backend: edit `build/server.spec` and verify `extraResources` mappings.\n3. Add or update unreleased change fragments in `changes/unreleased/` before packaging a release.\n4. If you need a specific release version, run `build\\build_app.bat <version>` (for example `build\\build_app.bat 2.0.0`); otherwise the script auto-increments the patch version.",
+            "Common Change Tasks": "1. Update app packaging metadata: edit `package.json` `build` block.\n2. Update bundled app server: edit `build/server.spec` and verify `extraResources` mappings.\n3. Add or update unreleased change fragments in `changes/unreleased/` before packaging a release.\n4. If you need a specific release version, run `build\\build_app.bat <version>` (for example `build\\build_app.bat 2.0.0`); otherwise the script auto-increments the patch version.",
             "Known Risks": "- Packaging excludes can accidentally omit runtime files.\n- Divergence between dev and packaged paths causes startup failures.",
         },
         auto_sections={
@@ -1053,7 +1053,7 @@ def conventions_doc() -> str:
         ## Naming and Placement
         - All docs live under `docs/`.
         - Frontend indexes: `docs/frontend/`.
-        - Backend indexes: `docs/backend/` and `docs/backend/domains/`.
+        - App-server indexes: `docs/app_server/` and `docs/app_server/domains/`.
         - Runtime/config indexes: `docs/runtime/`.
         - Build indexes: `docs/build/`.
         - Generated inventories: `docs/generated/`.
@@ -1072,7 +1072,7 @@ def generated_readme_doc() -> str:
         # Generated Documentation Files
 
         These files are fully generated by `tools/docs_index_builder.py`:
-        - `docs/generated/backend_routes.md`
+        - `docs/generated/app_server_routes.md`
         - `docs/generated/frontend_entrypoints.md`
         - `docs/generated/file_manifest.md`
 
@@ -1096,7 +1096,7 @@ def scaffold_templates() -> Dict[str, str]:
 
     templates["docs/CONVENTIONS.md"] = conventions_doc()
     templates["docs/GENERATED_README.md"] = generated_readme_doc()
-    templates["docs/generated/backend_routes.md"] = generated_placeholder("Backend Route Inventory")
+    templates["docs/generated/app_server_routes.md"] = generated_placeholder("App Server Route Inventory")
     templates["docs/generated/frontend_entrypoints.md"] = generated_placeholder("Frontend Entrypoint Inventory")
     templates["docs/generated/file_manifest.md"] = generated_placeholder("Repository File Manifest")
     return templates
@@ -1168,13 +1168,13 @@ def render_frontend_index_entrypoints(entrypoints: Mapping[str, FrontendEntrypoi
     return md_table(["HTML Entrypoint", "External Scripts", "Inline Imports"], rows)
 
 
-def render_backend_index_entrypoints(doc_path: str, by_domain: Mapping[str, Sequence[RouteEntry]]) -> str:
+def render_app_server_index_entrypoints(doc_path: str, by_domain: Mapping[str, Sequence[RouteEntry]]) -> str:
     rows: List[List[str]] = []
     for domain in sorted(BACKEND_DOMAIN_META):
         routes = list(by_domain.get(domain, []))
-        router = f"backend/api/{domain}_router.py"
+        router = f"app_server/api/{domain}_router.py"
         router_cell = f"[`{router}`]({rel_link(doc_path, router)})"
-        doc_file = f"docs/backend/domains/{domain}.md"
+        doc_file = f"docs/app_server/domains/{domain}.md"
         doc_cell = f"[`{domain}.md`]({rel_link(doc_path, doc_file)})"
         rows.append([f"`{domain}`", router_cell, str(len(routes)), doc_cell])
     return md_table(["Domain", "Router", "Route Count", "Domain Index"], rows)
@@ -1183,23 +1183,23 @@ def render_backend_index_entrypoints(doc_path: str, by_domain: Mapping[str, Sequ
 def render_root_key_files(doc_path: str) -> str:
     files = [
         ("docs/frontend/INDEX.md", "Frontend module index."),
-        ("docs/backend/INDEX.md", "Backend domain index."),
+        ("docs/app_server/INDEX.md", "App-server domain index."),
         ("docs/runtime/config_paths.md", "Runtime config and path index."),
         ("docs/runtime/data_cache_files.md", "Runtime cache/data file index."),
         ("docs/build/packaging.md", "Build and packaging index."),
-        ("docs/generated/backend_routes.md", "Generated route inventory."),
+        ("docs/generated/app_server_routes.md", "Generated route inventory."),
         ("docs/generated/frontend_entrypoints.md", "Generated frontend entrypoint inventory."),
         ("docs/generated/file_manifest.md", "Generated repository file manifest."),
     ]
     return render_key_files_block(doc_path, files)
 
 
-def render_backend_index_key_files(doc_path: str) -> str:
+def render_app_server_index_key_files(doc_path: str) -> str:
     files = [
-        ("backend/main.py", "FastAPI app creation, router registration, static mount."),
-        ("backend/api/__init__.py", "Router exports consumed by app startup."),
-        ("backend/config.py", "Runtime path/config constants and helpers."),
-        ("backend/helpers.py", "Cross-domain utility helpers."),
+        ("app_server/main.py", "FastAPI app creation, router registration, static mount."),
+        ("app_server/api/__init__.py", "Router exports consumed by app startup."),
+        ("app_server/config.py", "Runtime path/config constants and helpers."),
+        ("app_server/helpers.py", "Cross-domain utility helpers."),
     ]
     return render_key_files_block(doc_path, files)
 
@@ -1219,7 +1219,7 @@ def render_frontend_index_key_files(doc_path: str) -> str:
 def render_runtime_config_entrypoints(path_functions: Sequence[str], ui_config_routes: Sequence[RouteEntry]) -> str:
     lines: List[str] = []
     if path_functions:
-        lines.append("- Path/config helper functions in `backend/config.py`:")
+        lines.append("- Path/config helper functions in `app_server/config.py`:")
         lines.extend([f"  - `{name}`" for name in path_functions])
     else:
         lines.append("- No config helper functions discovered.")
@@ -1242,7 +1242,7 @@ def render_runtime_data_entrypoints(routes: Sequence[RouteEntry]) -> str:
 
 def render_runtime_data_key_files(doc_path: str, constants: Sequence[str]) -> str:
     cache_constants = [c for c in constants if c.endswith("_FILE") or c.endswith("_LOCK")]
-    lines = [render_key_files_block(doc_path, [("backend/config.py", "Cache/data file names and lock constants.")])]
+    lines = [render_key_files_block(doc_path, [("app_server/config.py", "Cache/data file names and lock constants.")])]
     if cache_constants:
         lines.append("")
         lines.append("Cache/lock constants detected:")
@@ -1252,10 +1252,10 @@ def render_runtime_data_key_files(doc_path: str, constants: Sequence[str]) -> st
 
 def render_runtime_config_key_files(doc_path: str) -> str:
     files = [
-        ("backend/config.py", "Primary runtime path + config module."),
-        ("backend/api/ui_config_router.py", "HTTP interface for root path updates."),
+        ("app_server/config.py", "Primary runtime path + config module."),
+        ("app_server/api/ui_config_router.py", "HTTP interface for root path updates."),
         ("ui_config.json", "Persisted root path and subpath config."),
-        ("backend/main.py", "App bootstrap and static path mounting."),
+        ("app_server/main.py", "App bootstrap and static path mounting."),
     ]
     return render_key_files_block(doc_path, files)
 
@@ -1277,8 +1277,8 @@ def render_build_entrypoints(package_info: Mapping[str, object]) -> str:
 def render_build_key_files(doc_path: str) -> str:
     files = [
         ("package.json", "Build scripts, Electron builder config, installer metadata."),
-        ("build/server.spec", "PyInstaller spec for Python backend executable."),
-        ("build/server_entry.py", "PyInstaller entrypoint for the bundled backend server."),
+        ("build/server.spec", "PyInstaller spec for Python app-server executable."),
+        ("build/server_entry.py", "PyInstaller entrypoint for the bundled app server."),
         ("build/release_notes.py", "Release fragment validator and versioned release note generator."),
         ("electron_main.js", "Electron main process entry."),
         ("app_launcher.py", "Python host launcher used by packaged runtime."),
@@ -1302,8 +1302,8 @@ def build_autogen_blocks(
     blocks["root.key_files"] = render_root_key_files("docs/INDEX.md")
     blocks["frontend.index.entry_points"] = render_frontend_index_entrypoints(entrypoints)
     blocks["frontend.index.key_files"] = render_frontend_index_key_files("docs/frontend/INDEX.md")
-    blocks["backend.index.entry_points"] = render_backend_index_entrypoints("docs/backend/INDEX.md", by_domain)
-    blocks["backend.index.key_files"] = render_backend_index_key_files("docs/backend/INDEX.md")
+    blocks["app_server.index.entry_points"] = render_app_server_index_entrypoints("docs/app_server/INDEX.md", by_domain)
+    blocks["app_server.index.key_files"] = render_app_server_index_key_files("docs/app_server/INDEX.md")
 
     for name, meta in FRONTEND_DOC_META.items():
         html_files = meta["html"]  # type: ignore[index]
@@ -1324,8 +1324,8 @@ def build_autogen_blocks(
 
     for domain, meta in BACKEND_DOMAIN_META.items():
         domain_routes = by_domain.get(domain, [])
-        blocks[f"backend.{domain}.entry_points"] = render_route_table_for_doc(meta["doc"], domain_routes)  # type: ignore[index]
-        blocks[f"backend.{domain}.key_files"] = render_key_files_block(meta["doc"], meta["files"])  # type: ignore[index]
+        blocks[f"app_server.{domain}.entry_points"] = render_route_table_for_doc(meta["doc"], domain_routes)  # type: ignore[index]
+        blocks[f"app_server.{domain}.key_files"] = render_key_files_block(meta["doc"], meta["files"])  # type: ignore[index]
 
     ui_config_routes = by_domain.get("ui_config", [])
     blocks["runtime.config_paths.entry_points"] = render_runtime_config_entrypoints(path_functions, ui_config_routes)
@@ -1338,23 +1338,23 @@ def build_autogen_blocks(
     return blocks
 
 
-def render_backend_routes_generated(routes: Sequence[RouteEntry]) -> str:
+def render_app_server_routes_generated(routes: Sequence[RouteEntry]) -> str:
     by_domain = routes_by_domain(routes)
     lines: List[str] = []
-    lines.append("# Backend Route Inventory")
+    lines.append("# App Server Route Inventory")
     lines.append("")
     lines.append("Generated by `python tools/docs_index_builder.py --write`.")
     lines.append("")
     summary_rows: List[List[str]] = []
     for domain in sorted(BACKEND_DOMAIN_META):
         domain_routes = by_domain.get(domain, [])
-        router = f"backend/api/{domain}_router.py"
+        router = f"app_server/api/{domain}_router.py"
         summary_rows.append(
             [
                 f"`{domain}`",
                 f"`{router}`",
                 str(len(domain_routes)),
-                f"[Open Domain Index](../backend/domains/{domain}.md)",
+                f"[Open Domain Index](../app_server/domains/{domain}.md)",
             ]
         )
     lines.append("## Domain Summary")
@@ -1364,7 +1364,7 @@ def render_backend_routes_generated(routes: Sequence[RouteEntry]) -> str:
         lines.append(f"## {domain}")
         lines.append("")
         domain_routes = by_domain.get(domain, [])
-        lines.append(render_route_table_for_doc("docs/generated/backend_routes.md", domain_routes))
+        lines.append(render_route_table_for_doc("docs/generated/app_server_routes.md", domain_routes))
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -1434,7 +1434,7 @@ def generated_docs_payload(
     manifest: Sequence[ManifestEntry],
 ) -> Dict[str, str]:
     return {
-        "docs/generated/backend_routes.md": render_backend_routes_generated(routes),
+        "docs/generated/app_server_routes.md": render_app_server_routes_generated(routes),
         "docs/generated/frontend_entrypoints.md": render_frontend_entrypoints_generated(entrypoints),
         "docs/generated/file_manifest.md": render_manifest_generated(manifest),
     }
@@ -1454,7 +1454,7 @@ def scaffold_missing(templates: Mapping[str, str]) -> List[str]:
 def apply_write(templates: Mapping[str, str]) -> Tuple[List[str], List[str]]:
     created = scaffold_missing(templates)
 
-    routes = parse_backend_routes()
+    routes = parse_app_server_routes()
     entrypoints = parse_frontend_entrypoints()
     manifest = collect_manifest()
     path_functions, constants = parse_config_signals()
@@ -1513,7 +1513,7 @@ def run_check(templates: Mapping[str, str]) -> Tuple[int, List[str]]:
         if not (REPO_ROOT / rel).exists():
             issues.append(f"Missing required file: {rel}")
 
-    routes = parse_backend_routes()
+    routes = parse_app_server_routes()
     entrypoints = parse_frontend_entrypoints()
     manifest = collect_manifest()
     path_functions, constants = parse_config_signals()

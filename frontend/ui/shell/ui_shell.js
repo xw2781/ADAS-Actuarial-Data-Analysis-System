@@ -311,7 +311,7 @@ async function openRootPathSettingsModal() {
   const input = $("rootPathInput");
   if (!overlay || !input) return;
   
-  // Load current value from backend
+  // Load current value from the app server.
   try {
     const res = await fetch("/ui_config");
     if (res.ok) {

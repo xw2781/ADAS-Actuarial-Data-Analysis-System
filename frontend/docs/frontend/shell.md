@@ -54,8 +54,8 @@ Detected `adas:*` message types in key JS files:
 ## External Interfaces
 <!-- MANUAL:BEGIN -->
 - Communicates with child iframes via `adas:*` postMessage events.
-- Invokes backend for workflow import helpers and configuration endpoints.
-- Uses Electron host bridge for shutdown/clear-cache actions; backend startup is host-managed with retry on transient launch failures.
+- Invokes app-server endpoints for workflow import helpers and configuration endpoints.
+- Uses Electron host bridge for shutdown/clear-cache actions; app-server startup is host-managed with retry on transient launch failures.
 - Consumes dataset-page browsing updates (`adas:dataset-settings-changed`, `adas:browsing-history-updated`) and forwards updates to any open Browsing History tab.
 - Receives `adas:open-dataset-from-history` from Browsing History tab to open dataset tabs with selected inputs.
 <!-- MANUAL:END -->
@@ -77,5 +77,5 @@ Detected `adas:*` message types in key JS files:
 <!-- MANUAL:BEGIN -->
 - DOM replacement in shell can invalidate iframe references.
 - Unsaved-state handling must stay consistent for close/close-all flows.
-- Host/backend startup races can surface as blank shell or startup timeout if lifecycle flags/process teardown are not coordinated.
+- Host/app-server startup races can surface as blank shell or startup timeout if lifecycle flags/process teardown are not coordinated.
 <!-- MANUAL:END -->

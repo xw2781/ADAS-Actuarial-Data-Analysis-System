@@ -294,7 +294,7 @@ export async function getRatioDataDir() {
 }
 
 export function getResultsCsvSuggestedName(options = {}) {
-  // Keep CSV naming aligned with backend set_data_path_like_vba for ADASTri so
+  // Keep CSV naming aligned with app-server set_data_path_like_vba for ADASTri so
   // Dataset Viewer can find DFM-produced files via standard /adas/tri refresh.
   const pathRaw = typeof options.path === "string"
     ? options.path

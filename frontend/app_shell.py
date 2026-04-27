@@ -17,7 +17,7 @@ def build_cmd(host: str, port: int, reload: bool) -> list[str]:
         sys.executable,
         "-m",
         "uvicorn",
-        "backend.main:app",
+        "app_server.main:app",
         "--host",
         host,
         "--port",

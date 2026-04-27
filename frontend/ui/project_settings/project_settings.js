@@ -2788,7 +2788,7 @@ async function createProjectInFolder(folderNode) {
     const saveResult = await saveRes.json();
     currentMtime = saveResult.mtime;
 
-    // 4) Commit in-memory/UI after backend succeeds.
+    // 4) Commit in-memory/UI after the app server succeeds.
     sheet.rows.push(newRow);
     projectData.customFolders = foldersNext;
     projectData.projectPaths = projectPathsNext;
@@ -2974,7 +2974,7 @@ async function renameProject(project) {
     const saveResult = await saveRes.json();
     currentMtime = saveResult.mtime;
 
-    // 4) Commit UI updates only after backend steps succeed.
+    // 4) Commit UI updates only after app-server steps succeed.
     project._row[nameIdx] = newName;
     project.name = newName;
     projectData.projectPaths = projectPathsNext;
@@ -3152,7 +3152,7 @@ async function duplicateProject(project) {
     const saveResult = await saveRes.json();
     currentMtime = saveResult.mtime;
 
-    // 4) Commit to in-memory/UI only after backend steps succeed.
+    // 4) Commit to in-memory/UI only after app-server steps succeed.
     sheet.rows.push(newRow);
     projectData.projectPaths = projectPathsNext;
     buildTreeData();

@@ -48,7 +48,7 @@ Detected `adas:*` message types in key JS files:
 
 ## External Interfaces
 <!-- MANUAL:BEGIN -->
-- Calls `/workflow/*` backend routes.
+- Calls `/workflow/*` app-server routes.
 - Coordinates with shell and embedded dataset/DFM iframes via message bridge.
 - For DFM embeds, preserves optional `outputType` in step settings and forwards it as `output_type` URL param.
 <!-- MANUAL:END -->
@@ -64,7 +64,7 @@ Detected `adas:*` message types in key JS files:
 
 ## Common Change Tasks
 <!-- MANUAL:BEGIN -->
-1. Extend workflow payload: update `workflow_main.js`, backend schema/service, and save/load compatibility.
+1. Extend workflow payload: update `workflow_main.js`, app-server schema/service, and save/load compatibility.
 2. Add sidebar behavior: update `workflow.html` + resize/collapse handlers.
 <!-- MANUAL:END -->
 
