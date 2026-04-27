@@ -1,0 +1,10 @@
+{
+  "type": "improvement",
+  "scope": "developer workflow",
+  "audience": "internal",
+  "summary": "Added a reusable agent commit-and-push helper.",
+  "details": [
+    "Agents now have a guarded root-level PowerShell workflow for staging, committing with a conversation-specific message, validating the GitHub remote, and pushing the active branch.",
+    "The local repository bootstrap now uses a single ArcRho root Git repository with ignore rules for dependencies, bundled toolchains, build outputs, caches, and editor state."
+  ]
+}

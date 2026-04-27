@@ -1,0 +1,2115 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Project Explorer</title>
+  <style>
+    :root {
+      --border: #ddd;
+      --table-border-width: 0.5px;
+      --muted: #666;
+      --bg: #fff;
+      --tree-indent: 8px;
+      --folder-bg: #f8f9fa;
+      --folder-hover: #e9ecef;
+      --project-hover: #fff3cd;
+      --active-bg: #cfe2ff;
+    }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+    input, textarea, select, option, [contenteditable="true"] { user-select: text; }
+
+    /* Global Scrollbar (match dataset_shared.css style) */
+    ::-webkit-scrollbar {
+      width: 23px;
+      height: 23px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background-color: rgba(182, 182, 182, 0.2);
+      border-radius: 6px;
+      border: 3px solid transparent;
+      background-clip: content-box;
+      transition: background-color 0.2s ease;
+    }
+    body.show-scrollbar ::-webkit-scrollbar-thumb {
+      background-color: rgba(120, 120, 120, 0.267);
+    }
+    body.show-scrollbar ::-webkit-scrollbar-thumb:hover {
+      background-color: rgba(90, 90, 90, 0.233);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background-color: rgba(90, 90, 90, 0.377);
+    }
+
+    /* Main layout */
+    .main {
+      display: flex;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* Tree panel */
+    .tree-panel {
+      width: 320px;
+      min-width: 200px;
+      max-width: 500px;
+      flex: 0 0 auto;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: #fdfdfd;
+    }
+    .tree-header {
+      padding: 12px 14px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #333;
+      border-bottom: 1px solid var(--border);
+    }
+    .tree-content {
+      flex: 1 1 auto;
+      overflow: auto;
+      padding: 8px 0;
+    }
+
+    /* Tree nodes */
+    .tree-node {
+      user-select: none;
+    }
+    .tree-folder {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #333;
+      background: transparent;
+      transition: background 0.1s;
+    }
+    .tree-folder:hover {
+      background: var(--folder-hover);
+    }
+    .tree-folder-arrow {
+      width: 14px;
+      height: 14px;
+      color: #888;
+      flex-shrink: 0;
+      transition: transform 0.15s ease;
+    }
+    .tree-folder-arrow svg {
+      width: 100%;
+      height: 100%;
+    }
+    .tree-folder-arrow.expanded {
+      transform: rotate(90deg);
+    }
+    .tree-folder-icon {
+      width: 16px;
+      height: 16px;
+      color: #f0ad4e;
+      flex-shrink: 0;
+    }
+    .tree-folder-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    .tree-folder-icon.expanded {
+      color: #ec971f;
+    }
+    .tree-folder-name {
+      font-weight: 500;
+    }
+    .tree-folder-count {
+      margin-left: auto;
+      font-size: 11px;
+      color: #999;
+      background: #eee;
+      padding: 1px 6px;
+      border-radius: 10px;
+    }
+    .tree-children {
+      display: none;
+      padding-left: var(--tree-indent);
+    }
+    .tree-children.expanded {
+      display: block;
+    }
+
+    /* Project items */
+    .tree-project {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px 5px 28px;
+      cursor: pointer;
+      font-size: 12px;
+      color: #444;
+      transition: background 0.1s;
+    }
+    .tree-project:hover {
+      background: var(--project-hover);
+    }
+    .tree-project.active {
+      background: var(--active-bg);
+    }
+    .tree-project.dragging {
+      opacity: 0.5;
+    }
+    .tree-folder.dragging {
+      opacity: 0.5;
+    }
+    .tree-folder.drop-target {
+      background: #d4edda;
+      border: 2px dashed #28a745;
+      border-radius: 4px;
+    }
+
+    /* Context Menu */
+    .context-menu {
+      display: none;
+      position: fixed;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      padding: 4px 0;
+      min-width: 140px;
+      z-index: 1000;
+    }
+    .context-menu.show {
+      display: block;
+    }
+    .context-menu-item {
+      padding: 8px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      color: #333;
+    }
+    .context-menu-item:hover {
+      background: #f0f0f0;
+    }
+    .context-menu-item.danger {
+      color: #dc3545;
+    }
+    .context-menu-item.danger:hover {
+      background: #ffeaea;
+    }
+    .context-menu-divider {
+      height: 1px;
+      background: #eee;
+      margin: 4px 0;
+    }
+    #reservingClassTypesRowContextMenu .context-menu-item {
+      padding: 6px 16px;
+      line-height: 1.2;
+    }
+    #reservingClassTypesRowContextMenu .context-menu-divider {
+      margin: 2px 0;
+    }
+    #datasetTypesRowContextMenu .context-menu-item {
+      padding: 6px 16px;
+      line-height: 1.2;
+    }
+    #datasetTypesRowContextMenu .context-menu-divider {
+      margin: 2px 0;
+    }
+
+    /* Custom Dialog */
+    .dialog-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+    .dialog-overlay.show {
+      display: flex;
+    }
+    .dialog-box {
+      background: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      min-width: 320px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    .dialog-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #333;
+    }
+    .dialog-input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      box-sizing: border-box;
+      user-select: text;
+      -webkit-user-select: text;
+      pointer-events: auto;
+    }
+    .dialog-input:focus {
+      outline: none;
+      border-color: #0d6efd;
+    }
+    .dialog-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .dialog-btn {
+      padding: 8px 16px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .dialog-btn:hover {
+      background: #f5f5f5;
+    }
+    .dialog-btn.primary {
+      background: #0d6efd;
+      color: #fff;
+      border-color: #0d6efd;
+    }
+    .dialog-btn.primary:hover {
+      background: #0b5ed7;
+    }
+    .dialog-btn.danger {
+      background: #dc3545;
+      color: #fff;
+      border-color: #dc3545;
+    }
+    .dialog-btn.danger:hover {
+      background: #bb2d3b;
+    }
+    .dialog-message {
+      font-size: 13px;
+      color: #333;
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+    .tree-project-icon {
+      width: 16px;
+      height: 16px;
+      color: #6c757d;
+      flex-shrink: 0;
+    }
+    .tree-project-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    .tree-project.active .tree-project-icon {
+      color: #0d6efd;
+    }
+    .tree-project-name {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* Detail panel */
+    .detail-panel {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      background: var(--bg);
+    }
+    .detail-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      color: #999;
+      font-size: 14px;
+    }
+    .detail-header {
+      padding: 12px 16px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .detail-header::after {
+      content: "";
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: 0;
+      height: 1px;
+      background: var(--border);
+    }
+    .detail-title {
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .detail-rename-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      color: #888;
+      display: inline-flex;
+      align-items: center;
+      border-radius: 4px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .detail-rename-btn:hover {
+      color: #0d6efd;
+      background: #e9ecef;
+    }
+    .detail-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 8px;
+    }
+    .detail-actions button {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .detail-actions button:hover {
+      background: #f5f5f5;
+    }
+    .detail-actions button.primary {
+      background: #0d6efd;
+      color: #fff;
+      border-color: #0d6efd;
+    }
+    .detail-actions button.primary:hover {
+      background: #0b5ed7;
+    }
+    .detail-open-folder-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      border-color: #b8cff8;
+      color: #0b4ca8;
+      background: linear-gradient(180deg, #f9fbff 0%, #edf4ff 100%);
+      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+    }
+    .detail-open-folder-btn svg {
+      width: 13px;
+      height: 13px;
+      stroke-width: 1.9;
+      flex-shrink: 0;
+    }
+    .detail-open-folder-btn:hover:not(:disabled) {
+      background: linear-gradient(180deg, #edf4ff 0%, #dfeeff 100%);
+      border-color: #97b8ef;
+      color: #083c87;
+    }
+    .detail-open-folder-btn:disabled {
+      cursor: not-allowed;
+      color: #7f92b3;
+      border-color: #d8e0ee;
+      background: #f5f7fb;
+      box-shadow: none;
+    }
+    .detail-content {
+      flex: 1 1 auto;
+      overflow: hidden;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    /* Detail form */
+    .detail-form {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 12px 16px;
+      flex-shrink: 0;
+      max-width: 700px;
+    }
+    .detail-label {
+      font-size: 12px;
+      color: #555;
+      text-align: right;
+      padding-top: 6px;
+    }
+    .detail-value {
+      font-size: 13px;
+    }
+    .detail-value input {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+    .detail-value input:read-only {
+      background: #f5f5f5;
+      color: #666;
+    }
+
+    /* Resize handle */
+    .resize-handle {
+      width: 4px;
+      cursor: col-resize;
+      background: transparent;
+      transition: background 0.2s;
+    }
+    .resize-handle:hover {
+      background: #ddd;
+    }
+
+    /* Table Summary */
+    .table-summary {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    .summary-header {
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 12px;
+    }
+    .summary-table-path {
+      display: grid;
+      grid-template-columns: auto minmax(320px, 1fr) auto auto;
+      gap: 8px 12px;
+      align-items: center;
+      margin-bottom: 12px;
+      max-width: none;
+    }
+    .summary-table-path-label {
+      font-size: 12px;
+      color: #555;
+      text-align: left;
+    }
+    .summary-table-path-input {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+    .summary-table-path-input:disabled {
+      background: #f5f5f5;
+      color: #666;
+    }
+    .summary-table-path-browse {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+      color: #333;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .summary-table-path-browse:hover:not(:disabled) {
+      background: #f5f5f5;
+    }
+    .summary-table-path-browse:disabled {
+      color: #888;
+      background: #f5f5f5;
+      cursor: not-allowed;
+    }
+    .summary-derived-dates {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 24px;
+      margin-bottom: 12px;
+      max-width: none;
+    }
+    .summary-derived-frame {
+      margin: 0;
+      padding: 6px 12px 10px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 5px;
+      min-width: 0;
+    }
+    .summary-derived-frame-label {
+      padding: 0 6px 0 0;
+      font-size: 12px;
+      color: #555;
+    }
+    .summary-derived-frame-body {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 24px;
+      min-width: 0;
+    }
+    .summary-derived-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .summary-derived-label {
+      font-size: 12px;
+      color: #555;
+      text-align: left;
+      white-space: nowrap;
+    }
+    .summary-derived-input {
+      width: 100%;
+      padding: 4px 24px 4px 6px;
+      border: 1px solid var(--border);
+      border-radius: 0;
+      font-size: 12px;
+      box-sizing: border-box;
+      height: 26px;
+    }
+    .summary-derived-field {
+      position: relative;
+      width: 110px;
+    }
+    .summary-derived-stepper {
+      position: absolute;
+      right: 1px;
+      top: 1px;
+      bottom: 1px;
+      width: 20px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-left: 1px solid #d9d9d9;
+      border-radius: 0;
+    }
+    .summary-derived-step-btn {
+      flex: 1 1 auto;
+      border: 0;
+      padding: 0;
+      margin: 0;
+      background: #f7f7f7;
+      color: #555;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .summary-derived-step-btn + .summary-derived-step-btn {
+      border-top: 1px solid #d9d9d9;
+    }
+    .summary-derived-step-btn svg {
+      width: 9px;
+      height: 9px;
+      pointer-events: none;
+    }
+    .summary-derived-step-btn:hover {
+      background: #ececec;
+    }
+    .summary-derived-step-btn:disabled {
+      color: #999;
+      cursor: not-allowed;
+      background: #f3f3f3;
+    }
+    @media (max-width: 1160px) {
+      .summary-derived-dates {
+        gap: 8px 14px;
+      }
+      .summary-derived-frame {
+        width: 100%;
+        max-width: 694px;
+      }
+      .summary-derived-frame-body {
+        width: 100%;
+        gap: 8px 14px;
+      }
+      .summary-derived-group {
+        width: 100%;
+        max-width: 340px;
+        display: grid;
+        grid-template-columns: auto 148px;
+        column-gap: 8px;
+      }
+    }
+    .summary-stats {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .stat-label {
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+    }
+    .stat-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+    }
+    .summary-columns {
+      margin-top: 12px;
+      flex: 1 1 0;
+      min-height: 300px;
+      overflow: auto;
+      position: relative;
+      border: var(--table-border-width) solid var(--border);
+      border-radius: 6px;
+      background: #fafafa;
+    }
+    .summary-columns::before,
+    .field-mapping-grid::before,
+    .dataset-types-grid::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 1px;
+      background: #f5f5f5;
+      pointer-events: none;
+      z-index: 3;
+    }
+    .columns-table {
+      width: 100%;
+      max-width: 900px;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .columns-table th,
+    .columns-table td {
+      padding: 6px 10px;
+      border: var(--table-border-width) solid var(--border);
+      text-align: left;
+    }
+    .columns-table th {
+      background: #f5f5f5;
+      font-weight: 600;
+      color: #555;
+      position: sticky;
+      top: calc(-1 * var(--table-border-width));
+      z-index: 2;
+      background-clip: padding-box;
+    }
+    .columns-table td.col-name {
+      font-weight: 500;
+    }
+    .columns-table td.col-type {
+      color: #666;
+      min-width: 70px;
+      white-space: nowrap;
+    }
+    .columns-table td.col-sample {
+      color: #555;
+      font-size: 11px;
+      max-width: 350px;
+      word-wrap: break-word;
+      white-space: normal;
+    }
+    .summary-loading {
+      color: #888;
+      font-size: 12px;
+      font-style: italic;
+    }
+    .summary-error {
+      color: #dc3545;
+      font-size: 12px;
+    }
+
+    /* Ribbon bar */
+    .ribbon-bar {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--border);
+      margin-top: 1px;
+      padding: 0 0 0 0;
+      flex-shrink: 0;
+    }
+    .ribbon-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 10px 18px 8px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+      background: transparent;
+      transition: background 0.15s, border-color 0.15s;
+      position: relative;
+      bottom: -2px;
+      min-width: 72px;
+    }
+    .ribbon-item:hover {
+      background: #e9ecef;
+    }
+    .ribbon-item.active {
+      background: #fff;
+      border-color: var(--border);
+      border-bottom: 2px solid #fff;
+    }
+    .ribbon-icon {
+      width: 28px;
+      height: 28px;
+      color: #555;
+    }
+    .ribbon-item.active .ribbon-icon {
+      color: #0d6efd;
+    }
+    .ribbon-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    .ribbon-label {
+      font-size: 11px;
+      color: #555;
+      white-space: nowrap;
+      font-weight: 500;
+      text-align: center;
+    }
+    .ribbon-item.active .ribbon-label {
+      color: #0d6efd;
+      font-weight: 600;
+    }
+
+    /* Ribbon content panels */
+    .ribbon-content-area {
+      flex: 1 1 auto;
+      overflow: hidden;
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .ribbon-panel {
+      display: none;
+    }
+    .ribbon-panel.active {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    .ribbon-panel-placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+      color: #999;
+      font-size: 13px;
+      font-style: italic;
+    }
+
+    /* Field Mapping */
+    .field-mapping-panel {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    .field-mapping-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .field-mapping-help {
+      font-size: 12px;
+      color: #666;
+      flex: 1 1 auto;
+    }
+    .field-mapping-toolbar button {
+      padding: 6px 12px;
+      border: 1px solid #0d6efd;
+      border-radius: 6px;
+      background: #0d6efd;
+      color: #fff;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .field-mapping-toolbar button:hover {
+      background: #0b5ed7;
+    }
+    .field-mapping-status {
+      font-size: 12px;
+      color: #666;
+      min-height: 16px;
+      margin-bottom: 8px;
+    }
+    .field-mapping-status.error {
+      color: #dc3545;
+    }
+    .field-mapping-grid {
+      width: 100%;
+      max-width: 1280px;
+      flex: 1 1 0;
+      min-height: 300px;
+      overflow: auto;
+      position: relative;
+      border: var(--table-border-width) solid var(--border);
+      border-radius: 6px;
+      background: #fafafa;
+    }
+    .field-mapping-table {
+      width: 100%;
+      min-width: 100%;
+      max-width: 1280px;
+      border-collapse: collapse;
+      font-size: 12px;
+      background: #fff;
+      table-layout: fixed;
+    }
+    .field-mapping-table th,
+    .field-mapping-table td {
+      padding: 6px 10px;
+      border: var(--table-border-width) solid var(--border);
+      text-align: left;
+      vertical-align: middle;
+    }
+    .field-mapping-table td {
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .field-mapping-table th {
+      background: #f5f5f5;
+      font-weight: 600;
+      color: #555;
+      position: sticky;
+      top: calc(-1 * var(--table-border-width));
+      z-index: 2;
+      background-clip: padding-box;
+    }
+    .field-mapping-table th {
+      white-space: normal;
+      word-break: break-word;
+    }
+    .field-mapping-table td input[type="number"],
+    .field-mapping-table td input[type="text"][data-role="dataset-type"],
+    .field-mapping-table td input[type="text"][data-role="significance"] {
+      width: 100%;
+      box-sizing: border-box;
+      border: 0;
+      border-radius: 0;
+      padding: 2px 4px;
+      font-size: 12px;
+      background: transparent;
+      outline: none;
+    }
+    .field-mapping-table td .fm-inline-dropdown-wrap {
+      position: relative;
+      width: 100%;
+    }
+    .field-mapping-table td input[type="text"][data-role="dataset-type"],
+    .field-mapping-table td input[type="text"][data-role="significance"] {
+      padding-right: 22px;
+    }
+    .field-mapping-table td input[type="number"]:disabled {
+      background: #f3f3f3;
+      color: #999;
+    }
+    .field-mapping-table td input[type="text"][data-role="dataset-type"]:disabled {
+      background: #f3f3f3;
+      color: #999;
+    }
+    .field-mapping-table td .fm-inline-dropdown-arrow {
+      position: absolute;
+      right: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: #6f7f92;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+    }
+    .field-mapping-table td .fm-inline-dropdown-arrow:hover {
+      background: #eef3fa;
+      color: #3f566f;
+    }
+    .field-mapping-table td .fm-inline-dropdown-arrow:disabled {
+      color: #b7c2cf;
+      cursor: default;
+      background: transparent;
+    }
+    .field-mapping-table td .fm-inline-dropdown-arrow svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+    .fm-dataset-type-dropdown {
+      position: fixed;
+      z-index: 3300;
+      min-width: 220px;
+      max-width: 460px;
+      max-height: 280px;
+      border: 1px solid #cfd8e3;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 14px 32px rgba(15, 23, 42, 0.18);
+      padding: 4px;
+      display: none;
+    }
+    .fm-dataset-type-dropdown.open {
+      display: block;
+    }
+    .fm-dataset-type-dropdown-list {
+      max-height: 270px;
+      overflow: auto;
+      display: block;
+      line-height: normal;
+    }
+    .fm-dataset-type-option {
+      appearance: none;
+      -webkit-appearance: none;
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 30px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: #233548;
+      font-size: 12px;
+      line-height: 18px;
+      text-align: left;
+      padding: 6px 8px;
+      margin: 0 0 2px;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .fm-dataset-type-option:last-child {
+      margin-bottom: 0;
+    }
+    .fm-dataset-type-option:hover {
+      background: #eaf2ff;
+      color: #133255;
+    }
+    .fm-dataset-type-option.active {
+      background: #dbeafe;
+      color: #0f3b82;
+      font-weight: 600;
+    }
+    .fm-dataset-type-empty {
+      color: #7a8696;
+      font-size: 12px;
+      padding: 8px;
+    }
+    .field-mapping-empty {
+      color: #999;
+      font-style: italic;
+      text-align: center;
+    }
+
+    /* Dataset Types */
+    .dataset-types-panel {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    .dataset-types-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .dataset-types-help {
+      font-size: 12px;
+      color: #666;
+      flex: 1 1 auto;
+    }
+    .dataset-types-toolbar button {
+      padding: 6px 12px;
+      border: 1px solid #0d6efd;
+      border-radius: 6px;
+      background: #0d6efd;
+      color: #fff;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .dataset-types-toolbar button:hover {
+      background: #0b5ed7;
+    }
+    .dataset-types-status {
+      font-size: 12px;
+      color: #666;
+      min-height: 16px;
+      margin-bottom: 8px;
+      max-width: 100%;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      flex-wrap: wrap;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .dataset-types-status-text {
+      min-width: 0;
+    }
+    .dataset-types-status-see-more {
+      border: 0;
+      padding: 0;
+      margin: 0;
+      background: transparent;
+      color: inherit;
+      font-size: 12px;
+      line-height: 1.2;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .dataset-types-status-see-more:hover {
+      opacity: 0.9;
+    }
+    .dataset-types-status.error {
+      color: #dc3545;
+    }
+    .dataset-types-error-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(10, 16, 26, 0.35);
+      z-index: 4300;
+    }
+    .dataset-types-error-overlay.show {
+      display: flex;
+    }
+    .dataset-types-error-dialog {
+      width: min(980px, calc(100vw - 48px));
+      max-height: min(72vh, 760px);
+      background: #fff;
+      border: 1px solid #cbd3de;
+      border-radius: 10px;
+      box-shadow: 0 16px 34px rgba(0, 0, 0, 0.24);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .dataset-types-error-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border-bottom: 1px solid #e6eaf0;
+      font-size: 13px;
+      font-weight: 600;
+      color: #2f3a4a;
+      background: #f8fafc;
+    }
+    .dataset-types-error-close {
+      width: 24px;
+      height: 24px;
+      border: 1px solid #c8cfda;
+      border-radius: 5px;
+      background: #fff;
+      color: #445168;
+      cursor: pointer;
+      line-height: 1;
+      font-size: 14px;
+      padding: 0;
+    }
+    .dataset-types-error-close:hover {
+      background: #f2f6ff;
+      border-color: #9bb3da;
+    }
+    .dataset-types-error-body {
+      padding: 10px 14px;
+      overflow: auto;
+      font-size: 12px;
+      color: #2c3545;
+      line-height: 1.35;
+    }
+    .dataset-types-error-line {
+      padding: 3px 0;
+      border-bottom: 1px solid #f0f2f6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .dataset-types-error-line:last-child {
+      border-bottom: 0;
+    }
+    .dataset-types-grid {
+      width: 100%;
+      max-width: 1400px;
+      flex: 1 1 0;
+      min-height: 300px;
+      overflow: auto;
+      position: relative;
+      border: var(--table-border-width) solid var(--border);
+      border-radius: 6px;
+      background: #fafafa;
+    }
+    .dataset-types-table {
+      width: 100%;
+      min-width: 100%;
+      max-width: 1400px;
+      border-collapse: collapse;
+      font-size: 12px;
+      background: #fff;
+      table-layout: fixed;
+    }
+    .dataset-types-table th,
+    .dataset-types-table td {
+      padding: 6px 10px;
+      border: var(--table-border-width) solid var(--border);
+      text-align: left;
+      vertical-align: middle;
+    }
+    .dataset-types-table td {
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .dataset-types-table th {
+      background: #f5f5f5;
+      font-weight: 600;
+      color: #555;
+      position: sticky;
+      top: calc(-1 * var(--table-border-width));
+      z-index: 2;
+      background-clip: padding-box;
+    }
+    .dataset-types-table th {
+      white-space: normal;
+      word-break: break-word;
+    }
+    .dataset-types-table td textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border: 0;
+      border-radius: 0;
+      padding: 2px 4px;
+      font-size: 12px;
+      line-height: 16px;
+      min-height: 20px;
+      max-height: none;
+      background: transparent;
+      resize: none;
+      overflow-y: hidden;
+      white-space: pre-wrap;
+      word-break: break-word;
+      outline: none;
+      font-family: inherit;
+    }
+    .dataset-types-table td textarea:disabled {
+      background: transparent;
+      color: #999;
+    }
+    .dataset-types-table td.invalid-formula-cell {
+      background: #fff5f5;
+      box-shadow: inset 0 0 0 1px #dc3545;
+    }
+    .dataset-types-table td.invalid-formula-cell textarea {
+      background: #fff5f5;
+    }
+    .dt-group-row td {
+      background: #f0f3f7;
+      font-weight: 600;
+      color: #2f3a4a;
+      padding: 4px 8px;
+      user-select: none;
+    }
+    .dt-group-row.collapsed td {
+      background: #e9edf4;
+    }
+    .dt-group-header {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dt-group-toggle {
+      width: 18px;
+      height: 18px;
+      border: 1px solid #b8c2cf;
+      border-radius: 4px;
+      background: #fff;
+      color: #33455f;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      padding: 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+    .dt-group-toggle:hover {
+      border-color: #8ea5c8;
+      background: #f6f9ff;
+      color: #1f3658;
+    }
+    .dt-group-toggle:focus-visible {
+      outline: 2px solid #6d9dff;
+      outline-offset: 1px;
+    }
+    .dt-group-label {
+      line-height: 1.2;
+    }
+    #datasetTypesTable th.dt-sortable-col {
+      cursor: pointer;
+    }
+    #datasetTypesTable th.dt-col-sorted {
+      background: #edf3ff;
+      color: #223b72;
+    }
+    #datasetTypesTable th .table-col-label.dt-col-label-wrap {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      width: calc(100% - 2px);
+      max-width: none;
+      min-width: 0;
+    }
+    #datasetTypesTable .dt-col-label-text {
+      min-width: 0;
+    }
+    #datasetTypesTable th .table-col-label.dt-col-label-wrap,
+    #datasetTypesTable th .dt-col-label-text {
+      white-space: nowrap;
+      word-break: normal;
+      overflow-wrap: normal;
+    }
+    #datasetTypesTable .dt-sort-indicator {
+      color: #5f6f85;
+      flex: 0 0 auto;
+      display: inline-block;
+      min-width: 10px;
+      text-align: center;
+      font-size: 11px;
+      line-height: 1;
+      margin-left: 1px;
+    }
+    #datasetTypesTable .dt-name-search-btn {
+      width: 18px;
+      height: 18px;
+      border: 1px solid #c6ccd4;
+      border-radius: 4px;
+      background: #fff;
+      color: #66758b;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      margin-left: 2px;
+      cursor: pointer;
+      flex: 0 0 auto;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    #datasetTypesTable .dt-name-search-btn:hover {
+      border-color: #8ea5c8;
+      color: #33455f;
+      background: #f7faff;
+    }
+    #datasetTypesTable .dt-name-search-btn.active {
+      border-color: #0d6efd;
+      color: #0d6efd;
+      background: #eaf2ff;
+    }
+    #datasetTypesTable .dt-name-search-btn svg {
+      width: 11px;
+      height: 11px;
+      fill: currentColor;
+      pointer-events: none;
+    }
+    #datasetTypesTable .dt-name-search-input {
+      width: 120px;
+      height: 20px;
+      border: 1px solid #c6ccd4;
+      border-radius: 4px;
+      font-size: 11px;
+      line-height: 1.2;
+      padding: 1px 6px;
+      color: #243145;
+      background: #fff;
+      margin-left: 4px;
+      flex: 0 0 auto;
+    }
+    #datasetTypesTable .dt-name-search-input:focus {
+      outline: 1px solid #78a8ff;
+      outline-offset: 0;
+      border-color: #78a8ff;
+    }
+    #datasetTypesTable .dt-category-filter-btn {
+      width: 18px;
+      height: 18px;
+      border: 1px solid #c6ccd4;
+      border-radius: 4px;
+      background: #fff;
+      color: #66758b;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      margin-left: auto;
+      cursor: pointer;
+      flex: 0 0 auto;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    #datasetTypesTable .dt-category-filter-btn:hover {
+      border-color: #8ea5c8;
+      color: #33455f;
+      background: #f7faff;
+    }
+    #datasetTypesTable .dt-category-filter-btn.active {
+      border-color: #0d6efd;
+      color: #0d6efd;
+      background: #eaf2ff;
+    }
+    #datasetTypesTable .dt-category-filter-btn svg {
+      width: 11px;
+      height: 11px;
+      fill: currentColor;
+      pointer-events: none;
+    }
+    .dt-category-filter-popover {
+      position: fixed;
+      z-index: 4200;
+      min-width: 210px;
+      max-width: 280px;
+      max-height: 360px;
+      border: 1px solid #c9ced5;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
+      padding: 8px;
+      overflow: hidden;
+    }
+    .dt-category-filter-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #2f3a4a;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #eceff3;
+    }
+    .dt-category-filter-list {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      overflow: auto;
+      max-height: 300px;
+      padding-right: 2px;
+    }
+    .dt-category-filter-option {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: #2f3a4a;
+      padding: 2px 2px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .dt-category-filter-option input[type="checkbox"] {
+      width: 13px;
+      height: 13px;
+      margin: 0;
+      accent-color: #2a63d4;
+    }
+    .dt-category-filter-empty {
+      font-size: 12px;
+      color: #9099a7;
+      padding: 6px 2px 2px;
+      font-style: italic;
+    }
+    .rct-group-row td {
+      background: #f0f3f7;
+      font-weight: 600;
+      color: #2f3a4a;
+      padding: 4px 8px;
+      user-select: none;
+    }
+    .rct-group-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border: none;
+      border-radius: 3px;
+      background: transparent;
+      color: #666;
+      cursor: pointer;
+      padding: 0;
+      margin-right: 6px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .rct-group-toggle:hover {
+      background: #dde3eb;
+      color: #333;
+    }
+    .rct-group-toggle:focus-visible {
+      outline: 2px solid #8fb4ff;
+      outline-offset: 1px;
+    }
+    .rct-group-toggle svg {
+      width: 14px;
+      height: 14px;
+      transition: transform 0.15s ease;
+    }
+    .rct-group-toggle.expanded svg {
+      transform: rotate(90deg);
+    }
+    .rct-group-label {
+      vertical-align: middle;
+    }
+    .rct-cell-text {
+      min-height: 18px;
+      line-height: 16px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .rct-row-editor {
+      display: none;
+      position: fixed;
+      left: 50%;
+      top: 140px;
+      transform: translateX(-50%);
+      width: 520px;
+      max-width: calc(100vw - 32px);
+      background: #fff;
+      border: 1px solid #cfd6df;
+      border-radius: 8px;
+      box-shadow: 0 14px 36px rgba(0,0,0,0.22);
+      z-index: 3600;
+      overflow: hidden;
+    }
+    .rct-row-editor.show {
+      display: block;
+    }
+    .rct-row-editor-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      background: #eef3fa;
+      border-bottom: 1px solid #d8e0eb;
+      cursor: move;
+      user-select: none;
+    }
+    .rct-row-editor-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #2f3a4a;
+    }
+    .rct-row-editor-close {
+      border: 1px solid #b8c4d5;
+      background: #fff;
+      border-radius: 4px;
+      width: 22px;
+      height: 22px;
+      line-height: 20px;
+      text-align: center;
+      font-size: 14px;
+      cursor: pointer;
+      color: #333;
+      padding: 0;
+    }
+    .rct-row-editor-close:hover {
+      background: #f7f9fc;
+    }
+    .rct-row-editor-body {
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 112px 1fr;
+      gap: 10px 12px;
+      align-items: center;
+    }
+    .rct-row-editor-body label {
+      font-size: 12px;
+      color: #444;
+      font-weight: 600;
+    }
+    .rct-row-editor-body input[type="checkbox"] {
+      width: auto;
+      justify-self: start;
+    }
+    .rct-row-editor-body input:not([type="checkbox"]),
+    .rct-row-editor-body textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #ccd2da;
+      border-radius: 6px;
+      padding: 7px 9px;
+      font-size: 12px;
+      font-family: inherit;
+      background: #fff;
+    }
+    .rct-row-editor-body textarea {
+      min-height: 58px;
+      resize: vertical;
+    }
+    .rct-row-editor-body input:focus,
+    .rct-row-editor-body textarea:focus {
+      outline: none;
+      border-color: #0d6efd;
+      box-shadow: 0 0 0 2px rgba(13,110,253,0.12);
+    }
+    .rct-row-editor-body input:disabled,
+    .rct-row-editor-body textarea:disabled {
+      background: #f1f4f8;
+      color: #67758a;
+    }
+    .rct-row-editor-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 10px 12px 12px;
+      border-top: 1px solid #e4e8ee;
+      background: #fafbfd;
+    }
+    .rct-validation-tooltip {
+      display: none;
+      position: fixed;
+      z-index: 4100;
+      background: #fff7db;
+      color: #6f4f00;
+      border: 1px solid #e7c768;
+      border-radius: 6px;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+      padding: 8px 10px;
+      font-size: 12px;
+      line-height: 1.35;
+      white-space: normal;
+      pointer-events: none;
+    }
+    .rct-validation-tooltip.show {
+      display: block;
+    }
+    .table-col-resizer {
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: 4px;
+      height: 100%;
+      cursor: col-resize;
+      user-select: none;
+      touch-action: none;
+      z-index: 5;
+    }
+    .table-col-resizer:hover {
+      background: #d0d0d0;
+    }
+    .table-col-label {
+      display: inline-block;
+      max-width: 100%;
+      white-space: normal;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+    .col-resize-preview {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #0d6efd;
+      opacity: 0.75;
+      pointer-events: none;
+      z-index: 4000;
+      display: none;
+    }
+    .dataset-types-empty {
+      color: #999;
+      font-style: italic;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="main" style="height: 100%;">
+    <div class="tree-panel" id="treePanel">
+      <div class="tree-header">Projects</div>
+      <div class="tree-content" id="treeContent"></div>
+    </div>
+    <div class="resize-handle" id="resizeHandle"></div>
+    <div class="detail-panel" id="detailPanel">
+      <div class="detail-empty" id="detailEmpty">
+        Select a project to view details
+      </div>
+      <div id="detailView" style="display:none; flex-direction:column; flex:1;">
+        <div class="detail-header">
+          <div class="detail-title" id="detailTitle">Project Name</div>
+        </div>
+        <div class="detail-content">
+          <div class="detail-form" id="detailForm"></div>
+
+          <!-- Ribbon navigation -->
+          <div class="ribbon-bar" id="ribbonBar">
+            <div class="ribbon-item active" data-ribbon="summary">
+              <div class="ribbon-icon">
+                <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <!-- Summary / table chart icon -->
+                  <rect x="4" y="4" width="24" height="24" rx="2"/>
+                  <line x1="4" y1="11" x2="28" y2="11"/>
+                  <line x1="4" y1="18" x2="28" y2="18"/>
+                  <line x1="4" y1="25" x2="28" y2="25"/>
+                  <line x1="14" y1="4" x2="14" y2="28"/>
+                </svg>
+              </div>
+              <div class="ribbon-label">Source<br>Data</div>
+            </div>
+            <div class="ribbon-item" data-ribbon="field-mapping">
+              <div class="ribbon-icon">
+                <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <!-- Field mapping: left grid → arrow → right grid -->
+                  <!-- Left mini table -->
+                  <rect x="2" y="7" width="10" height="18" rx="1.5"/>
+                  <line x1="2" y1="13" x2="12" y2="13"/>
+                  <line x1="2" y1="19" x2="12" y2="19"/>
+                  <!-- Right mini table -->
+                  <rect x="20" y="7" width="10" height="18" rx="1.5"/>
+                  <line x1="20" y1="13" x2="30" y2="13"/>
+                  <line x1="20" y1="19" x2="30" y2="19"/>
+                  <!-- Arrow -->
+                  <line x1="13" y1="16" x2="19" y2="16"/>
+                  <polyline points="17,13.5 19.5,16 17,18.5"/>
+                </svg>
+              </div>
+              <div class="ribbon-label">Field<br>Mapping</div>
+            </div>
+            <div class="ribbon-item" data-ribbon="reserving-class-types">
+              <div class="ribbon-icon">
+                <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <!-- Tree / hierarchy blocks icon -->
+                  <rect x="11" y="3" width="10" height="8" rx="1.5"/>
+                  <rect x="2" y="21" width="10" height="8" rx="1.5"/>
+                  <rect x="20" y="21" width="10" height="8" rx="1.5"/>
+                  <line x1="16" y1="11" x2="16" y2="16"/>
+                  <line x1="7" y1="16" x2="25" y2="16"/>
+                  <line x1="7" y1="16" x2="7" y2="21"/>
+                  <line x1="25" y1="16" x2="25" y2="21"/>
+                </svg>
+              </div>
+              <div class="ribbon-label">Reserving<br>Class Types</div>
+            </div>
+            <div class="ribbon-item" data-ribbon="dataset-types">
+              <div class="ribbon-icon">
+                <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <!-- Database cylinder icon -->
+                  <ellipse cx="16" cy="7" rx="10" ry="4"/>
+                  <path d="M6 7 L6 25 C6 27.2 10.5 29 16 29 C21.5 29 26 27.2 26 25 L26 7"/>
+                  <path d="M6 16 C6 18.2 10.5 20 16 20 C21.5 20 26 18.2 26 16"/>
+                </svg>
+              </div>
+              <div class="ribbon-label">Dataset<br>Types</div>
+            </div>
+            <div class="ribbon-item" data-ribbon="audit-log">
+              <div class="ribbon-icon">
+                <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="6" y="4" width="20" height="24" rx="2"/>
+                  <line x1="11" y1="11" x2="21" y2="11"/>
+                  <line x1="11" y1="16" x2="21" y2="16"/>
+                  <line x1="11" y1="21" x2="18" y2="21"/>
+                  <circle cx="24" cy="24" r="4.5"/>
+                  <line x1="24" y1="24" x2="24" y2="21.5"/>
+                  <line x1="24" y1="24" x2="26.2" y2="25.2"/>
+                </svg>
+              </div>
+              <div class="ribbon-label">Audit<br>Log</div>
+            </div>
+            <div class="ribbon-item" data-ribbon="project-settings">
+              <div class="ribbon-icon">
+                <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+                  <!-- Gear icon -->
+                  <circle cx="16" cy="16" r="4.5"/>
+                  <path d="M14 3 L18 3 L19 6.5 L21.5 7.5 L24.5 5.5 L27 8 L25 11 L26 13.5 L29 14.5 L29 18.5 L26 19.5 L25 22 L27 24.5 L24.5 27 L21.5 25 L19 26 L18 29 L14 29 L13 26 L10.5 25 L7.5 27 L5 24.5 L7 22 L6 19.5 L3 18.5 L3 14.5 L6 13.5 L7 11 L5 8 L7.5 5.5 L10.5 7.5 L13 6.5 Z"/>
+                </svg>
+              </div>
+              <div class="ribbon-label">Project<br>Settings</div>
+            </div>
+          </div>
+
+          <!-- Ribbon content panels -->
+          <div class="ribbon-content-area">
+            <div class="ribbon-panel active" id="ribbonSummary">
+              <div class="table-summary" id="tableSummary" style="display:none;">
+                <div class="summary-header">Data Table Summary</div>
+                <div class="summary-table-path">
+                  <label class="summary-table-path-label" for="summaryTablePathInput">Table Path: </label>
+                  <input id="summaryTablePathInput" class="summary-table-path-input" type="text" autocomplete="off">
+                  <button id="summaryTablePathReloadBtn" class="summary-table-path-browse" type="button">Reload</button>
+                  <button id="summaryTablePathBrowseBtn" class="summary-table-path-browse" type="button">Browse...</button>
+                </div>
+                <div class="summary-derived-dates">
+                  <fieldset class="summary-derived-frame">
+                    <legend class="summary-derived-frame-label">Origin Periods</legend>
+                    <div class="summary-derived-frame-body">
+                      <div class="summary-derived-group">
+                        <label class="summary-derived-label" for="summaryOriginStartInput">Start Date:</label>
+                        <div class="summary-derived-field">
+                          <input id="summaryOriginStartInput" class="summary-derived-input" type="text" autocomplete="off" placeholder="MMM YYYY">
+                          <div class="summary-derived-stepper">
+                            <button id="summaryOriginStartUpBtn" class="summary-derived-step-btn" type="button" aria-label="Increase Origin Start Date by one month">
+                              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 5 L3.5 10 h9 Z"/></svg>
+                            </button>
+                            <button id="summaryOriginStartDownBtn" class="summary-derived-step-btn" type="button" aria-label="Decrease Origin Start Date by one month">
+                              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 11 L12.5 6 h-9 Z"/></svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="summary-derived-group">
+                        <label class="summary-derived-label" for="summaryOriginEndInput">End Date:</label>
+                        <div class="summary-derived-field">
+                          <input id="summaryOriginEndInput" class="summary-derived-input" type="text" autocomplete="off" placeholder="MMM YYYY">
+                          <div class="summary-derived-stepper">
+                            <button id="summaryOriginEndUpBtn" class="summary-derived-step-btn" type="button" aria-label="Increase Origin End Date by one month">
+                              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 5 L3.5 10 h9 Z"/></svg>
+                            </button>
+                            <button id="summaryOriginEndDownBtn" class="summary-derived-step-btn" type="button" aria-label="Decrease Origin End Date by one month">
+                              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 11 L12.5 6 h-9 Z"/></svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </fieldset>
+                  <fieldset class="summary-derived-frame">
+                    <legend class="summary-derived-frame-label">Development Period</legend>
+                    <div class="summary-derived-frame-body">
+                      <div class="summary-derived-group">
+                        <label class="summary-derived-label" for="summaryDevelopmentEndInput">End Date:</label>
+                        <div class="summary-derived-field">
+                          <input id="summaryDevelopmentEndInput" class="summary-derived-input" type="text" autocomplete="off" placeholder="MMM YYYY">
+                          <div class="summary-derived-stepper">
+                            <button id="summaryDevelopmentEndUpBtn" class="summary-derived-step-btn" type="button" aria-label="Increase Development End Date by one month">
+                              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 5 L3.5 10 h9 Z"/></svg>
+                            </button>
+                            <button id="summaryDevelopmentEndDownBtn" class="summary-derived-step-btn" type="button" aria-label="Decrease Development End Date by one month">
+                              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 11 L12.5 6 h-9 Z"/></svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </fieldset>
+                </div>
+                <div class="summary-stats" id="summaryStats"></div>
+                <div class="summary-columns" id="summaryColumns"></div>
+              </div>
+            </div>
+            <div class="ribbon-panel" id="ribbonFieldMapping">
+              <div class="field-mapping-panel">
+                <div class="summary-header">Field Mapping</div>
+                <div class="field-mapping-toolbar">
+                  <div class="field-mapping-help">Select significance for each field. New dataset types can be created in "Dataset Types" Page. </div>
+                  <button id="saveFieldMappingBtn" type="button">Save Field Mapping</button>
+                </div>
+                <div class="field-mapping-status" id="fieldMappingStatus"></div>
+                <div class="field-mapping-grid">
+                  <table class="field-mapping-table" id="fieldMappingTable">
+                    <colgroup>
+                      <col style="width: 260px;">
+                      <col style="width: 220px;">
+                      <col style="width: 360px;">
+                      <col style="width: 120px;">
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th>Field Name</th>
+                        <th>Significances</th>
+                        <th>Dataset Type</th>
+                        <th>Level</th>
+                      </tr>
+                    </thead>
+                    <tbody id="fieldMappingBody">
+                      <tr>
+                        <td colspan="4" class="field-mapping-empty">Select a project with a valid Table Path to load fields.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="ribbon-panel" id="ribbonReservingClassTypes">
+              <div class="dataset-types-panel">
+                <div class="summary-header">Reserving Class Types</div>
+                <div class="dataset-types-toolbar">
+                  <div class="dataset-types-help">
+                    Loaded from field mapping. 
+                    Click a column header to sort rows within each Level group. 
+                    Right-click any data row to add below or delete. 
+                    Changes auto-save.
+                  </div>
+                </div>
+                <div class="dataset-types-status" id="reservingClassTypesStatus"></div>
+                <div class="dataset-types-grid">
+                  <table class="dataset-types-table" id="reservingClassTypesTable">
+                    <colgroup>
+                      <col style="width: 300px;">
+                      <col style="width: 420px;">
+                      <col style="width: 420px;">
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Formula</th>
+                        <th>EEX Formula</th>
+                      </tr>
+                    </thead>
+                    <tbody id="reservingClassTypesBody">
+                      <tr>
+                        <td colspan="3" class="dataset-types-empty">Select a project to load reserving class types.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="ribbon-panel" id="ribbonDatasetTypes">
+              <div class="dataset-types-panel">
+                <div class="summary-header">Dataset Types</div>
+                <div class="dataset-types-toolbar">
+                  <div class="dataset-types-help">Right-click any row to edit, add, or delete. Changes auto-save.</div>
+                </div>
+                <div class="dataset-types-status" id="datasetTypesStatus"></div>
+                <div class="dataset-types-grid">
+                  <table class="dataset-types-table" id="datasetTypesTable">
+                    <colgroup>
+                      <col style="width: 300px;">
+                      <col style="width: 220px;">
+                      <col style="width: 300px;">
+                      <col style="width: 120px;">
+                      <col style="width: 520px;">
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Data Format</th>
+                        <th>Category</th>
+                        <th>Calculated</th>
+                        <th>Formula</th>
+                      </tr>
+                    </thead>
+                    <tbody id="datasetTypesBody">
+                      <tr>
+                        <td colspan="5" class="dataset-types-empty">Select a project to load dataset types.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="ribbon-panel" id="ribbonAuditLog">
+              <div class="dataset-types-panel">
+                <div class="summary-header">Audit Log</div>
+                <div class="dataset-types-toolbar">
+                  <div class="dataset-types-help">Records project settings changes with timestamp, user, and action description.</div>
+                </div>
+                <div class="dataset-types-status" id="auditLogStatus"></div>
+                <div class="dataset-types-grid">
+                  <table class="dataset-types-table" id="auditLogTable">
+                    <colgroup>
+                      <col style="width: 220px;">
+                      <col style="width: 200px;">
+                      <col style="width: 820px;">
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th>Timestamp</th>
+                        <th>User</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="auditLogBody">
+                      <tr>
+                        <td colspan="3" class="dataset-types-empty">Select a project to load audit log.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="ribbon-panel" id="ribbonProjectSettings">
+              <div class="dataset-types-panel">
+                <div class="summary-header">Project Settings</div>
+                <div class="dataset-types-toolbar">
+                  <div class="dataset-types-help">Open the selected project's folder in File Explorer.</div>
+                  <button id="openProjectFolderBtn" class="detail-open-folder-btn" type="button" title="Open project folder in File Explorer" aria-label="Open project folder in File Explorer">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                      <path d="M1.5 5.5H6l1.2 1.5H14.5v6.5H1.5z"></path>
+                      <path d="M1.5 5.5V3.8h4.2l1.1 1.4H14.5V7"></path>
+                    </svg>
+                    <span>Open Folder</span>
+                  </button>
+                </div>
+                <div class="ribbon-panel-placeholder">Project Settings configuration will appear here.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context Menu (projects) -->
+  <div class="context-menu" id="contextMenu">
+    <div class="context-menu-item" data-action="rename">Rename</div>
+    <div class="context-menu-item" data-action="duplicate">Duplicate</div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item danger" data-action="delete">Delete</div>
+  </div>
+
+  <!-- Folder Context Menu -->
+  <div class="context-menu" id="folderContextMenu">
+    <div class="context-menu-item" data-action="rename-folder">Rename</div>
+    <div class="context-menu-item" data-action="create-project-in-folder">Create New Project</div>
+    <div class="context-menu-item" data-action="create-subfolder">Create subfolder</div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item danger" data-action="delete-folder">Delete</div>
+  </div>
+
+  <!-- Tree blank area Context Menu -->
+  <div class="context-menu" id="treeContextMenu">
+    <div class="context-menu-item" data-action="create-root-folder">Create root folder</div>
+  </div>
+
+  <!-- Dataset Types Row Context Menu -->
+  <div class="context-menu" id="datasetTypesRowContextMenu">
+    <div class="context-menu-item" data-action="copy-cell">Copy</div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" data-action="edit-row">Edit</div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" data-action="add-row">Add</div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item danger" data-action="delete-row">Delete</div>
+  </div>
+
+  <!-- Dataset Types Row Editor -->
+  <div class="rct-row-editor" id="datasetTypeEditor">
+    <div class="rct-row-editor-header" id="datasetTypeEditorHeader">
+      <div class="rct-row-editor-title" id="datasetTypeEditorTitle">Edit Dataset Type</div>
+      <button class="rct-row-editor-close" id="datasetTypeEditorClose" type="button" aria-label="Close">x</button>
+    </div>
+    <div class="rct-row-editor-body">
+      <label for="dtEditName">Name</label>
+      <input id="dtEditName" type="text" spellcheck="false" />
+      <label for="dtEditDataFormat">Data Format</label>
+      <input id="dtEditDataFormat" type="text" spellcheck="false" />
+      <label for="dtEditCategory">Category</label>
+      <input id="dtEditCategory" type="text" spellcheck="false" />
+      <label for="dtEditCalculated">Calculated</label>
+      <input id="dtEditCalculated" type="checkbox" style="justify-self: start;" />
+      <label for="dtEditFormula">Formula</label>
+      <textarea id="dtEditFormula" spellcheck="false"></textarea>
+    </div>
+    <div class="rct-row-editor-actions">
+      <button class="dialog-btn" id="dtEditorCancelBtn" type="button">Cancel</button>
+      <button class="dialog-btn primary" id="dtEditorSaveBtn" type="button">Apply</button>
+    </div>
+  </div>
+
+  <!-- Reserving Class Types Row Context Menu -->
+  <div class="context-menu" id="reservingClassTypesRowContextMenu">
+    <div class="context-menu-item" data-action="copy-cell">Copy</div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" data-action="edit-row">Edit</div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" data-action="add-type">Add</div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item danger" data-action="delete-row">Delete</div>
+  </div>
+
+  <!-- Reserving Class Types Row Editor -->
+  <div class="rct-row-editor" id="reservingClassTypeEditor">
+    <div class="rct-row-editor-header" id="reservingClassTypeEditorHeader">
+      <div class="rct-row-editor-title" id="reservingClassTypeEditorTitle">Edit Reserving Class Type</div>
+      <button class="rct-row-editor-close" id="reservingClassTypeEditorClose" type="button" aria-label="Close">x</button>
+    </div>
+    <div class="rct-row-editor-body">
+      <label for="rctEditName">Name</label>
+      <input id="rctEditName" type="text" spellcheck="false" />
+      <label for="rctEditLevel">Level</label>
+      <input id="rctEditLevel" type="text" spellcheck="false" />
+      <label for="rctEditFormula">Formula</label>
+      <textarea id="rctEditFormula" spellcheck="false"></textarea>
+      <label for="rctEditEexFormula">EEX Formula</label>
+      <textarea id="rctEditEexFormula" spellcheck="false"></textarea>
+    </div>
+    <div class="rct-row-editor-actions">
+      <button class="dialog-btn" id="rctEditorCancelBtn" type="button">Cancel</button>
+      <button class="dialog-btn primary" id="rctEditorSaveBtn" type="button">Apply</button>
+    </div>
+  </div>
+
+  <!-- Custom Prompt Dialog -->
+  <div class="dialog-overlay" id="dialogOverlay">
+    <div class="dialog-box" id="dialogBox">
+      <div class="dialog-title" id="dialogTitle">Enter value</div>
+      <input type="text" class="dialog-input" id="dialogInput" autocomplete="off" />
+      <div class="dialog-buttons">
+        <button class="dialog-btn" id="dialogCancel" type="button">Cancel</button>
+        <button class="dialog-btn primary" id="dialogOk" type="button">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Confirm Dialog -->
+  <div class="dialog-overlay" id="confirmOverlay">
+    <div class="dialog-box" id="confirmBox">
+      <div class="dialog-title" id="confirmTitle">Confirm</div>
+      <div class="dialog-message" id="confirmMessage"></div>
+      <div class="dialog-buttons">
+        <button class="dialog-btn" id="confirmCancel" type="button">Cancel</button>
+        <button class="dialog-btn danger" id="confirmOk" type="button">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dataset-types-error-overlay" id="datasetTypesErrorOverlay" aria-hidden="true">
+    <div class="dataset-types-error-dialog" role="dialog" aria-modal="true" aria-labelledby="datasetTypesErrorTitle">
+      <div class="dataset-types-error-header">
+        <div id="datasetTypesErrorTitle">Dataset Types Error Details</div>
+        <button class="dataset-types-error-close" id="datasetTypesErrorClose" type="button" aria-label="Close">x</button>
+      </div>
+      <div class="dataset-types-error-body" id="datasetTypesErrorBody"></div>
+    </div>
+  </div>
+
+<script type="module" src="/ui/project_settings/project_settings.js?v=2026040309"></script>
+</body>
+</html>

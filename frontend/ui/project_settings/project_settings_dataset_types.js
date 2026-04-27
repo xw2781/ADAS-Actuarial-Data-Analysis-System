@@ -1,0 +1,1785 @@
+import { fetchProjectDatasetTypes, normalizeDatasetTypesPayload as normalizeDatasetTypesPayloadShared } from "/ui/dataset/dataset_types_source.js";
+import {
+  buildDatasetTypeColumnFilterOptionsFromRows,
+  getDatasetTypeCategoryKey,
+  getDatasetTypeCategoryLabel,
+  getDatasetTypeColumnFilterValueKeyFromRow,
+  isDatasetTypeSelectionFilterActive,
+  matchesDatasetTypeNameSearch,
+  tokenizeDatasetTypeNameSearch,
+} from "/ui/dataset/dataset_types_view_model.js";
+
+export function createDatasetTypesFeature(deps = {}) {
+  const {
+    datasetTypesBody = null,
+    datasetTypesStatus = null,
+    datasetTypesRowContextMenu = null,
+    datasetTypesErrorOverlay = null,
+    datasetTypesErrorBody = null,
+    datasetTypesErrorClose = null,
+    initTableColumnResizing = () => {},
+    resizeCellTextarea = () => {},
+    normalizeProjectKey = (name) => String(name || "").trim().toLowerCase(),
+    fetchImpl = fetch,
+    setStatus = () => {},
+    loadAuditLog = async () => {},
+    getSelectedProject = () => null,
+    getCurrentFieldNames = () => [],
+    ensureFieldMappingLoaded = async () => {},
+    findDatasetTypeOwnerInFieldMapping = () => "",
+    getMappedDatasetTypeNamesInFieldMapping = () => [],
+    renderFieldMappingTable = () => {},
+    hideContextMenu = () => {},
+    hideFolderContextMenu = () => {},
+    hideTreeContextMenu = () => {},
+    hideReservingClassTypesRowContextMenu = () => {},
+    positionContextMenu = (menu, x, y) => { menu.style.left = `${x}px`; menu.style.top = `${y}px`; menu.classList.add("show"); },
+    datasetTypeEditor = null,
+    datasetTypeEditorHeader = null,
+    datasetTypeEditorTitle = null,
+    dtEditName = null,
+    dtEditDataFormat = null,
+    dtEditCategory = null,
+    dtEditCalculated = null,
+    dtEditFormula = null,
+    scheduleDatasetTypesAutoSave = () => {},
+  } = deps;
+
+  const DATASET_TYPES_COLUMNS = ["Name", "Data Format", "Category", "Calculated", "Formula"];
+  const DATASET_TYPES_SORTABLE_COLS = new Set([...DATASET_TYPES_COLUMNS]);
+  const DATASET_TYPES_FILTERABLE_COLS = new Set(["Data Format", "Category", "Calculated"]);
+  const DATASET_TYPES_BLANK_CATEGORY_KEY = "__blank__";
+  const datasetTypesByProject = new Map();
+  const loadedDatasetTypesByProject = new Set();
+  const datasetTypesInvalidFormulaByProject = new Map();
+  const datasetTypesSortStateByProject = new Map();
+  const datasetTypesDataFormatFilterStateByProject = new Map();
+  const datasetTypesDataFormatOptionsByProject = new Map();
+  const datasetTypesCategoryFilterStateByProject = new Map();
+  const datasetTypesCategoryOptionsByProject = new Map();
+  const datasetTypesCalculatedFilterStateByProject = new Map();
+  const datasetTypesCalculatedOptionsByProject = new Map();
+  const datasetTypesNameSearchTextByProject = new Map();
+  const datasetTypesNameSearchOpenByProject = new Map();
+  const datasetTypesCollapsedGroupsByProject = new Map();
+  let datasetTypesContextProject = "";
+  let datasetTypesContextRowIndex = -1;
+  let datasetTypesContextCellText = "";
+  let datasetTypesLoadSeq = 0;
+  let dtEditorProject = "";
+  let dtEditorRowIndex = -1;
+  let dtEditorMode = "edit";
+  let dtEditorInsertAfterIndex = -1;
+  let dtEditorDragState = null;
+  let dtEditorInitialCalculated = false;
+  let datasetTypesFilterPopover = null;
+  let datasetTypesFilterPopoverProject = "";
+  let datasetTypesFilterPopoverColLabel = "";
+  let datasetTypesFilterPopoverAnchor = null;
+  let datasetTypesFilterPopoverWired = false;
+  let datasetTypesErrorUiWired = false;
+  let datasetTypesLoadModeDialog = null;
+  let datasetTypesLoadModeDialogResolve = null;
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  async function copyTextToClipboard(rawText, doc = window.document) {
+    const text = String(rawText ?? "");
+
+    try {
+      const nav = doc?.defaultView?.navigator || window.navigator;
+      if (nav?.clipboard && typeof nav.clipboard.writeText === "function") {
+        await nav.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      // fallback below
+    }
+
+    try {
+      const ta = doc.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "readonly");
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      ta.style.pointerEvents = "none";
+      ta.style.left = "-9999px";
+      ta.style.top = "0";
+      doc.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = typeof doc.execCommand === "function" ? doc.execCommand("copy") : false;
+      if (ta.parentNode) ta.parentNode.removeChild(ta);
+      return !!ok;
+    } catch {
+      return false;
+    }
+  }
+
+  function setDatasetTypesStatus(msg, isError = false) {
+    if (!datasetTypesStatus) return;
+    const text = String(msg || "").trim();
+    datasetTypesStatus.innerHTML = "";
+    datasetTypesStatus.classList.toggle("error", !!isError);
+    if (!text) return;
+
+    if (!isError) {
+      const plain = document.createElement("span");
+      plain.className = "dataset-types-status-text";
+      plain.textContent = text;
+      datasetTypesStatus.appendChild(plain);
+      return;
+    }
+
+    const detailLines = buildDatasetTypesErrorLines(text);
+    const summaryText = buildDatasetTypesErrorSummary(text, detailLines);
+    const summary = document.createElement("span");
+    summary.className = "dataset-types-status-text";
+    summary.textContent = summaryText;
+    datasetTypesStatus.appendChild(summary);
+
+    const seeMoreBtn = document.createElement("button");
+    seeMoreBtn.type = "button";
+    seeMoreBtn.className = "dataset-types-status-see-more";
+    seeMoreBtn.textContent = "see more";
+    seeMoreBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openDatasetTypesErrorOverlay(detailLines);
+    });
+    datasetTypesStatus.appendChild(seeMoreBtn);
+  }
+
+  function buildDatasetTypesErrorLines(rawMessage) {
+    const raw = String(rawMessage || "").trim();
+    if (!raw) return [];
+    const normalized = raw
+      .replace(/\r/g, "\n")
+      .replace(/\.\s+(?=E\s+\d+\b)/g, ";\n");
+    const parts = normalized
+      .split(/\n|;\s*/g)
+      .map((v) => String(v || "").trim())
+      .filter(Boolean);
+    return parts.length > 0 ? parts : [raw];
+  }
+
+  function buildDatasetTypesErrorSummary(rawMessage, lines) {
+    const first = String((Array.isArray(lines) && lines[0]) || rawMessage || "").trim();
+    if (!first) return "";
+    const extra = Math.max(0, (Array.isArray(lines) ? lines.length : 0) - 1);
+    return extra > 0 ? `${first} (+${extra} more)` : first;
+  }
+
+  function closeDatasetTypesErrorOverlay() {
+    if (!datasetTypesErrorOverlay) return;
+    datasetTypesErrorOverlay.classList.remove("show");
+    datasetTypesErrorOverlay.setAttribute("aria-hidden", "true");
+  }
+
+  function ensureDatasetTypesErrorUiWired() {
+    if (datasetTypesErrorUiWired) return;
+    datasetTypesErrorUiWired = true;
+    if (datasetTypesErrorClose) {
+      datasetTypesErrorClose.addEventListener("click", () => {
+        closeDatasetTypesErrorOverlay();
+      });
+    }
+    if (datasetTypesErrorOverlay) {
+      datasetTypesErrorOverlay.addEventListener("mousedown", (e) => {
+        if (e.target === datasetTypesErrorOverlay) closeDatasetTypesErrorOverlay();
+      });
+    }
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      if (!datasetTypesErrorOverlay || !datasetTypesErrorOverlay.classList.contains("show")) return;
+      closeDatasetTypesErrorOverlay();
+    });
+  }
+
+  function openDatasetTypesErrorOverlay(lines) {
+    if (!datasetTypesErrorOverlay || !datasetTypesErrorBody) return;
+    ensureDatasetTypesErrorUiWired();
+    const detailLines = Array.isArray(lines) ? lines : [];
+    datasetTypesErrorBody.innerHTML = "";
+    if (detailLines.length === 0) {
+      const line = document.createElement("div");
+      line.className = "dataset-types-error-line";
+      line.textContent = "No additional details.";
+      datasetTypesErrorBody.appendChild(line);
+    } else {
+      for (const item of detailLines) {
+        const line = document.createElement("div");
+        line.className = "dataset-types-error-line";
+        line.textContent = String(item || "").trim();
+        datasetTypesErrorBody.appendChild(line);
+      }
+    }
+    datasetTypesErrorOverlay.classList.add("show");
+    datasetTypesErrorOverlay.setAttribute("aria-hidden", "false");
+  }
+
+  function getProjectDatasetTypesState(projectName) {
+    const key = normalizeProjectKey(projectName);
+    if (!datasetTypesByProject.has(key)) {
+      datasetTypesByProject.set(key, {
+        columns: [...DATASET_TYPES_COLUMNS],
+        rows: [],
+      });
+    }
+    return datasetTypesByProject.get(key);
+  }
+
+  function getInvalidFormulaSet(projectName) {
+    const key = normalizeProjectKey(projectName);
+    if (!datasetTypesInvalidFormulaByProject.has(key)) {
+      datasetTypesInvalidFormulaByProject.set(key, new Set());
+    }
+    return datasetTypesInvalidFormulaByProject.get(key);
+  }
+
+  function clearInvalidFormulaSet(projectName) {
+    const key = normalizeProjectKey(projectName);
+    datasetTypesInvalidFormulaByProject.delete(key);
+  }
+
+  function clearInvalidFormulaName(projectName, name) {
+    const set = getInvalidFormulaSet(projectName);
+    const key = normalizeProjectKey(name);
+    if (key) set.delete(key);
+  }
+
+  function setInvalidFormulaNames(projectName, names) {
+    const set = getInvalidFormulaSet(projectName);
+    set.clear();
+    for (const n of names || []) {
+      const key = normalizeProjectKey(n);
+      if (key) set.add(key);
+    }
+  }
+
+  function parseInvalidFormulaDatasetNames(detailText) {
+    const out = new Set();
+    const text = String(detailText || "");
+    const re = /([A-Za-z0-9_ .\-]+):\s*unresolved in formula/g;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const name = String(m[1] || "").trim();
+      const key = normalizeProjectKey(name);
+      if (key) out.add(name);
+    }
+    return Array.from(out);
+  }
+
+  function parseCalculatedFlag(value) {
+    if (typeof value === "boolean") return value;
+    const s = String(value ?? "").trim().toLowerCase();
+    return s === "true" || s === "1" || s === "yes" || s === "y";
+  }
+
+  function ensureDatasetTypesLoadModeDialog() {
+    if (datasetTypesLoadModeDialog) return datasetTypesLoadModeDialog;
+
+    const overlay = document.createElement("div");
+    overlay.className = "dialog-overlay";
+    overlay.innerHTML = `
+      <div class="dialog-box" role="dialog" aria-modal="true" aria-labelledby="dtLoadModeTitle">
+        <div class="dialog-title" id="dtLoadModeTitle">Load Dataset Types</div>
+        <div class="dialog-message" data-role="message"></div>
+        <div class="dialog-buttons">
+          <button class="dialog-btn" type="button" data-role="cancel">Cancel</button>
+          <button class="dialog-btn danger" type="button" data-role="overwrite">Overwrite</button>
+          <button class="dialog-btn primary" type="button" data-role="merge">Merge</button>
+        </div>
+      </div>
+    `;
+    overlay.setAttribute("aria-hidden", "true");
+    document.body.appendChild(overlay);
+
+    const box = overlay.querySelector(".dialog-box");
+    const cancelBtn = overlay.querySelector('[data-role="cancel"]');
+    const overwriteBtn = overlay.querySelector('[data-role="overwrite"]');
+    const mergeBtn = overlay.querySelector('[data-role="merge"]');
+
+    const close = (mode) => {
+      overlay.classList.remove("show");
+      overlay.setAttribute("aria-hidden", "true");
+      const resolve = datasetTypesLoadModeDialogResolve;
+      datasetTypesLoadModeDialogResolve = null;
+      if (typeof resolve === "function") resolve(mode || "cancel");
+    };
+
+    cancelBtn?.addEventListener("click", () => close("cancel"));
+    overwriteBtn?.addEventListener("click", () => close("overwrite"));
+    mergeBtn?.addEventListener("click", () => close("merge"));
+
+    overlay.addEventListener("mousedown", (e) => {
+      if (!box || !box.contains(e.target)) close("cancel");
+    });
+
+    overlay.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close("cancel");
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        close("merge");
+      }
+    });
+
+    overlay._dtLoadModeFocusBtn = mergeBtn;
+    datasetTypesLoadModeDialog = overlay;
+    return overlay;
+  }
+
+  function showDatasetTypesLoadModeDialog(messageText) {
+    const overlay = ensureDatasetTypesLoadModeDialog();
+    const messageEl = overlay.querySelector('[data-role="message"]');
+    if (messageEl) {
+      messageEl.textContent = String(messageText || "").trim();
+    }
+
+    if (datasetTypesLoadModeDialogResolve) {
+      const prevResolve = datasetTypesLoadModeDialogResolve;
+      datasetTypesLoadModeDialogResolve = null;
+      prevResolve("cancel");
+    }
+
+    overlay.classList.add("show");
+    overlay.setAttribute("aria-hidden", "false");
+
+    setTimeout(() => {
+      try {
+        const focusBtn = overlay._dtLoadModeFocusBtn;
+        if (focusBtn && typeof focusBtn.focus === "function") {
+          focusBtn.focus();
+        }
+      } catch {
+        // ignore focus failures
+      }
+    }, 30);
+
+    return new Promise((resolve) => {
+      datasetTypesLoadModeDialogResolve = resolve;
+    });
+  }
+
+  function createEmptyDatasetTypesRow() {
+    return ["", "", "", false, ""];
+  }
+
+  function sanitizeDatasetTypeRow(rowLike) {
+    const out = createEmptyDatasetTypesRow();
+    out[0] = String(rowLike?.[0] ?? "").trim();
+    out[1] = String(rowLike?.[1] ?? "").trim();
+    out[2] = String(rowLike?.[2] ?? "").trim();
+    out[3] = parseCalculatedFlag(rowLike?.[3]);
+    out[4] = out[3] ? String(rowLike?.[4] ?? "").trim() : "";
+    return out;
+  }
+
+  function buildPersistableRows(rowList) {
+    return (Array.isArray(rowList) ? rowList : [])
+      .map((row) => sanitizeDatasetTypeRow(row))
+      .filter((row) => row[0] !== "" || row[1] !== "" || row[2] !== "" || row[4] !== "" || row[3] === true);
+  }
+
+  function areDatasetTypeRowsExactlyEqual(rowsA, rowsB) {
+    const left = Array.isArray(rowsA) ? rowsA.map((row) => sanitizeDatasetTypeRow(row)) : [];
+    const right = Array.isArray(rowsB) ? rowsB.map((row) => sanitizeDatasetTypeRow(row)) : [];
+    if (left.length !== right.length) return false;
+    for (let i = 0; i < left.length; i += 1) {
+      const l = left[i];
+      const r = right[i];
+      if (
+        String(l?.[0] ?? "") !== String(r?.[0] ?? "")
+        || String(l?.[1] ?? "") !== String(r?.[1] ?? "")
+        || String(l?.[2] ?? "") !== String(r?.[2] ?? "")
+        || Boolean(l?.[3]) !== Boolean(r?.[3])
+        || String(l?.[4] ?? "") !== String(r?.[4] ?? "")
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function sanitizeFileStem(value) {
+    return String(value || "").trim().replace(/[\\/:*?"<>|]/g, "_");
+  }
+
+  function joinWinPath(...parts) {
+    const cleaned = parts
+      .map((part) => String(part || "").trim().replace(/[\\/]+/g, "\\"))
+      .filter(Boolean);
+    return cleaned.join("\\");
+  }
+
+  function getDatasetTypesSortState(projectName) {
+    const key = normalizeProjectKey(projectName);
+    if (!datasetTypesSortStateByProject.has(key)) {
+      datasetTypesSortStateByProject.set(key, { colLabel: "", dir: "" });
+    }
+    return datasetTypesSortStateByProject.get(key);
+  }
+
+  function toggleDatasetTypesSort(projectName, colLabel) {
+    const col = String(colLabel || "").trim();
+    if (!DATASET_TYPES_SORTABLE_COLS.has(col)) return;
+    const state = getDatasetTypesSortState(projectName);
+    if (state.colLabel !== col) {
+      state.colLabel = col;
+      state.dir = "asc";
+      return;
+    }
+    if (state.dir === "asc") {
+      state.dir = "desc";
+      return;
+    }
+    if (state.dir === "desc") {
+      state.colLabel = "";
+      state.dir = "";
+      return;
+    }
+    state.dir = "asc";
+  }
+
+  function compareDatasetTypeSortValues(a, b, colLabel, dir) {
+    const direction = String(dir || "").toLowerCase() === "desc" ? "desc" : "asc";
+    let cmp = 0;
+    if (colLabel === "Calculated") {
+      cmp = (parseCalculatedFlag(a) ? 1 : 0) - (parseCalculatedFlag(b) ? 1 : 0);
+    } else {
+      const av = String(a ?? "").trim();
+      const bv = String(b ?? "").trim();
+      const an = Number(av);
+      const bn = Number(bv);
+      const aNum = av !== "" && Number.isFinite(an);
+      const bNum = bv !== "" && Number.isFinite(bn);
+      if (aNum && bNum) cmp = an - bn;
+      else cmp = av.localeCompare(bv, undefined, { sensitivity: "base", numeric: true });
+    }
+    return direction === "desc" ? -cmp : cmp;
+  }
+
+  function getDatasetTypesFilterState(stateMap, projectName, options = []) {
+    const key = normalizeProjectKey(projectName);
+    if (!stateMap.has(key)) {
+      const initialKeys = options.map((opt) => opt.key);
+      stateMap.set(key, {
+        selected: new Set(),
+        known: new Set(initialKeys),
+      });
+    }
+    const state = stateMap.get(key);
+    const optionKeys = new Set((options || []).map((opt) => opt.key));
+
+    for (const knownKey of Array.from(state.known)) {
+      if (optionKeys.has(knownKey)) continue;
+      state.known.delete(knownKey);
+      state.selected.delete(knownKey);
+    }
+    for (const optionKey of optionKeys) {
+      if (state.known.has(optionKey)) continue;
+      state.known.add(optionKey);
+    }
+    return state;
+  }
+
+  function getDatasetTypesNameSearchText(projectName) {
+    const key = normalizeProjectKey(projectName);
+    return String(datasetTypesNameSearchTextByProject.get(key) || "");
+  }
+
+  function setDatasetTypesNameSearchText(projectName, text) {
+    const key = normalizeProjectKey(projectName);
+    datasetTypesNameSearchTextByProject.set(key, String(text || ""));
+  }
+
+  function isDatasetTypesNameSearchOpen(projectName) {
+    const key = normalizeProjectKey(projectName);
+    return datasetTypesNameSearchOpenByProject.get(key) === true;
+  }
+
+  function setDatasetTypesNameSearchOpen(projectName, open) {
+    const key = normalizeProjectKey(projectName);
+    datasetTypesNameSearchOpenByProject.set(key, !!open);
+  }
+
+  function getDatasetTypesNameSearchTokens(projectName) {
+    const raw = getDatasetTypesNameSearchText(projectName);
+    return tokenizeDatasetTypeNameSearch(raw);
+  }
+
+  function rowMatchesDatasetTypesNameSearch(projectName, row) {
+    const tokens = getDatasetTypesNameSearchTokens(projectName);
+    if (tokens.length === 0) return true;
+    return matchesDatasetTypeNameSearch({ name: String(row?.[0] ?? "") }, tokens);
+  }
+
+  function buildDatasetTypeDataFormatOptions(projectName) {
+    const state = getProjectDatasetTypesState(projectName);
+    const options = buildDatasetTypeColumnFilterOptionsFromRows(state.rows || [], "Data Format", {
+      blankKey: DATASET_TYPES_BLANK_CATEGORY_KEY,
+    });
+    datasetTypesDataFormatOptionsByProject.set(normalizeProjectKey(projectName), options);
+    return options;
+  }
+
+  function buildDatasetTypeCategoryOptions(projectName) {
+    const state = getProjectDatasetTypesState(projectName);
+    const options = buildDatasetTypeColumnFilterOptionsFromRows(state.rows || [], "Category", {
+      blankKey: DATASET_TYPES_BLANK_CATEGORY_KEY,
+    });
+    datasetTypesCategoryOptionsByProject.set(normalizeProjectKey(projectName), options);
+    return options;
+  }
+
+  function buildDatasetTypeCalculatedOptions(projectName) {
+    const state = getProjectDatasetTypesState(projectName);
+    const options = buildDatasetTypeColumnFilterOptionsFromRows(state.rows || [], "Calculated", {
+      blankKey: DATASET_TYPES_BLANK_CATEGORY_KEY,
+    });
+    datasetTypesCalculatedOptionsByProject.set(normalizeProjectKey(projectName), options);
+    return options;
+  }
+
+  function getDatasetTypeDataFormatFilterState(projectName, options = []) {
+    return getDatasetTypesFilterState(datasetTypesDataFormatFilterStateByProject, projectName, options);
+  }
+
+  function getDatasetTypeCategoryFilterState(projectName, options = []) {
+    return getDatasetTypesFilterState(datasetTypesCategoryFilterStateByProject, projectName, options);
+  }
+
+  function getDatasetTypeCalculatedFilterState(projectName, options = []) {
+    return getDatasetTypesFilterState(datasetTypesCalculatedFilterStateByProject, projectName, options);
+  }
+
+  function getDatasetTypesColumnFilterMeta(projectName, colLabel) {
+    const project = String(projectName || "").trim();
+    const col = String(colLabel || "").trim();
+    if (!project || !col) return null;
+    const key = normalizeProjectKey(project);
+
+    if (col === "Category") {
+      const options = datasetTypesCategoryOptionsByProject.get(key) || buildDatasetTypeCategoryOptions(project);
+      const filterState = getDatasetTypeCategoryFilterState(project, options);
+      return { col, options, filterState, title: "Category Filter", emptyText: "No categories" };
+    }
+    if (col === "Data Format") {
+      const options = datasetTypesDataFormatOptionsByProject.get(key) || buildDatasetTypeDataFormatOptions(project);
+      const filterState = getDatasetTypeDataFormatFilterState(project, options);
+      return { col, options, filterState, title: "Data Format Filter", emptyText: "No data formats" };
+    }
+    if (col === "Calculated") {
+      const options = datasetTypesCalculatedOptionsByProject.get(key) || buildDatasetTypeCalculatedOptions(project);
+      const filterState = getDatasetTypeCalculatedFilterState(project, options);
+      return { col, options, filterState, title: "Calculated Filter", emptyText: "No calculated values" };
+    }
+    return null;
+  }
+
+  function getDatasetTypesColumnFilterValueKey(colLabel, row) {
+    return getDatasetTypeColumnFilterValueKeyFromRow(colLabel, row, {
+      blankKey: DATASET_TYPES_BLANK_CATEGORY_KEY,
+    });
+  }
+
+  function getDatasetTypesCollapsedGroupSet(projectName, categoryOptions = []) {
+    const key = normalizeProjectKey(projectName);
+    if (!datasetTypesCollapsedGroupsByProject.has(key)) {
+      datasetTypesCollapsedGroupsByProject.set(key, new Set());
+    }
+    const collapsed = datasetTypesCollapsedGroupsByProject.get(key);
+    const optionKeys = new Set((categoryOptions || []).map((opt) => opt.key));
+    for (const collapsedKey of Array.from(collapsed)) {
+      if (!optionKeys.has(collapsedKey)) collapsed.delete(collapsedKey);
+    }
+    return collapsed;
+  }
+
+  function findDatasetTypesFilterButton(colLabel) {
+    const table = document.getElementById("datasetTypesTable");
+    if (!table) return null;
+    const wanted = String(colLabel || "").trim();
+    const headers = table.querySelectorAll("thead th");
+    for (const th of headers) {
+      if (String(th?.dataset?.dtColLabel || "").trim() !== wanted) continue;
+      const btn = th.querySelector(".dt-category-filter-btn");
+      if (btn) return btn;
+    }
+    return null;
+  }
+
+  function findDatasetTypesCategoryFilterButton() {
+    return findDatasetTypesFilterButton("Category");
+  }
+
+  function closeDatasetTypesFilterPopover() {
+    if (!datasetTypesFilterPopover) return;
+    datasetTypesFilterPopover.style.display = "none";
+    datasetTypesFilterPopover.classList.remove("open");
+    datasetTypesFilterPopoverProject = "";
+    datasetTypesFilterPopoverColLabel = "";
+    datasetTypesFilterPopoverAnchor = null;
+  }
+
+  function closeDatasetTypesCategoryFilterPopover() {
+    closeDatasetTypesFilterPopover();
+  }
+
+  function positionDatasetTypesFilterPopover() {
+    if (!datasetTypesFilterPopover || datasetTypesFilterPopover.style.display === "none") return;
+    const anchor =
+      datasetTypesFilterPopoverAnchor
+      || findDatasetTypesFilterButton(datasetTypesFilterPopoverColLabel || "Category");
+    if (!anchor) {
+      closeDatasetTypesFilterPopover();
+      return;
+    }
+
+    const anchorRect = anchor.getBoundingClientRect();
+    const pop = datasetTypesFilterPopover;
+    pop.style.left = `${Math.round(anchorRect.left)}px`;
+    pop.style.top = `${Math.round(anchorRect.bottom + 6)}px`;
+
+    const rect = pop.getBoundingClientRect();
+    const pad = 8;
+    let left = rect.left;
+    let top = rect.top;
+    if (rect.right > window.innerWidth - pad) {
+      left = Math.max(pad, window.innerWidth - rect.width - pad);
+    }
+    if (rect.bottom > window.innerHeight - pad) {
+      top = Math.max(pad, anchorRect.top - rect.height - 6);
+    }
+    pop.style.left = `${Math.round(left)}px`;
+    pop.style.top = `${Math.round(top)}px`;
+  }
+
+  function positionDatasetTypesCategoryFilterPopover() {
+    positionDatasetTypesFilterPopover();
+  }
+
+  function ensureDatasetTypesFilterPopoverWired() {
+    if (datasetTypesFilterPopoverWired) return;
+    datasetTypesFilterPopoverWired = true;
+    document.addEventListener("mousedown", (e) => {
+      if (!datasetTypesFilterPopover || datasetTypesFilterPopover.style.display === "none") return;
+      const target = e.target;
+      if (datasetTypesFilterPopover.contains(target)) return;
+      if (datasetTypesFilterPopoverAnchor && datasetTypesFilterPopoverAnchor.contains(target)) return;
+      closeDatasetTypesFilterPopover();
+    }, true);
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      closeDatasetTypesFilterPopover();
+    }, true);
+    window.addEventListener("resize", () => {
+      positionDatasetTypesFilterPopover();
+    });
+    window.addEventListener("scroll", () => {
+      positionDatasetTypesFilterPopover();
+    }, true);
+  }
+
+  function ensureDatasetTypesFilterPopover() {
+    ensureDatasetTypesFilterPopoverWired();
+    if (datasetTypesFilterPopover) return datasetTypesFilterPopover;
+    datasetTypesFilterPopover = document.createElement("div");
+    datasetTypesFilterPopover.className = "dt-category-filter-popover";
+    datasetTypesFilterPopover.style.display = "none";
+    document.body.appendChild(datasetTypesFilterPopover);
+    return datasetTypesFilterPopover;
+  }
+
+  function openDatasetTypesColumnFilterPopover(projectName, colLabel, anchorEl = null) {
+    const project = String(projectName || "").trim();
+    const col = String(colLabel || "").trim();
+    if (!project || !col) return;
+    const meta = getDatasetTypesColumnFilterMeta(project, col);
+    if (!meta) return;
+
+    const pop = ensureDatasetTypesFilterPopover();
+    const { options, filterState, title: filterTitle, emptyText } = meta;
+    const selectedSet = filterState.selected;
+
+    pop.innerHTML = "";
+
+    const title = document.createElement("div");
+    title.className = "dt-category-filter-title";
+    title.textContent = filterTitle;
+    pop.appendChild(title);
+
+    const list = document.createElement("div");
+    list.className = "dt-category-filter-list";
+    pop.appendChild(list);
+
+    for (const opt of options) {
+      const row = document.createElement("label");
+      row.className = "dt-category-filter-option";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = selectedSet.has(opt.key);
+      cb.addEventListener("change", () => {
+        if (cb.checked) selectedSet.add(opt.key);
+        else selectedSet.delete(opt.key);
+        renderDatasetTypesTable(project, { preserveColumnWidths: true });
+      });
+      const text = document.createElement("span");
+      text.textContent = opt.label;
+      row.appendChild(cb);
+      row.appendChild(text);
+      list.appendChild(row);
+    }
+
+    if (options.length === 0) {
+      const none = document.createElement("div");
+      none.className = "dt-category-filter-empty";
+      none.textContent = emptyText;
+      list.appendChild(none);
+    }
+
+    datasetTypesFilterPopoverProject = project;
+    datasetTypesFilterPopoverColLabel = col;
+    datasetTypesFilterPopoverAnchor = anchorEl || findDatasetTypesFilterButton(col);
+    pop.style.display = "block";
+    pop.classList.add("open");
+    positionDatasetTypesFilterPopover();
+  }
+
+  function openDatasetTypesCategoryFilterPopover(projectName, anchorEl = null) {
+    openDatasetTypesColumnFilterPopover(projectName, "Category", anchorEl);
+  }
+
+  function syncDatasetTypesHeaderUi(projectName) {
+    const table = document.getElementById("datasetTypesTable");
+    if (!table) return;
+
+    const sortState = getDatasetTypesSortState(projectName);
+
+    const headers = table.querySelectorAll("thead th");
+    headers.forEach((th, idx) => {
+      const colLabel = DATASET_TYPES_COLUMNS[idx] || String(th.textContent || "").trim();
+      th.dataset.dtColLabel = colLabel;
+      th.dataset.dtProjectName = String(projectName || "");
+      th.classList.add("dt-sortable-col");
+
+      if (th.dataset.dtSortWired !== "1") {
+        th.dataset.dtSortWired = "1";
+        th.addEventListener("click", (e) => {
+          const target = e.target;
+          if (target?.closest?.(".table-col-resizer")) return;
+          if (target?.closest?.(".dt-category-filter-btn")) return;
+          if (target?.closest?.(".dt-name-search-btn")) return;
+          if (target?.closest?.(".dt-name-search-input")) return;
+          const header = e.currentTarget;
+          const col = String(header?.dataset?.dtColLabel || "").trim();
+          const project = String(header?.dataset?.dtProjectName || "").trim();
+          if (!col || !project) return;
+          toggleDatasetTypesSort(project, col);
+          renderDatasetTypesTable(project);
+        });
+      }
+
+      const labelEl = th.querySelector(".table-col-label");
+      if (!labelEl) {
+        const wrapped = document.createElement("span");
+        wrapped.className = "table-col-label";
+        const nodesToMove = Array.from(th.childNodes).filter((node) => {
+          return !(node.nodeType === 1 && node.classList?.contains("table-col-resizer"));
+        });
+        nodesToMove.forEach((node) => wrapped.appendChild(node));
+        th.insertBefore(wrapped, th.querySelector(".table-col-resizer"));
+      }
+      const nextLabelEl = th.querySelector(".table-col-label");
+      if (!nextLabelEl) return;
+      nextLabelEl.innerHTML = "";
+      nextLabelEl.classList.add("dt-col-label-wrap");
+
+      const text = document.createElement("span");
+      text.className = "dt-col-label-text";
+      text.textContent = colLabel;
+      nextLabelEl.appendChild(text);
+
+      const indicator = document.createElement("span");
+      indicator.className = "dt-sort-indicator";
+      const isActiveSort = sortState.colLabel === colLabel && (sortState.dir === "asc" || sortState.dir === "desc");
+      indicator.textContent = isActiveSort ? (sortState.dir === "asc" ? "\u25B2" : "\u25BC") : "";
+      nextLabelEl.appendChild(indicator);
+      th.classList.toggle("dt-col-sorted", isActiveSort);
+
+      if (colLabel === "Name") {
+        const searchTokens = getDatasetTypesNameSearchTokens(projectName);
+        const nameSearchOpen = isDatasetTypesNameSearchOpen(projectName);
+        const searchBtn = document.createElement("button");
+        searchBtn.type = "button";
+        searchBtn.className = "dt-name-search-btn";
+        searchBtn.title = "Name Search";
+        searchBtn.innerHTML = `
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path d="M7 2.5a4.5 4.5 0 1 0 0 9a4.5 4.5 0 0 0 0-9Zm0-1.5a6 6 0 1 1 0 12a6 6 0 0 1 0-12Z"></path>
+            <path d="M10.9 10.2l3.2 3.2l-1.1 1.1l-3.2-3.2z"></path>
+          </svg>
+        `;
+        searchBtn.classList.toggle("active", searchTokens.length > 0 || nameSearchOpen);
+        searchBtn.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const currentlyOpen = isDatasetTypesNameSearchOpen(projectName);
+          setDatasetTypesNameSearchOpen(projectName, !currentlyOpen);
+          renderDatasetTypesTable(projectName);
+        });
+        nextLabelEl.appendChild(searchBtn);
+
+        if (nameSearchOpen) {
+          const nameSearchInput = document.createElement("input");
+          nameSearchInput.type = "text";
+          nameSearchInput.className = "dt-name-search-input";
+          nameSearchInput.placeholder = "keyword(s)";
+          nameSearchInput.value = getDatasetTypesNameSearchText(projectName);
+          nameSearchInput.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+          });
+          nameSearchInput.addEventListener("keydown", (ev) => {
+            ev.stopPropagation();
+            if (ev.key === "Escape") {
+              ev.preventDefault();
+              setDatasetTypesNameSearchOpen(projectName, false);
+              renderDatasetTypesTable(projectName);
+            }
+          });
+          nameSearchInput.addEventListener("input", () => {
+            setDatasetTypesNameSearchText(projectName, nameSearchInput.value);
+            renderDatasetTypesTable(projectName, { preserveColumnWidths: true, focusNameSearch: true });
+          });
+          nextLabelEl.appendChild(nameSearchInput);
+        }
+      }
+
+      if (DATASET_TYPES_FILTERABLE_COLS.has(colLabel)) {
+        const filterMeta = getDatasetTypesColumnFilterMeta(projectName, colLabel);
+        const options = filterMeta?.options || [];
+        const filterState = filterMeta?.filterState;
+        const hasActiveFilter = !!filterState
+          && isDatasetTypeSelectionFilterActive(options, filterState.selected);
+
+        const filterBtn = document.createElement("button");
+        filterBtn.type = "button";
+        filterBtn.className = "dt-category-filter-btn";
+        filterBtn.title = `${colLabel} Filter`;
+        filterBtn.innerHTML = `
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path d="M2 3h12L9.5 8v4l-3 1V8z"></path>
+          </svg>
+        `;
+        filterBtn.classList.toggle("active", hasActiveFilter);
+        filterBtn.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const sameProjectOpen =
+            datasetTypesFilterPopover
+            && datasetTypesFilterPopover.style.display !== "none"
+            && normalizeProjectKey(datasetTypesFilterPopoverProject) === normalizeProjectKey(projectName)
+            && String(datasetTypesFilterPopoverColLabel || "").trim() === colLabel;
+          if (sameProjectOpen) {
+            closeDatasetTypesFilterPopover();
+            return;
+          }
+          openDatasetTypesColumnFilterPopover(projectName, colLabel, filterBtn);
+        });
+        nextLabelEl.appendChild(filterBtn);
+      }
+    });
+
+    const shouldReopenFilter =
+      datasetTypesFilterPopover
+      && datasetTypesFilterPopover.style.display !== "none"
+      && normalizeProjectKey(datasetTypesFilterPopoverProject) === normalizeProjectKey(projectName)
+      && String(datasetTypesFilterPopoverColLabel || "").trim() !== "";
+    if (shouldReopenFilter) {
+      const nextCol = String(datasetTypesFilterPopoverColLabel || "").trim();
+      const nextAnchor = findDatasetTypesFilterButton(nextCol);
+      if (nextAnchor) openDatasetTypesColumnFilterPopover(projectName, nextCol, nextAnchor);
+      else closeDatasetTypesFilterPopover();
+    }
+  }
+
+  function getDatasetTypeNamesForProject(projectName, opts = {}) {
+    const onlyFormulaEmpty = !!opts?.formulaEmptyOnly;
+    const state = getProjectDatasetTypesState(projectName);
+    const out = [];
+    const seen = new Set();
+    for (const row of state.rows || []) {
+      const name = String(row?.[0] ?? "").trim();
+      if (!name) continue;
+      if (onlyFormulaEmpty && String(row?.[4] ?? "").trim() !== "") continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(name);
+    }
+    return out;
+  }
+
+  async function getFieldMappingDatasetTypeOwner(projectName, datasetTypeName) {
+    const project = String(projectName || "").trim();
+    const datasetType = String(datasetTypeName || "").trim();
+    if (!project || !datasetType) return "";
+    try {
+      await ensureFieldMappingLoaded(project);
+    } catch {
+      // ignore read errors; save-time guard still runs against current state
+    }
+    return String(findDatasetTypeOwnerInFieldMapping(project, datasetType) || "").trim();
+  }
+
+  async function getFieldMappingDatasetTypeNames(projectName) {
+    const project = String(projectName || "").trim();
+    if (!project) return [];
+    try {
+      await ensureFieldMappingLoaded(project);
+    } catch {
+      // ignore read errors; caller will use the current in-memory state
+    }
+    const raw = getMappedDatasetTypeNamesInFieldMapping(project);
+    const out = [];
+    const seen = new Set();
+    for (const value of Array.isArray(raw) ? raw : []) {
+      const name = String(value || "").trim();
+      const key = normalizeProjectKey(name);
+      if (!name || !key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(name);
+    }
+    return out;
+  }
+
+  function normalizeLocalDatasetTypesPayload(raw) {
+    if (Array.isArray(raw)) return normalizeDatasetTypesPayload({ rows: raw });
+    if (raw && typeof raw === "object") {
+      if (raw.data && typeof raw.data === "object") {
+        return normalizeDatasetTypesPayload(raw.data);
+      }
+      return normalizeDatasetTypesPayload(raw);
+    }
+    return normalizeDatasetTypesPayload(null);
+  }
+
+  function buildCalculatedBlockedMessage(datasetTypeName, ownerFieldName = "") {
+    const name = String(datasetTypeName || "").trim() || "(unnamed)";
+    const owner = String(ownerFieldName || "").trim();
+    if (owner) {
+      return `Cannot enable Calculated for '${name}' because it is used by field mapping field '${owner}'.`;
+    }
+    return `Cannot enable Calculated for '${name}' because it is used in field mapping.`;
+  }
+
+  function normalizeDatasetTypesPayload(payload) {
+    const normalized = normalizeDatasetTypesPayloadShared(payload);
+    const rows = [];
+    for (const r of Array.isArray(normalized?.rows) ? normalized.rows : []) {
+      const row = createEmptyDatasetTypesRow();
+      row[0] = String(r?.[0] ?? "");
+      row[1] = String(r?.[1] ?? "");
+      row[2] = String(r?.[2] ?? "");
+      row[3] = parseCalculatedFlag(r?.[3]);
+      row[4] = String(r?.[4] ?? "");
+      if (!row[3]) row[4] = "";
+      rows.push(row);
+    }
+    return { columns: [...DATASET_TYPES_COLUMNS], rows };
+  }
+
+  function renderDatasetTypesEmpty(message) {
+    if (!datasetTypesBody) return;
+    closeDatasetTypesCategoryFilterPopover();
+    datasetTypesBody.innerHTML = `
+      <tr>
+        <td colspan="5" class="dataset-types-empty">${escapeHtml(message || "No rows found.")}</td>
+      </tr>
+    `;
+  }
+
+  async function ensureDatasetTypesLoaded(projectName) {
+    const key = normalizeProjectKey(projectName);
+    if (!key) return false;
+    if (loadedDatasetTypesByProject.has(key)) return true;
+
+    const state = getProjectDatasetTypesState(projectName);
+    try {
+      const fetched = await fetchProjectDatasetTypes(projectName, { fetchImpl });
+      const parsed = normalizeDatasetTypesPayload(fetched?.data);
+      state.columns = [...DATASET_TYPES_COLUMNS];
+      state.rows = parsed.rows.map((r) => [
+        String(r[0] ?? ""),
+        String(r[1] ?? ""),
+        String(r[2] ?? ""),
+        parseCalculatedFlag(r[3]),
+        String(r[4] ?? ""),
+      ]);
+      loadedDatasetTypesByProject.add(key);
+      return true;
+    } catch (err) {
+      setDatasetTypesStatus(`Load error: ${err.message}`, true);
+      state.columns = [...DATASET_TYPES_COLUMNS];
+      state.rows = [];
+      return false;
+    }
+  }
+
+  function showDatasetTypesRowContextMenu(x, y, projectName, rowIndex, cellText = "") {
+    if (!datasetTypesRowContextMenu) return;
+    closeDatasetTypesCategoryFilterPopover();
+    datasetTypesContextProject = projectName || "";
+    datasetTypesContextRowIndex = rowIndex;
+    datasetTypesContextCellText = String(cellText ?? "");
+    positionContextMenu(datasetTypesRowContextMenu, x, y);
+  }
+
+  function hideDatasetTypesRowContextMenu() {
+    if (!datasetTypesRowContextMenu) return;
+    datasetTypesRowContextMenu.classList.remove("show");
+    datasetTypesContextProject = "";
+    datasetTypesContextRowIndex = -1;
+    datasetTypesContextCellText = "";
+  }
+
+  function closeDatasetTypeEditor() {
+    if (!datasetTypeEditor) return;
+    datasetTypeEditor.classList.remove("show");
+    datasetTypeEditor.style.left = "";
+    datasetTypeEditor.style.top = "";
+    datasetTypeEditor.style.transform = "translateX(-50%)";
+    dtEditorProject = "";
+    dtEditorRowIndex = -1;
+    dtEditorMode = "edit";
+    dtEditorInsertAfterIndex = -1;
+    dtEditorDragState = null;
+    dtEditorInitialCalculated = false;
+  }
+
+  function openDatasetTypeEditor(projectName, rowIndex, options = {}) {
+    if (!datasetTypeEditor || !projectName) return;
+    const mode = String(options?.mode || "edit").toLowerCase() === "add" ? "add" : "edit";
+    const state = getProjectDatasetTypesState(projectName);
+    if (!Array.isArray(state.rows)) return;
+    if (mode === "edit" && (!Number.isInteger(rowIndex) || rowIndex < 0 || rowIndex >= state.rows.length)) return;
+    const row = mode === "edit" ? state.rows[rowIndex] : null;
+
+    if (datasetTypeEditorTitle) {
+      datasetTypeEditorTitle.textContent = mode === "add"
+        ? "Add Dataset Type"
+        : "Edit Dataset Type";
+    }
+    if (dtEditName) dtEditName.value = mode === "add" ? "" : String(row?.[0] ?? "");
+    if (dtEditDataFormat) dtEditDataFormat.value = mode === "add" ? "" : String(row?.[1] ?? "");
+    if (dtEditCategory) dtEditCategory.value = mode === "add" ? "" : String(row?.[2] ?? "");
+    const initialCalculated = mode === "add" ? false : parseCalculatedFlag(row?.[3]);
+    if (dtEditCalculated) dtEditCalculated.checked = initialCalculated;
+    if (dtEditFormula) {
+      dtEditFormula.value = mode === "add" ? "" : String(row?.[4] ?? "");
+      dtEditFormula.disabled = !(dtEditCalculated?.checked);
+    }
+
+    dtEditorProject = projectName;
+    dtEditorMode = mode;
+    dtEditorRowIndex = mode === "edit" ? rowIndex : -1;
+    dtEditorInitialCalculated = initialCalculated;
+    dtEditorInsertAfterIndex = Number.isInteger(options?.insertAfterIndex)
+      ? options.insertAfterIndex
+      : (Number.isInteger(rowIndex) ? rowIndex : -1);
+    datasetTypeEditor.style.transform = "translateX(-50%)";
+    datasetTypeEditor.style.left = "50%";
+    datasetTypeEditor.style.top = "140px";
+    datasetTypeEditor.classList.add("show");
+    setTimeout(() => {
+      if (dtEditName && !dtEditName.disabled) dtEditName.focus();
+    }, 0);
+  }
+
+  async function applyDatasetTypeEditor() {
+    const projectName = dtEditorProject;
+    const mode = dtEditorMode;
+    const rowIndex = dtEditorRowIndex;
+    if (!projectName) return;
+
+    const state = getProjectDatasetTypesState(projectName);
+    if (!Array.isArray(state.rows)) return;
+
+    const nameValue = String(dtEditName?.value ?? "").trim();
+    const dataFormatValue = String(dtEditDataFormat?.value ?? "").trim();
+    const categoryValue = String(dtEditCategory?.value ?? "").trim();
+    const calculatedValue = !!(dtEditCalculated?.checked);
+    const formulaValue = calculatedValue ? String(dtEditFormula?.value ?? "").trim() : "";
+
+    if (!nameValue) {
+      setDatasetTypesStatus("Name is required.", true);
+      if (dtEditName) dtEditName.focus();
+      return;
+    }
+
+    if (calculatedValue && !dtEditorInitialCalculated) {
+      const owner = await getFieldMappingDatasetTypeOwner(projectName, nameValue);
+      if (owner) {
+        if (dtEditCalculated) dtEditCalculated.checked = false;
+        if (dtEditFormula) dtEditFormula.disabled = true;
+        setDatasetTypesStatus(buildCalculatedBlockedMessage(nameValue, owner), true);
+        return;
+      }
+    }
+
+    let target = null;
+    if (mode === "edit") {
+      if (!Number.isInteger(rowIndex) || rowIndex < 0 || rowIndex >= state.rows.length) return;
+      target = state.rows[rowIndex];
+    } else {
+      const newRow = createEmptyDatasetTypesRow();
+      const after = Number.isInteger(dtEditorInsertAfterIndex) ? dtEditorInsertAfterIndex : -1;
+      const insertPos = Math.max(0, Math.min(state.rows.length, after + 1));
+      state.rows.splice(insertPos, 0, newRow);
+      target = state.rows[insertPos];
+    }
+    if (!Array.isArray(target)) return;
+
+    target[0] = nameValue;
+    target[1] = dataFormatValue;
+    target[2] = categoryValue;
+    target[3] = calculatedValue;
+    target[4] = formulaValue;
+
+    renderDatasetTypesTable(projectName);
+    setDatasetTypesStatus("");
+    scheduleDatasetTypesAutoSave(projectName);
+    closeDatasetTypeEditor();
+  }
+
+  async function handleDatasetTypeEditorCalculatedToggle() {
+    if (!dtEditCalculated) return;
+    if (!dtEditCalculated.checked) {
+      if (dtEditFormula) dtEditFormula.disabled = true;
+      return;
+    }
+    const projectName = String(dtEditorProject || "").trim();
+    const nameValue = String(dtEditName?.value ?? "").trim();
+    if (!projectName || !nameValue) {
+      if (dtEditFormula) dtEditFormula.disabled = false;
+      return;
+    }
+    const owner = await getFieldMappingDatasetTypeOwner(projectName, nameValue);
+    if (owner) {
+      dtEditCalculated.checked = false;
+      if (dtEditFormula) dtEditFormula.disabled = true;
+      setDatasetTypesStatus(buildCalculatedBlockedMessage(nameValue, owner), true);
+      return;
+    }
+    if (dtEditFormula) dtEditFormula.disabled = false;
+    setDatasetTypesStatus("");
+  }
+
+  function onEditorHeaderMouseDown(e) {
+    if (!datasetTypeEditor || e.button !== 0) return;
+    const rect = datasetTypeEditor.getBoundingClientRect();
+    datasetTypeEditor.style.left = `${rect.left}px`;
+    datasetTypeEditor.style.top = `${rect.top}px`;
+    datasetTypeEditor.style.transform = "none";
+    dtEditorDragState = {
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+    };
+    e.preventDefault();
+  }
+
+  function onEditorMouseMove(e) {
+    if (!datasetTypeEditor || !dtEditorDragState) return;
+    const left = Math.max(8, Math.min(window.innerWidth - datasetTypeEditor.offsetWidth - 8, e.clientX - dtEditorDragState.offsetX));
+    const top = Math.max(8, Math.min(window.innerHeight - datasetTypeEditor.offsetHeight - 8, e.clientY - dtEditorDragState.offsetY));
+    datasetTypeEditor.style.left = `${left}px`;
+    datasetTypeEditor.style.top = `${top}px`;
+  }
+
+  function onEditorMouseUp() {
+    dtEditorDragState = null;
+  }
+
+  function addDatasetTypesRow(projectName, insertIndex) {
+    const state = getProjectDatasetTypesState(projectName);
+    const blank = createEmptyDatasetTypesRow();
+    const idx = Number(insertIndex);
+    const pos = Number.isInteger(idx) ? Math.max(0, Math.min(state.rows.length, idx)) : state.rows.length;
+    state.rows.splice(pos, 0, blank);
+    renderDatasetTypesTable(projectName);
+  }
+
+  function deleteDatasetTypesRow(projectName, rowIndex) {
+    const state = getProjectDatasetTypesState(projectName);
+    if (!state.rows.length) return;
+    if (!Number.isInteger(rowIndex) || rowIndex < 0 || rowIndex >= state.rows.length) return;
+    state.rows.splice(rowIndex, 1);
+    if (!state.rows.length) {
+      state.rows.push(createEmptyDatasetTypesRow());
+    }
+    renderDatasetTypesTable(projectName);
+    scheduleDatasetTypesAutoSave(projectName);
+  }
+
+  function renderDatasetTypesTable(projectName, options = {}) {
+    if (!datasetTypesBody) return;
+    if (!projectName) {
+      renderDatasetTypesEmpty("Select a project to load dataset types.");
+      return;
+    }
+
+    const state = getProjectDatasetTypesState(projectName);
+    const invalidSet = getInvalidFormulaSet(projectName);
+    if (!Array.isArray(state.rows) || state.rows.length === 0) {
+      state.rows = [createEmptyDatasetTypesRow()];
+    }
+
+    for (let rowIndex = 0; rowIndex < state.rows.length; rowIndex++) {
+      const rowValues = state.rows[rowIndex];
+      if (!Array.isArray(rowValues)) {
+        state.rows[rowIndex] = createEmptyDatasetTypesRow();
+        continue;
+      }
+      if (rowValues.length < DATASET_TYPES_COLUMNS.length) {
+        const fallback = createEmptyDatasetTypesRow();
+        for (let i = 0; i < rowValues.length && i < DATASET_TYPES_COLUMNS.length; i++) {
+          fallback[i] = rowValues[i];
+        }
+        state.rows[rowIndex] = fallback;
+      }
+    }
+
+    const dataFormatOptions = buildDatasetTypeDataFormatOptions(projectName);
+    const dataFormatFilter = getDatasetTypeDataFormatFilterState(projectName, dataFormatOptions);
+    const categoryOptions = buildDatasetTypeCategoryOptions(projectName);
+    const categoryFilter = getDatasetTypeCategoryFilterState(projectName, categoryOptions);
+    const calculatedOptions = buildDatasetTypeCalculatedOptions(projectName);
+    const calculatedFilter = getDatasetTypeCalculatedFilterState(projectName, calculatedOptions);
+    const dataFormatSelected = dataFormatFilter.selected;
+    const categorySelected = categoryFilter.selected;
+    const calculatedSelected = calculatedFilter.selected;
+    const collapsedGroups = getDatasetTypesCollapsedGroupSet(projectName, categoryOptions);
+    const sortState = getDatasetTypesSortState(projectName);
+    const sortColIdx = DATASET_TYPES_COLUMNS.indexOf(String(sortState.colLabel || "").trim());
+    const sortDir = String(sortState.dir || "").trim().toLowerCase();
+
+    const groups = new Map();
+    state.rows.forEach((row, rowIndex) => {
+      if (!rowMatchesDatasetTypesNameSearch(projectName, row)) return;
+      if (dataFormatSelected.size > 0 && !dataFormatSelected.has(getDatasetTypesColumnFilterValueKey("Data Format", row))) return;
+      if (calculatedSelected.size > 0 && !calculatedSelected.has(getDatasetTypesColumnFilterValueKey("Calculated", row))) return;
+      const categoryLabel = getDatasetTypeCategoryLabel(row?.[2]);
+      const categoryKey = getDatasetTypeCategoryKey(row?.[2]);
+      if (!groups.has(categoryKey)) {
+        groups.set(categoryKey, {
+          key: categoryKey,
+          label: categoryLabel,
+          rows: [],
+        });
+      }
+      groups.get(categoryKey).rows.push({ row, rowIndex });
+    });
+
+    const sortedGroups = Array.from(groups.values()).sort((a, b) =>
+      String(a.label || "").localeCompare(String(b.label || ""), undefined, { sensitivity: "base", numeric: true }),
+    );
+    const visibleGroups = categorySelected.size > 0
+      ? sortedGroups.filter((group) => categorySelected.has(group.key))
+      : sortedGroups;
+
+    datasetTypesBody.innerHTML = "";
+
+    if (visibleGroups.length === 0) {
+      datasetTypesBody.innerHTML = `
+        <tr>
+          <td colspan="5" class="dataset-types-empty">No rows for selected filters.</td>
+        </tr>
+      `;
+    } else {
+      for (const group of visibleGroups) {
+        const isCollapsed = collapsedGroups.has(group.key);
+        const groupRow = document.createElement("tr");
+        groupRow.className = "dt-group-row";
+        if (isCollapsed) groupRow.classList.add("collapsed");
+        const groupTd = document.createElement("td");
+        groupTd.colSpan = DATASET_TYPES_COLUMNS.length;
+
+        const groupHeader = document.createElement("div");
+        groupHeader.className = "dt-group-header";
+
+        const groupToggle = document.createElement("button");
+        groupToggle.type = "button";
+        groupToggle.className = "dt-group-toggle";
+        groupToggle.textContent = isCollapsed ? "+" : "-";
+        groupToggle.title = isCollapsed ? "Expand group" : "Collapse group";
+        groupToggle.setAttribute("aria-label", `${isCollapsed ? "Expand" : "Collapse"} category ${group.label}`);
+        groupToggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+        groupToggle.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (collapsedGroups.has(group.key)) collapsedGroups.delete(group.key);
+          else collapsedGroups.add(group.key);
+          renderDatasetTypesTable(projectName);
+        });
+
+        const groupLabel = document.createElement("span");
+        groupLabel.className = "dt-group-label";
+        groupLabel.textContent = `Category: ${group.label}`;
+
+        groupHeader.appendChild(groupToggle);
+        groupHeader.appendChild(groupLabel);
+        groupTd.appendChild(groupHeader);
+        groupRow.appendChild(groupTd);
+        datasetTypesBody.appendChild(groupRow);
+
+        if (isCollapsed) continue;
+
+        const rowsToRender = group.rows.slice();
+        if (sortColIdx >= 0 && (sortDir === "asc" || sortDir === "desc")) {
+          rowsToRender.sort((a, b) => {
+            const cmp = compareDatasetTypeSortValues(
+              a?.row?.[sortColIdx],
+              b?.row?.[sortColIdx],
+              DATASET_TYPES_COLUMNS[sortColIdx],
+              sortDir,
+            );
+            if (cmp !== 0) return cmp;
+            return (a?.rowIndex ?? 0) - (b?.rowIndex ?? 0);
+          });
+        }
+
+        for (const rowItem of rowsToRender) {
+          const rowIndex = rowItem.rowIndex;
+          const tr = document.createElement("tr");
+          tr.dataset.rowIndex = String(rowIndex);
+
+          DATASET_TYPES_COLUMNS.forEach((colName, colIndex) => {
+            const td = document.createElement("td");
+            td.dataset.col = colName;
+            td.dataset.colIndex = String(colIndex);
+            const rowName = String(state.rows[rowIndex][0] ?? "").trim();
+            const isInvalidFormulaCell = colName === "Formula" && invalidSet.has(normalizeProjectKey(rowName));
+
+            if (colName === "Calculated") {
+              const checkbox = document.createElement("input");
+              checkbox.type = "checkbox";
+              checkbox.checked = parseCalculatedFlag(state.rows[rowIndex][3]);
+              checkbox.disabled = true;
+              td.style.textAlign = "center";
+              td.appendChild(checkbox);
+            } else {
+              const span = document.createElement("span");
+              span.textContent = String(state.rows[rowIndex][colIndex] ?? "");
+              td.appendChild(span);
+            }
+            if (isInvalidFormulaCell) {
+              td.classList.add("invalid-formula-cell");
+              td.title = "Invalid formula: unresolved source value.";
+            }
+
+            tr.appendChild(td);
+          });
+
+          tr.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            hideContextMenu();
+            hideFolderContextMenu();
+            hideTreeContextMenu();
+            hideReservingClassTypesRowContextMenu();
+            const cell = e.target?.closest?.("td");
+            let cellText = cell ? String(cell.textContent ?? "") : "";
+            const checkbox = cell?.querySelector?.('input[type="checkbox"]');
+            if (checkbox) cellText = checkbox.checked ? "TRUE" : "FALSE";
+            showDatasetTypesRowContextMenu(e.clientX, e.clientY, projectName, rowIndex, cellText);
+          });
+
+          datasetTypesBody.appendChild(tr);
+        }
+      }
+    }
+
+    datasetTypesBody.querySelectorAll("textarea").forEach(resizeCellTextarea);
+    syncDatasetTypesHeaderUi(projectName);
+    if (!options || !options.preserveColumnWidths) {
+      initTableColumnResizing("datasetTypesTable", [150, 120, 130, 110, 140]);
+    }
+    if (options && options.focusNameSearch) {
+      requestAnimationFrame(() => {
+        const table = document.getElementById("datasetTypesTable");
+        const input = table?.querySelector('th[data-dt-col-label="Name"] .dt-name-search-input');
+        if (!input) return;
+        input.focus();
+        const len = input.value.length;
+        input.setSelectionRange(len, len);
+      });
+    }
+  }
+
+  async function loadDatasetTypes(projectName) {
+    const requestSeq = ++datasetTypesLoadSeq;
+    if (!projectName) {
+      closeDatasetTypesCategoryFilterPopover();
+      renderDatasetTypesEmpty("Select a project to load dataset types.");
+      setDatasetTypesStatus("");
+      return;
+    }
+
+    if (
+      datasetTypesFilterPopover
+      && datasetTypesFilterPopover.style.display !== "none"
+      && normalizeProjectKey(datasetTypesFilterPopoverProject) !== normalizeProjectKey(projectName)
+    ) {
+      closeDatasetTypesCategoryFilterPopover();
+    }
+
+    setDatasetTypesStatus("Loading dataset types...");
+    const loadedOk = await ensureDatasetTypesLoaded(projectName);
+    if (requestSeq !== datasetTypesLoadSeq) return;
+    renderDatasetTypesTable(projectName);
+    const selectedProject = getSelectedProject();
+    const currentFieldNames = getCurrentFieldNames();
+    if (
+      selectedProject &&
+      normalizeProjectKey(selectedProject.name) === normalizeProjectKey(projectName) &&
+      Array.isArray(currentFieldNames) &&
+      currentFieldNames.length > 0
+    ) {
+      renderFieldMappingTable(currentFieldNames, projectName);
+    }
+    if (loadedOk) setDatasetTypesStatus("");
+  }
+
+  async function saveDatasetTypes(projectName) {
+    if (!projectName) return false;
+    const state = getProjectDatasetTypesState(projectName);
+    const rows = buildPersistableRows(state.rows || []);
+
+    setDatasetTypesStatus("Saving dataset types...");
+    try {
+      const res = await fetchImpl("/dataset_types", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_name: projectName,
+          columns: [...DATASET_TYPES_COLUMNS],
+          rows,
+        }),
+      });
+      if (!res.ok) {
+        let detail = "";
+        try {
+          const body = await res.json();
+          detail = String(body?.detail || "").trim();
+        } catch {
+          const text = await res.text();
+          detail = String(text || "").trim();
+        }
+        throw new Error(detail || `HTTP ${res.status}`);
+      }
+      const out = await res.json();
+      clearInvalidFormulaSet(projectName);
+      renderDatasetTypesTable(projectName);
+      setDatasetTypesStatus(`Saved dataset types to ${out.path}`);
+      setStatus(`Saved dataset types: ${projectName}`);
+      await loadAuditLog(projectName, true);
+      return true;
+    } catch (err) {
+      const detail = String(err?.message || "");
+      const invalidNames = parseInvalidFormulaDatasetNames(detail);
+      setInvalidFormulaNames(projectName, invalidNames);
+      renderDatasetTypesTable(projectName);
+      setDatasetTypesStatus(`Save error: ${err.message}`, true);
+      setStatus(`Dataset types save error: ${err.message}`);
+      return false;
+    }
+  }
+
+  async function saveDatasetTypesToLocalFile(projectName) {
+    const name = String(projectName || "").trim();
+    if (!name) {
+      setDatasetTypesStatus("Select a project first.", true);
+      return;
+    }
+
+    const hostApi = window.ADAHost || window.parent?.ADAHost || window.top?.ADAHost;
+    if (!hostApi?.saveJsonFile) {
+      setDatasetTypesStatus("Local save is available in the desktop app only.", true);
+      return;
+    }
+
+    const state = getProjectDatasetTypesState(name);
+    const rows = buildPersistableRows(state.rows || []);
+    const safeName = sanitizeFileStem(name) || "project";
+    const suggestedName = `${safeName}_dataset_types.json`;
+    let startDir = "";
+    try {
+      const docsPath = String((await hostApi.getDocumentsPath?.()) || "").trim();
+      if (docsPath) {
+        startDir = joinWinPath(docsPath, "ArcRho", "templates");
+      }
+    } catch {
+      startDir = "";
+    }
+
+    setDatasetTypesStatus("Saving dataset types to local file...");
+    try {
+      const result = await hostApi.saveJsonFile({
+        data: {
+          project_name: name,
+          columns: [...DATASET_TYPES_COLUMNS],
+          rows,
+        },
+        suggestedName,
+        startDir,
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (result?.canceled) {
+        setDatasetTypesStatus("Local save canceled.");
+        return;
+      }
+      if (result?.error) {
+        throw new Error(String(result.error || "Unable to save local file."));
+      }
+      const outPath = String(result?.path || "").trim();
+      setDatasetTypesStatus(outPath ? `Saved local dataset types: ${outPath}` : "Saved local dataset types.");
+      setStatus(outPath ? `Saved Dataset Types local file: ${outPath}` : "Saved Dataset Types local file.");
+    } catch (err) {
+      const msg = String(err?.message || err || "Unable to save local file.");
+      setDatasetTypesStatus(`Local save failed: ${msg}`, true);
+      setStatus(`Dataset types local save error: ${msg}`);
+    }
+  }
+
+  async function loadDatasetTypesFromLocalFile(projectName) {
+    const name = String(projectName || "").trim();
+    if (!name) {
+      setDatasetTypesStatus("Select a project first.", true);
+      return;
+    }
+
+    const hostApi = window.ADAHost || window.parent?.ADAHost || window.top?.ADAHost;
+    if (!hostApi?.pickOpenFile) {
+      setDatasetTypesStatus("Local load is available in the desktop app only.", true);
+      return;
+    }
+
+    let startDir = "";
+    try {
+      const docsPath = String((await hostApi.getDocumentsPath?.()) || "").trim();
+      if (docsPath) {
+        startDir = joinWinPath(docsPath, "ArcRho", "templates");
+      }
+    } catch {
+      startDir = "";
+    }
+
+    const pickedPath = String(
+      (await hostApi.pickOpenFile({
+        startDir,
+        filters: [
+          { name: "Dataset Types", extensions: ["json", "xlsx"] },
+          { name: "JSON", extensions: ["json"] },
+          { name: "Excel", extensions: ["xlsx"] },
+        ],
+      })) || "",
+    ).trim();
+    if (!pickedPath) {
+      setDatasetTypesStatus("Local load canceled.");
+      return;
+    }
+
+    setDatasetTypesStatus("Loading dataset types from local file...");
+    try {
+      const parseRes = await fetchImpl("/dataset_types/import_local_file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_path: pickedPath }),
+      });
+      if (!parseRes.ok) {
+        let detail = "";
+        try {
+          const body = await parseRes.json();
+          detail = String(body?.detail || "").trim();
+        } catch {
+          const text = await parseRes.text();
+          detail = String(text || "").trim();
+        }
+        throw new Error(detail || `HTTP ${parseRes.status}`);
+      }
+      const parseOut = await parseRes.json();
+      const parsed = normalizeLocalDatasetTypesPayload(parseOut?.data);
+      const importedRows = buildPersistableRows(parsed.rows || []);
+
+      const state = getProjectDatasetTypesState(name);
+      const currentRows = buildPersistableRows(state.rows || []);
+
+      // Skip merge/overwrite prompt when imported content is exactly the same as current UI rows.
+      if (areDatasetTypeRowsExactlyEqual(currentRows, importedRows)) {
+        const fileFormat = String(parseOut?.format || "").trim().toUpperCase();
+        const formatText = fileFormat ? ` (${fileFormat})` : "";
+        const sameMsg = `Loaded local dataset types from ${pickedPath}${formatText}: no changes detected.`;
+        setDatasetTypesStatus(sameMsg);
+        setStatus(sameMsg);
+        return;
+      }
+
+      const mappedNames = await getFieldMappingDatasetTypeNames(name);
+      const mappedKeySet = new Set(mappedNames.map((v) => normalizeProjectKey(v)).filter(Boolean));
+
+      const selectedMode = await showDatasetTypesLoadModeDialog(
+        "Choose how to load Dataset Types.\nMerge: add/update imported rows.\nOverwrite: remove existing rows not used by Field Mapping, then load imported rows.",
+      );
+      if (selectedMode !== "merge" && selectedMode !== "overwrite") {
+        setDatasetTypesStatus("Local load canceled.");
+        return;
+      }
+      const mode = selectedMode;
+
+      let nextRows = [];
+      const preservedMappedNames = [];
+      if (mode === "overwrite") {
+        nextRows = importedRows.map((row) => sanitizeDatasetTypeRow(row));
+        const indexByName = new Map();
+        for (let i = 0; i < nextRows.length; i += 1) {
+          const rowNameKey = normalizeProjectKey(nextRows[i]?.[0]);
+          if (!rowNameKey || indexByName.has(rowNameKey)) continue;
+          indexByName.set(rowNameKey, i);
+        }
+
+        // Keep field-mapping-relevant dataset type rows if they are not present in imported content.
+        for (const existing of currentRows) {
+          const currentRow = sanitizeDatasetTypeRow(existing);
+          const rowNameKey = normalizeProjectKey(currentRow[0]);
+          if (!rowNameKey || !mappedKeySet.has(rowNameKey)) continue;
+          if (indexByName.has(rowNameKey)) continue;
+          indexByName.set(rowNameKey, nextRows.length);
+          nextRows.push(currentRow);
+          preservedMappedNames.push(currentRow[0]);
+        }
+      } else {
+        nextRows = currentRows.map((row) => sanitizeDatasetTypeRow(row));
+        const indexByName = new Map();
+        for (let i = 0; i < nextRows.length; i += 1) {
+          const rowNameKey = normalizeProjectKey(nextRows[i]?.[0]);
+          if (!rowNameKey || indexByName.has(rowNameKey)) continue;
+          indexByName.set(rowNameKey, i);
+        }
+
+        for (const incoming of importedRows) {
+          const row = sanitizeDatasetTypeRow(incoming);
+          const rowNameKey = normalizeProjectKey(row[0]);
+          if (!rowNameKey) continue;
+
+          if (mappedKeySet.has(rowNameKey)) {
+            const existingIndex = indexByName.get(rowNameKey);
+            if (existingIndex == null) {
+              indexByName.set(rowNameKey, nextRows.length);
+              nextRows.push(row);
+            } else {
+              preservedMappedNames.push(nextRows[existingIndex][0]);
+            }
+            continue;
+          }
+
+          const existingIndex = indexByName.get(rowNameKey);
+          if (existingIndex == null) {
+            indexByName.set(rowNameKey, nextRows.length);
+            nextRows.push(row);
+          } else {
+            nextRows[existingIndex] = row;
+          }
+        }
+      }
+
+      state.rows = nextRows.length > 0 ? nextRows : [createEmptyDatasetTypesRow()];
+      clearInvalidFormulaSet(name);
+      renderDatasetTypesTable(name);
+
+      const selectedProject = getSelectedProject();
+      const currentFieldNames = getCurrentFieldNames();
+      if (
+        selectedProject &&
+        normalizeProjectKey(selectedProject.name) === normalizeProjectKey(name) &&
+        Array.isArray(currentFieldNames) &&
+        currentFieldNames.length > 0
+      ) {
+        renderFieldMappingTable(currentFieldNames, name);
+      }
+
+      scheduleDatasetTypesAutoSave(name);
+
+      const preservedUnique = Array.from(new Set(preservedMappedNames.map((v) => String(v || "").trim()).filter(Boolean)));
+      const preservedMsg = preservedUnique.length
+        ? ` Preserved mapped names: ${preservedUnique.slice(0, 6).join(", ")}${preservedUnique.length > 6 ? "..." : ""}.`
+        : "";
+      const modeText = mode;
+      const fileFormat = String(parseOut?.format || "").trim().toUpperCase();
+      const formatText = fileFormat ? ` (${fileFormat})` : "";
+      const finalMsg = `Loaded local dataset types from ${pickedPath}${formatText} using ${modeText} mode.${preservedMsg}`;
+      setDatasetTypesStatus(finalMsg);
+      setStatus(finalMsg);
+    } catch (err) {
+      const msg = String(err?.message || err || "Unable to load local dataset types.");
+      setDatasetTypesStatus(`Local load failed: ${msg}`, true);
+      setStatus(`Dataset types local load error: ${msg}`);
+    }
+  }
+
+  async function handleDatasetTypesRowContextAction(action) {
+    if (!action || !datasetTypesContextProject) return;
+    const projectName = datasetTypesContextProject;
+    const rowIndex = datasetTypesContextRowIndex;
+    const cellText = datasetTypesContextCellText;
+    hideDatasetTypesRowContextMenu();
+    if (action === "copy-cell") {
+      const ok = await copyTextToClipboard(cellText);
+      if (ok) {
+        setDatasetTypesStatus("Cell value copied.");
+      } else {
+        setDatasetTypesStatus("Unable to copy cell value.", true);
+      }
+    } else if (action === "edit-row") {
+      openDatasetTypeEditor(projectName, rowIndex);
+    } else if (action === "add-row") {
+      openDatasetTypeEditor(projectName, rowIndex, {
+        mode: "add",
+        insertAfterIndex: Number.isInteger(rowIndex) ? rowIndex : -1,
+      });
+    } else if (action === "delete-row") {
+      deleteDatasetTypesRow(projectName, rowIndex);
+    }
+  }
+
+  return {
+    getDatasetTypeNamesForProject,
+    setDatasetTypesStatus,
+    renderDatasetTypesEmpty,
+    ensureDatasetTypesLoaded,
+    showDatasetTypesRowContextMenu,
+    hideDatasetTypesRowContextMenu,
+    addDatasetTypesRow,
+    deleteDatasetTypesRow,
+    renderDatasetTypesTable,
+    loadDatasetTypes,
+    saveDatasetTypes,
+    saveDatasetTypesToLocalFile,
+    loadDatasetTypesFromLocalFile,
+    handleDatasetTypesRowContextAction,
+    openDatasetTypeEditor,
+    closeDatasetTypeEditor,
+    applyDatasetTypeEditor,
+    handleDatasetTypeEditorCalculatedToggle,
+    onEditorHeaderMouseDown,
+    onEditorMouseMove,
+    onEditorMouseUp,
+  };
+}

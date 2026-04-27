@@ -1,0 +1,94 @@
+const { contextBridge, ipcRenderer } = require("electron");
+
+const invoke = (channel, payload) => ipcRenderer.invoke(channel, payload);
+
+// Splash screen progress API
+contextBridge.exposeInMainWorld("electronAPI", {
+  onSplashProgress: (callback) => {
+    ipcRenderer.on("splash-progress", (_event, data) => callback(data));
+  },
+});
+
+contextBridge.exposeInMainWorld("ADAHost", {
+  isWindows11: () => invoke("is-windows-11"),
+  pickOpenWorkflowFile: (startDir) => invoke("pick-open-workflow", { startDir }),
+  pickOpenTableFile: (startDir) => invoke("pick-open-table-file", { startDir }),
+  pickSaveWorkflowFile: (suggestedName, startDir) =>
+    invoke("pick-save-workflow", { suggestedName, startDir }),
+  shutdownApp: () => invoke("app-shutdown"),
+  minimizeWindow: () => invoke("window-minimize"),
+  maximizeWindow: () => invoke("window-maximize"),
+  restoreWindow: () => invoke("window-restore-native"),
+  isMaximized: () => invoke("window-is-maximized"),
+  isFullscreen: () => invoke("window-is-fullscreen"),
+  setFullscreen: (enabled) => invoke("window-set-fullscreen", { enabled }),
+  exitFullscreenToLast: () => invoke("window-restore-to-last"),
+  getWindowSize: () => invoke("window-get-size"),
+  resizeWindow: (width, height) => invoke("window-resize", { width, height }),
+  resizeSelfWindow: (width, height) => invoke("window-resize-self", { width, height }),
+  isPseudoMaximized: () => invoke("window-is-pseudo-maximized"),
+  pseudoMaximize: (margin) => invoke("window-pseudo-maximize", { margin }),
+  restoreToLast: () => invoke("window-restore-to-last"),
+  getZoomFactor: () => invoke("zoom-get"),
+  setZoomFactor: (factor) => invoke("zoom-set", { factor }),
+  openTabWindow: (payload) => invoke("open-tab-window", payload),
+  openDfmResultsWindow: (payload) => invoke("open-dfm-results-window", payload),
+  getDocumentsPath: () => invoke("get-documents-path"),
+  saveJsonFile: (payload) => invoke("save-json-file", payload),
+  saveTextFile: (payload) => invoke("save-text-file", payload),
+  readJsonFile: (payload) => invoke("read-json-file", payload),
+  loadScriptingShortcuts: () => invoke("scripting-shortcuts-load"),
+  saveScriptingShortcuts: (bindings) => invoke("scripting-shortcuts-save", { bindings }),
+  pickOpenFile: (payload) => invoke("pick-open-file", payload),
+  openPath: (payload) => invoke("open-path", payload),
+  clearCacheAndReload: () => invoke("app-clear-cache-reload"),
+  focusWindow: () => invoke("focus-window"),
+});
+
+window.addEventListener("DOMContentLoaded", () => {
+  try {
+    window.dispatchEvent(new Event("adaHostReady"));
+  } catch {
+    // ignore
+  }
+});
+
+ipcRenderer.on("adas:close-active-tab", () => {
+  try {
+    window.postMessage({ type: "adas:close-active-tab" }, "*");
+  } catch {
+    // ignore
+  }
+});
+
+ipcRenderer.on("adas:hotkey", (_event, payload) => {
+  try {
+    window.postMessage({ type: "adas:hotkey", action: payload?.action }, "*");
+  } catch {
+    // ignore
+  }
+});
+
+ipcRenderer.on("adas:zoom", (_event, payload) => {
+  try {
+    window.postMessage({ type: "adas:zoom", deltaY: payload?.deltaY }, "*");
+  } catch {
+    // ignore
+  }
+});
+
+ipcRenderer.on("adas:zoom-step", (_event, payload) => {
+  try {
+    window.postMessage({ type: "adas:zoom-step", delta: payload?.delta }, "*");
+  } catch {
+    // ignore
+  }
+});
+
+ipcRenderer.on("adas:zoom-reset", () => {
+  try {
+    window.postMessage({ type: "adas:zoom-reset" }, "*");
+  } catch {
+    // ignore
+  }
+});

@@ -1,0 +1,9 @@
+{
+  "type": "fix",
+  "scope": "startup",
+  "audience": "user",
+  "summary": "Restored the ArcRho logo on the startup splash screen.",
+  "details": [
+    "The splash screen now references the shared icon asset from the correct relative path."
+  ]
+}

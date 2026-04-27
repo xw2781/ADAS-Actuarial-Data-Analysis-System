@@ -1,0 +1,74 @@
+{
+  "name": "arcrho-electron",
+  "version": "0.2.0",
+  "private": true,
+  "main": "electron_main.js",
+  "scripts": {
+    "electron": "electron .",
+    "build:python": "pyinstaller build/server.spec --distpath python_dist --workpath python_build --noconfirm",
+    "build:electron": "electron-builder --win",
+    "clean:python-artifacts": "node -e \"const fs=require('fs'); ['python_dist','python_build'].forEach((p)=>fs.rmSync(p,{recursive:true,force:true}));\"",
+    "build": "npm run build:python && npm run build:electron && npm run clean:python-artifacts"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "electron": "^29.0.0",
+    "electron-builder": "^24.13.3",
+    "png-to-ico": "^3.0.1"
+  },
+  "build": {
+    "appId": "com.arcrho.app",
+    "productName": "ArcRho",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!dist/**",
+      "!build/**",
+      "!python_dist/**",
+      "!python_build/**",
+      "!node-portable/**",
+      "!node-v24.13.0-win-x64/**",
+      "!__pycache__/**",
+      "!*.ipynb",
+      "!*.spec",
+      "!.claude/**",
+      "!*.py"
+    ],
+    "extraResources": [
+      {
+        "from": "python_dist/adas_server",
+        "to": "adas_server"
+      },
+      {
+        "from": "ui_config.json",
+        "to": "ui_config.json"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icons/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "allowElevation": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "ArcRho",
+      "artifactName": "ArcRho-Setup-${version}.exe",
+      "deleteAppDataOnUninstall": false,
+      "include": "build/installer.nsh"
+    },
+    "asar": true
+  }
+}

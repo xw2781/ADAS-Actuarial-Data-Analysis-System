@@ -1,0 +1,38 @@
+# Dependencies and bundled toolchains
+node_modules/
+node-portable/
+node-v*-win-x64/
+.venv/
+venv/
+venv_*/
+
+# Build and packaging outputs
+dist/
+python_build/
+python_dist/
+*.spec.log
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime and local temp files
+tmp_data/
+*.tmp
+*.log
+.restart_app
+.shutdown_app
+.restart_electron
+.shutdown_electron
+
+# Editor and agent-local state
+.claude/
+.idea/
+.vscode/
+
+# OS metadata
+Thumbs.db
+Desktop.ini

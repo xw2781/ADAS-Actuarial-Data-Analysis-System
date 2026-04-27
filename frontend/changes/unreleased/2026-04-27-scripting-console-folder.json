@@ -1,0 +1,9 @@
+{
+  "type": "improvement",
+  "scope": "scripting",
+  "audience": "user",
+  "summary": "Organized scripting console frontend files into a dedicated UI folder.",
+  "details": [
+    "The scripting console page and companion JavaScript modules now live together under ui/scripting_console."
+  ]
+}

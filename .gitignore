@@ -1,66 +1,80 @@
-﻿# =========================
-# ADAS .gitignore
-# =========================
+# ArcRho monorepo ignores
 
-# -------- Scripts --------
+# Local helper scripts
 backup_src_vba.ps1
 backup_src_vba.cmd
 push.cmd
 
-# -------- Excel / VBA --------
+# Excel / Office artifacts
 *.xlam
 *.xlsm
 *.xlsx
 ~$*
-*.tmp
 
+# Dependencies and bundled toolchains
+node_modules/
+node-portable/
+node-v*-win-x64/
+.venv/
+venv/
+venv_*/
+.env
+.env.*
 
-# -------- Python --------
+# Build and packaging outputs
+build/
+dist/
+python_build/
+python_dist/
+*.spec
+*.spec.log
+*.exe
+
+# Python caches
 __pycache__/
 *.py[cod]
 *.pyd
 *.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-.venv/
-venv/
-.env
-.env.*
-
-# PyInstaller / build artifacts
-build/
-dist/
-*.spec
-*.exe
-
-# -------- Frontend (JS/HTML) --------
-node_modules/
-dist/
-build/
+# Frontend caches
 .cache/
 .vite/
 
-# -------- Runtime / Data --------
+# Runtime, generated data, and local temp files
 data/
 requests/
 logs/
 output/
 cache/
 temp/
+tmp_data/
+*.tmp
+*.log
+.restart_app
+.shutdown_app
+.restart_electron
+.shutdown_electron
 
-# -------- ADAS runtime --------
+# ArcRho runtime instance state
 backend/src/agent/instances/
 backend/src/master/instances/
 
-# -------- OS / Editor --------
-.DS_Store
-Thumbs.db
-desktop.ini
-
-.vscode/
+# Editor and agent-local state
+.claude/
 .idea/
+.vscode/
 *.swp
 *.swo
 *.bak
 
-# -------- Jupyter --------
+# Jupyter
 .ipynb_checkpoints/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+desktop.ini

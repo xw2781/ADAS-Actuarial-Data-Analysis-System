@@ -1,0 +1,9 @@
+{
+  "type": "feature",
+  "scope": "workflow",
+  "audience": "user",
+  "summary": "Describe the change in user-facing language.",
+  "details": [
+    "Optional supporting detail."
+  ]
+}

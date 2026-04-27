@@ -1,0 +1,10 @@
+{
+  "root_path": "E:\\ADAS",
+  "paths": {
+    "project_map": "projects",
+    "virtual_projects": "Virtual Projects",
+    "data": "data",
+    "requests": "requests",
+    "web_ui": "Web UI"
+  }
+}

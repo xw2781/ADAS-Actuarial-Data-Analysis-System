@@ -1,0 +1,316 @@
+export function injectDatasetMarkup(container) {
+  if (!container) return null;
+  if (container.querySelector("#topFrame")) return container;
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = `<button
+    id="clearCacheReloadBtn"
+    type="button"
+    title="Clear Cache and Reload"
+    aria-label="Clear Cache and Reload"
+  >&#x21bb;</button>
+  <div class="panel" id="topFrame">
+    <div class="topFrameGrid">
+      <div class="topField">
+        <label class="small" for="projectSelect">Project Name</label>
+        <div class="projectSelectWrap">
+          <input id="projectSelect" autocomplete="off" />
+          <button id="projectTreeBtn" type="button" class="projectTreeBtn" title="Browse project folders" aria-label="Browse project folders">
+            ...
+          </button>
+          <div id="projectDropdown" class="projectDropdown"></div>
+        </div>
+      </div>
+
+      <div class="topField">
+        <label class="small" for="pathInput">Reserving Class</label>
+        <div class="reservingClassWrap">
+          <input id="pathInput" />
+          <button id="pathTreeBtn" type="button" class="pathTreeBtn" title="Browse reserving classes" aria-label="Browse reserving classes">...</button>
+        </div>
+      </div>
+
+      <div class="topField">
+        <label class="small" for="triInput">Dataset Type</label>
+        <div class="datasetSelectWrap">
+          <input id="triInput" autocomplete="off" />
+          <button id="datasetTreeBtn" type="button" class="datasetTreeBtn" title="Browse dataset types" aria-label="Browse dataset types">...</button>
+          <div id="datasetDropdown" class="datasetDropdown"></div>
+        </div>
+      </div>
+
+
+    </div>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="dsTabBar">
+    <button class="dsTab" data-page="details" type="button">Details</button>
+    <button class="dsTab active" data-page="data" type="button">Data</button>
+    <button class="dsTab" data-page="chart" type="button">Chart</button>
+    <button class="dsTab" data-page="notes" type="button">Notes</button>
+    <button class="dsTab" data-page="auditLog" type="button">Audit Log</button>
+  </div>
+
+  <!-- Details tab page -->
+  <div id="dsDetailsPage" style="display:none;">
+    <div class="dsDetailsPanel">
+      <div class="dsDetailsGrid">
+        <div class="dsDetailLabel">
+          <label class="small" for="dsDetailName">Name</label>
+        </div>
+        <div class="dsDetailInput">
+          <input id="dsDetailName" autocomplete="off" />
+        </div>
+
+        <div class="dsDetailLabel">
+          <label class="small" for="dsDetailType">Dataset Type</label>
+        </div>
+        <div class="dsDetailInput">
+          <select id="dsDetailType"></select>
+        </div>
+
+        <div class="dsDetailLabel">
+          <label class="small" for="dsDetailFormula">Formula</label>
+        </div>
+        <div class="dsDetailInput">
+          <input id="dsDetailFormula" autocomplete="off" readonly />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Data tab page: parameter strip + formula bar + triangle table -->
+  <div id="dsDataPage">
+    <div class="right">
+      <!-- parameter strip -->
+      <div class="topRow">
+        <div class="panel" id="datasetTopBar">
+          <div class="topbar-grid">
+            <!-- Col 1: Cumulative / Transposed / Development / Calendar -->
+            <div class="topbar-left" style="grid-column: 1; grid-row: 1 / span 2;">
+              <label class="chk"><span>Cumulative:</span> <input id="cumulativeChk" type="checkbox" checked /></label>
+              <label class="chk"><span>Transposed:</span> <input id="transposedChk" type="checkbox" /></label>
+              <label class="rad">
+                <input type="radio" name="timeMode" value="development" checked />
+                <span>Development</span>
+              </label>
+              <label class="rad">
+                <input type="radio" name="timeMode" value="calendar" />
+                <span>Calendar</span>
+              </label>
+            </div>
+
+            <!-- Col 2: Labels -->
+            <div class="topbar-label-stack" style="grid-column: 2; grid-row: 1 / span 2;">
+              <div class="topbar-label"><span class="lbl">Origin Length:</span></div>
+              <div class="topbar-label"><span class="lbl">Development Length:</span></div>
+            </div>
+
+            <!-- Col 3: Inputs -->
+            <div class="topbar-input-stack" style="grid-column: 3; grid-row: 1 / span 2;">
+              <div class="topbar-input">
+                <div id="originLenWrap" class="lenSelectWrap">
+                  <button
+                    id="originLenDisplay"
+                    class="lenSelectDisplay"
+                    type="button"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    aria-controls="originLenDropdown"
+                  >
+                    <span class="lenSelectValue">12</span>
+                    <span class="lenSelectCaret" aria-hidden="true">
+                      <svg viewBox="0 0 16 16" focusable="false" aria-hidden="true">
+                        <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                      </svg>
+                    </span>
+                  </button>
+                  <div id="originLenDropdown" class="datasetDropdown lenDropdown" role="listbox" aria-label="Origin Length options"></div>
+                  <select id="originLenSelect" class="lenSelectNative" tabindex="-1" aria-hidden="true"></select>
+                </div>
+              </div>
+              <div class="topbar-input">
+                <div id="devLenWrap" class="lenSelectWrap">
+                  <button
+                    id="devLenDisplay"
+                    class="lenSelectDisplay"
+                    type="button"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    aria-controls="devLenDropdown"
+                  >
+                    <span class="lenSelectValue">12</span>
+                    <span class="lenSelectCaret" aria-hidden="true">
+                      <svg viewBox="0 0 16 16" focusable="false" aria-hidden="true">
+                        <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                      </svg>
+                    </span>
+                  </button>
+                  <div id="devLenDropdown" class="datasetDropdown lenDropdown" role="listbox" aria-label="Development Length options"></div>
+                  <select id="devLenSelect" class="lenSelectNative" tabindex="-1" aria-hidden="true"></select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Col 4: Remaining -->
+            <div class="topbar-right-stack" style="grid-column: 4; grid-row: 1 / span 2;">
+              <div class="topbar-right">
+                <div class="field linkField">
+                  <label class="linkToggle">
+                    <input id="linkLenChk" type="checkbox" checked />
+                    <span class="linkIcon" aria-hidden="true">&#128279;</span>
+                    <span class="linkText">Link Period Length</span>
+                    <span class="linkTip" role="tooltip">Keep Origin Length and Development Length the same</span>
+                  </label>
+                </div>
+              </div>
+              <div class="topbar-right">
+                <div class="field">
+                  <span class="lbl">Decimal Places:</span>
+                  <input id="decimalPlaces" type="number" min="0" max="6" value="1" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Triangle -->
+      <div class="panel" id="triPanel">
+        <div class="panelInner">
+          <div id="tableWrapHost">
+            <div id="tableWrap"></div>
+            <button id="tableScrollUpBtn" class="tableScrollArrow" type="button" title="Scroll up" aria-label="Scroll up">
+              <svg viewBox="0 0 16 16" focusable="false" aria-hidden="true"><path d="M4.5 10.5 8 7l3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            </button>
+            <button id="tableScrollDownBtn" class="tableScrollArrow" type="button" title="Scroll down" aria-label="Scroll down">
+              <svg viewBox="0 0 16 16" focusable="false" aria-hidden="true"><path d="M4.5 5.5 8 9l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            </button>
+            <button id="tableScrollLeftBtn" class="tableScrollArrow" type="button" title="Scroll left" aria-label="Scroll left">
+              <svg viewBox="0 0 16 16" focusable="false" aria-hidden="true"><path d="M10.5 4.5 7 8l3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            </button>
+            <button id="tableScrollRightBtn" class="tableScrollArrow" type="button" title="Scroll right" aria-label="Scroll right">
+              <svg viewBox="0 0 16 16" focusable="false" aria-hidden="true"><path d="M5.5 4.5 9 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart tab page -->
+  <div id="dsChartPage" style="display:none;">
+    <div class="right">
+      <div class="panel" id="chartPanel">
+        <div class="panelInner">
+          <div class="chartHeader">
+            <span class="small"><b id="chartTitle">Development Curves</b></span>
+            <div class="chartToggle" id="chartModeToggle">
+              <button class="chartToggleBtn active" data-mode="byCol" title="By Column (Dev Period)">By Column</button>
+              <button class="chartToggleBtn" data-mode="byRow" title="By Row (Origin)">By Row</button>
+            </div>
+          </div>
+          <div class="chartRow">
+            <div class="chartCanvasWrap">
+              <canvas id="devChart"></canvas>
+            </div>
+            <div id="devChartLegend" class="chartLegend" aria-label="Legend"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notes tab page -->
+  <div id="dsNotesPage" style="display:none;">
+    <div class="dsNotesEditorWrap">
+      <div class="notesFormatToolbar" id="dsNotesFormatToolbar" data-notes-format-toolbar>
+        <label class="notesFormatGroup" title="Font family">
+          <span class="notesFormatLabel">Font</span>
+          <select class="notesFormatSelect notesFormatFontFamily" data-notes-style="font-family">
+            <option value="">Default</option>
+            <option value="'Segoe UI', Tahoma, sans-serif">Segoe UI</option>
+            <option value="Calibri, 'Segoe UI', sans-serif">Calibri</option>
+            <option value="'Consolas', 'Courier New', monospace">Consolas</option>
+            <option value="'Georgia', serif">Georgia</option>
+          </select>
+        </label>
+        <label class="notesFormatGroup" title="Font size">
+          <span class="notesFormatLabel">Size</span>
+          <input
+            class="notesFormatInput notesFormatFontSize"
+            type="number"
+            min="8"
+            max="48"
+            step="1"
+            value="13"
+            data-notes-style="font-size"
+          />
+        </label>
+        <label class="notesFormatGroup notesFormatColorGroup" title="Text color">
+          <span class="notesFormatLabel">Color</span>
+          <input class="notesFormatColor" type="color" value="#1c2433" data-notes-style="color" />
+        </label>
+        <span class="notesFormatDivider" aria-hidden="true"></span>
+        <button type="button" class="notesFormatToggle" data-notes-toggle="bold" aria-pressed="false" title="Bold">B</button>
+        <button type="button" class="notesFormatToggle notesFormatToggleItalic" data-notes-toggle="italic" aria-pressed="false" title="Italic">I</button>
+        <button type="button" class="notesFormatToggle" data-notes-toggle="underline" aria-pressed="false" title="Underline">U</button>
+        <button type="button" class="notesFormatToggle" data-notes-toggle="strike" aria-pressed="false" title="Strikethrough">S</button>
+      </div>
+      <div class="dsNotesInputWrap" id="dsNotesInputWrap">
+        <pre id="dsNotesDecor" aria-hidden="true"></pre>
+        <textarea
+          id="dsNotesInput"
+          placeholder="Enter notes..."
+          spellcheck="false"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          data-gramm="false"
+          data-gramm_editor="false"
+          data-enable-grammarly="false"
+        ></textarea>
+      </div>
+      <div class="dsNotesToolbar" id="dsNotesToolbar">
+        <div class="dsNotesActions">
+          <span id="dsNotesSaveState" class="small dsNotesSaveState">Not saved</span>
+          <button id="dsNotesSaveBtn" type="button">Save Notes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audit Log tab page -->
+  <div id="dsAuditLogPage" style="display:none;">
+    <div class="dsPlaceholderBlock">
+      <div class="small"><b>Audit Log</b></div>
+      <div class="dsPlaceholderText">No audit entries yet.</div>
+    </div>
+  </div>
+
+  <div id="hiddenControls" style="display:none;">
+    <div class="small" id="dsMeta"></div>
+    <button id="saveBtn">Save</button>
+    <button id="toggleBlankBtn">Show blanks</button>
+    <pre id="log"></pre>
+  </div>
+
+  <div id="ctxMenu" class="ctx-menu" style="display:none;">
+    <div class="ctx-menu-inner">
+      <button class="ctx-item" data-action="copy_value">Copy value</button>
+      <button class="ctx-item" data-action="copy_formula">Copy formula</button>
+      <div class="ctx-sep"></div>
+      <button class="ctx-item" data-action="clear">Clear</button>
+      <button class="ctx-item" data-action="select_all">Select all</button>
+      <div class="ctx-sep"></div>
+      <button class="ctx-item" data-action="export_data">Export data</button>
+    </div>
+  </div>
+
+  <!-- Same-folder JS entrypoint (no /static) -->
+  <!--  -->`;
+  while (wrapper.firstElementChild) {
+    container.appendChild(wrapper.firstElementChild);
+  }
+  return container;
+}

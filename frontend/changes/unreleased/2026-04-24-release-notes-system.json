@@ -1,0 +1,10 @@
+{
+  "type": "improvement",
+  "scope": "build",
+  "audience": "internal",
+  "summary": "Added automated release fragment validation and per-version release note generation.",
+  "details": [
+    "Successful packaged builds now archive unreleased fragments into versioned release notes.",
+    "Contributors can record changes in small JSON fragments instead of editing one large changelog by hand."
+  ]
+}

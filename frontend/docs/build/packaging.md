@@ -1,0 +1,64 @@
+# Build and Packaging
+
+## Purpose
+<!-- MANUAL:BEGIN -->
+Document Electron + Python packaging inputs and scripts.
+<!-- MANUAL:END -->
+
+## Entry Points
+<!-- AUTO-GEN:BEGIN build.packaging.entry_points -->
+| Script | Command |
+| --- | --- |
+| `npm run build` | `npm run build:python && npm run build:electron && npm run clean:python-artifacts` |
+| `npm run build:electron` | `electron-builder --win` |
+| `npm run build:python` | `pyinstaller build/server.spec --distpath python_dist --workpath python_build --noconfirm` |
+| `npm run clean:python-artifacts` | `node -e "const fs=require('fs'); ['python_dist','python_build'].forEach((p)=>fs.rmSync(p,{recursive:true,force:true}));"` |
+| `npm run electron` | `electron .` |
+
+Electron main entry: `electron_main.js`
+<!-- AUTO-GEN:END -->
+
+## Key Files
+<!-- AUTO-GEN:BEGIN build.packaging.key_files -->
+- [`package.json`](../../package.json) - Build scripts, Electron builder config, installer metadata.
+- [`build/server.spec`](../../build/server.spec) - PyInstaller spec for Python backend executable.
+- [`build/server_entry.py`](../../build/server_entry.py) - PyInstaller entrypoint for the bundled backend server.
+- [`build/release_notes.py`](../../build/release_notes.py) - Release fragment validator and versioned release note generator.
+- [`electron_main.js`](../../electron_main.js) - Electron main process entry.
+- [`app_launcher.py`](../../app_launcher.py) - Python host launcher used by packaged runtime.
+- [`build/installer.nsh`](../../build/installer.nsh) - NSIS custom installer script include.
+- [`build/build_app.bat`](../../build/build_app.bat) - Convenience build script wrapper.
+- [`build/convert_icon.js`](../../build/convert_icon.js) - Build helper for regenerating Windows icon assets.
+<!-- AUTO-GEN:END -->
+
+## External Interfaces
+<!-- MANUAL:BEGIN -->
+- Node scripts from `package.json` drive build orchestration.
+- PyInstaller spec (`build/server.spec`) builds backend executable artifacts.
+- `build/release_notes.py` validates unreleased change fragments and generates versioned release notes in `docs/releases/`.
+- `build/build_app.bat` updates the app version before packaging: by default it bumps the patch version, and an explicit semantic version argument overrides that default.
+- Successful build flows now clean `python_dist/` and `python_build/` automatically.
+<!-- MANUAL:END -->
+
+## Data/State/Caches
+<!-- MANUAL:BEGIN -->
+- Build outputs: `dist/`, `python_build/`, `python_dist/`.
+- Installer settings in `package.json` and `build/installer.nsh`.
+- Release tracking data lives under `changes/unreleased/`, `changes/archive/`, and `docs/releases/`.
+- `python_dist/` and `python_build/` are transient and removed after successful packaging.
+<!-- MANUAL:END -->
+
+## Common Change Tasks
+<!-- MANUAL:BEGIN -->
+1. Update app packaging metadata: edit `package.json` `build` block.
+2. Update bundled backend: edit `build/server.spec` and verify `extraResources` mappings.
+3. Add or update unreleased change fragments in `changes/unreleased/` before packaging a release.
+4. If you need a specific release version, run `build\build_app.bat <version>` (for example `build\build_app.bat 2.0.0`); otherwise the script auto-increments the patch version.
+5. If inspecting PyInstaller artifacts is needed, run `npm run build:python` directly (the full build cleans them on success).
+<!-- MANUAL:END -->
+
+## Known Risks
+<!-- MANUAL:BEGIN -->
+- Packaging excludes can accidentally omit runtime files.
+- Divergence between dev and packaged paths causes startup failures.
+<!-- MANUAL:END -->
