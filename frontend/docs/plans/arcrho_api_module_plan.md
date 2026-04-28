@@ -23,7 +23,7 @@ ArcRho 自定义 Python 模块（`arcrho`）子项目计划
 2. 约束与设计原则
 
 必须遵守：
-1. 根目录来源必须是 `ui_config.json` / `app_server.config`，禁止硬编码 `E:\\ADAS`。
+1. 根目录来源必须是 `workspace_paths.json` / `app_server.config`，禁止硬编码 `E:\\ADAS`。
 2. 代码分层保持 `router -> service -> config/schema`，不要把业务逻辑塞进 router。
 3. 对外接口默认向后兼容；新增能力优先增量，不直接重构旧行为。
 4. Scripting 会话隔离语义保持不变（不同会话变量互不污染）。
@@ -174,7 +174,7 @@ Docs
 
 QA
 1. 新建最小回归脚本（导入、读取、写入、异常、并发会话）。
-2. 覆盖路径变更场景（修改 `ui_config.root_path` 后是否生效）。
+2. 覆盖路径变更场景（修改 `workspace_paths.workspace_root` 后是否生效）。
 3. 覆盖权限场景（禁止写目录的错误提示）。
 
 ---
@@ -183,7 +183,7 @@ QA
 
 功能验收：
 1. `import arcrho` 在 scripting console 成功。
-2. `arcrho.application.root` 与 `ui_config` 配置一致。
+2. `arcrho.application.root` 与 `workspace_paths` 配置一致。
 3. `arcrho.projects()` 可返回项目对象列表，且不依赖硬编码路径。
 4. `Dfm` 读方法与写方法在目标样例项目上可用。
 

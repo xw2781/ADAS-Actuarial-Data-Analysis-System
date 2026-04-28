@@ -1,8 +1,8 @@
 {
   "name": "arcrho-electron",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
-  "main": "electron_main.js",
+  "main": "electron/main.js",
   "scripts": {
     "electron": "electron .",
     "build:python": "pyinstaller build/server.spec --distpath python_dist --workpath python_build --noconfirm",
@@ -42,8 +42,8 @@
         "to": "adas_server"
       },
       {
-        "from": "ui_config.json",
-        "to": "ui_config.json"
+        "from": "workspace_paths.json",
+        "to": "workspace_paths.json"
       }
     ],
     "win": {

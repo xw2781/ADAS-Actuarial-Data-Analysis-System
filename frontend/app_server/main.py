@@ -14,7 +14,7 @@ from app_server import config
 from app_server.api import (
     workflow_router,
     app_control_router,
-    ui_config_router,
+    workspace_paths_router,
     audit_log_router,
     dataset_router,
     book_router,
@@ -38,7 +38,7 @@ app = FastAPI(title="Triangle Demo API", version="0.1")
 # --- Include routers (API routes BEFORE static mount) ---
 app.include_router(workflow_router)
 app.include_router(app_control_router)
-app.include_router(ui_config_router)
+app.include_router(workspace_paths_router)
 app.include_router(audit_log_router)
 app.include_router(dataset_router)
 app.include_router(book_router)

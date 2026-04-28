@@ -15,20 +15,20 @@ Detected `fetch(...)` targets in key JS files:
 - `/app/restart_electron`
 - `/app/shutdown`
 - `/restart`
-- `/ui_config`
 - `/workflow/default_dir`
 - `/workflow/load`
+- `/workspace_paths`
 
-Detected `adas:*` message types in key JS files:
-- `adas:autosave-toggle`
-- `adas:browsing-history-updated`
-- `adas:dfm-tab-activated`
-- `adas:force-rebuild-toggle`
-- `adas:open-path-result`
-- `adas:set-app-font`
-- `adas:set-zoom`
-- `adas:tab-activated`
-- `adas:workflow-load`
+Detected `arcrho:*` message types in key JS files:
+- `arcrho:autosave-toggle`
+- `arcrho:browsing-history-updated`
+- `arcrho:dfm-tab-activated`
+- `arcrho:force-rebuild-toggle`
+- `arcrho:open-path-result`
+- `arcrho:set-app-font`
+- `arcrho:set-zoom`
+- `arcrho:tab-activated`
+- `arcrho:workflow-load`
 <!-- AUTO-GEN:END -->
 
 ## Key Files
@@ -41,7 +41,7 @@ Detected `adas:*` message types in key JS files:
 ## External Interfaces
 <!-- MANUAL:BEGIN -->
 - Uses `BroadcastChannel` for shell <-> popout message relays.
-- Forwards `adas:*` iframe messages back to shell.
+- Forwards `arcrho:*` iframe messages back to shell.
 <!-- MANUAL:END -->
 
 ## Data/State/Caches

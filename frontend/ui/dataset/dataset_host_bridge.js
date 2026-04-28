@@ -34,11 +34,11 @@ export function wireDatasetHostBridge(deps) {
   const { getTriInputsForStorage, instanceId, redrawChartSafely } = deps;
 
   window.addEventListener("message", (e) => {
-    if (e?.data?.type === "adas:get-dataset-settings") {
+    if (e?.data?.type === "arcrho:get-dataset-settings") {
       const settings = getTriInputsForStorage();
       window.parent.postMessage(
         {
-          type: "adas:dataset-settings",
+          type: "arcrho:dataset-settings",
           requestId: e.data.requestId,
           stepId: instanceId,
           settings,
@@ -48,7 +48,7 @@ export function wireDatasetHostBridge(deps) {
       return;
     }
 
-    if (e?.data?.type === "adas:tab-activated") {
+    if (e?.data?.type === "arcrho:tab-activated") {
       // Only redraw when THIS tab becomes active
       requestAnimationFrame(() => {
         requestAnimationFrame(redrawChartSafely);

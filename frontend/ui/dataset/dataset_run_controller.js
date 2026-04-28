@@ -385,7 +385,7 @@ export function createDatasetRunController(deps) {
     if (stepId && !window.ADA_DFM_CONTEXT) {
       window.parent.postMessage(
         {
-          type: "adas:update-workflow-step-title",
+          type: "arcrho:update-workflow-step-title",
           stepId: stepId,
           title: title,
         },

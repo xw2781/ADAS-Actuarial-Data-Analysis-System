@@ -1,4 +1,4 @@
-﻿// Entry point: orchestrates load/save/toggle and wires events.
+// Entry point: orchestrates load/save/toggle and wires events.
 
 import { state } from "/ui/shared/state.js";
 import { config } from "/ui/shared/config.js";
@@ -97,20 +97,20 @@ applyZoomValue(loadZoomFromStorage());
 applyAppFont(loadAppFontFromStorage());
 
 function notifyDatasetUpdated() {
-  window.dispatchEvent(new CustomEvent("adas:dataset-updated"));
+  window.dispatchEvent(new CustomEvent("arcrho:dataset-updated"));
 }
 
 window.addEventListener("message", (e) => {
-  if (e?.data?.type === "adas:set-zoom") {
+  if (e?.data?.type === "arcrho:set-zoom") {
     applyZoomValue(e.data.zoom);
   }
-  if (e?.data?.type === "adas:set-app-font") {
+  if (e?.data?.type === "arcrho:set-app-font") {
     applyAppFont(e.data.font);
   }
-  if (e?.data?.type === "adas:workflow-global-changed") {
+  if (e?.data?.type === "arcrho:workflow-global-changed") {
     handleWorkflowGlobalChange(e.data.globalControl);
   }
-  if (e?.data?.type === "adas:force-rebuild-toggle") {
+  if (e?.data?.type === "arcrho:force-rebuild-toggle") {
     try {
       localStorage.setItem(FORCE_REBUILD_KEY, e?.data?.enabled ? "1" : "0");
     } catch {
@@ -127,11 +127,11 @@ window.addEventListener("storage", (e) => {
 });
 
 window.addEventListener("mousedown", () => {
-  window.parent.postMessage({ type: "adas:close-shell-menus" }, "*");
+  window.parent.postMessage({ type: "arcrho:close-shell-menus" }, "*");
 }, { capture: true });
 
 function requestCloseActiveTab() {
-  window.parent.postMessage({ type: "adas:close-active-tab" }, "*");
+  window.parent.postMessage({ type: "arcrho:close-active-tab" }, "*");
 }
 
 window.addEventListener("keydown", (e) => {
@@ -145,7 +145,7 @@ window.addEventListener("keydown", (e) => {
   if (e.ctrlKey && key === "q") {
     e.preventDefault();
     e.stopPropagation();
-    window.parent.postMessage({ type: "adas:hotkey", action: "app_shutdown" }, "*");
+    window.parent.postMessage({ type: "arcrho:hotkey", action: "app_shutdown" }, "*");
     return;
   }
   if (e.ctrlKey) {
@@ -153,32 +153,32 @@ window.addEventListener("keydown", (e) => {
       e.preventDefault();
       e.stopPropagation();
       const action = e.shiftKey ? "file_save_as" : "file_save";
-      window.parent.postMessage({ type: "adas:hotkey", action }, "*");
+      window.parent.postMessage({ type: "arcrho:hotkey", action }, "*");
       return;
     }
     if (key === "o") {
       e.preventDefault();
       e.stopPropagation();
-      window.parent.postMessage({ type: "adas:hotkey", action: "file_import" }, "*");
+      window.parent.postMessage({ type: "arcrho:hotkey", action: "file_import" }, "*");
       return;
     }
     if (key === "p") {
       e.preventDefault();
       e.stopPropagation();
-      window.parent.postMessage({ type: "adas:hotkey", action: "file_print" }, "*");
+      window.parent.postMessage({ type: "arcrho:hotkey", action: "file_print" }, "*");
       return;
     }
     if (e.shiftKey && key === "f") {
       e.preventDefault();
       e.stopPropagation();
-      window.parent.postMessage({ type: "adas:hotkey", action: "view_toggle_nav" }, "*");
+      window.parent.postMessage({ type: "arcrho:hotkey", action: "view_toggle_nav" }, "*");
       return;
     }
   }
   if (e.altKey && key === "r" && e.ctrlKey) {
     e.preventDefault();
     e.stopPropagation();
-    window.parent.postMessage({ type: "adas:hotkey", action: "file_restart" }, "*");
+    window.parent.postMessage({ type: "arcrho:hotkey", action: "file_restart" }, "*");
     return;
   }
 }, { capture: true });
@@ -188,7 +188,7 @@ document.addEventListener("wheel", (e) => {
   e.preventDefault();
   e.stopPropagation();
   e.stopImmediatePropagation();
-  window.parent.postMessage({ type: "adas:zoom", deltaY: e.deltaY }, "*");
+  window.parent.postMessage({ type: "arcrho:zoom", deltaY: e.deltaY }, "*");
 }, { capture: true, passive: false });
 
 // -----------------------------
@@ -1109,7 +1109,7 @@ function recordDatasetBrowsingHistory(entry) {
   try {
     window.parent.postMessage(
       {
-        type: "adas:browsing-history-updated",
+        type: "arcrho:browsing-history-updated",
         entry: out?.entry || normalized,
       },
       "*",
@@ -1446,7 +1446,7 @@ function saveTriInputsToStorage() {
     }
     try {
       window.parent.postMessage({
-        type: "adas:dataset-settings-changed",
+        type: "arcrho:dataset-settings-changed",
         stepId: instanceId,
         settings: payload,
         resolved: resolvedInputs || null,
@@ -1674,7 +1674,7 @@ function handleWorkflowGlobalChange(control = null) {
     saveTriInputsToStorage();
     scheduleAutoRun(0);
     try {
-      window.dispatchEvent(new CustomEvent("adas:workflow-defaults-updated", { detail: defaults }));
+      window.dispatchEvent(new CustomEvent("arcrho:workflow-defaults-updated", { detail: defaults }));
     } catch {
       // ignore
     }
@@ -2092,7 +2092,7 @@ function updateCurrentTabTitle() {
 
   window.parent.postMessage(
     {
-      type: "adas:update-active-tab-title",
+      type: "arcrho:update-active-tab-title",
       title: `${triangleName}`,
     },
     "*"
@@ -2103,7 +2103,7 @@ function updateCurrentTabTitle() {
 
 function setStatus(text) {
   try {
-    window.parent.postMessage({ type: "adas:status", text }, "*");
+    window.parent.postMessage({ type: "arcrho:status", text }, "*");
   } catch {
     // ignore
   }

@@ -20,7 +20,7 @@ Application lifecycle control domain (restart/shutdown flags) coordinated betwee
 - [`app_server/api/app_control_router.py`](../../../app_server/api/app_control_router.py) - Restart/shutdown control endpoints.
 - [`app_server/config.py`](../../../app_server/config.py) - Flag-file paths for app control.
 - [`app_launcher.py`](../../../app_launcher.py) - Launcher process watching control flags.
-- [`electron_main.js`](../../../electron_main.js) - Electron host restart/shutdown integration.
+- [`electron/main.js`](../../../electron/main.js) - Electron host restart/shutdown integration.
 <!-- AUTO-GEN:END -->
 
 ## External Interfaces

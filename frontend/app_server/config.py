@@ -25,7 +25,10 @@ def _resolve_project_root() -> Path:
         Path.cwd(),
     ]
     for candidate in candidates:
-        if (candidate / "ui_config.json").exists() or (candidate / "index.html").exists():
+        if (
+            (candidate / "workspace_paths.json").exists()
+            or (candidate / "index.html").exists()
+        ):
             return candidate
     return candidates[0]
 
@@ -33,69 +36,89 @@ def _resolve_project_root() -> Path:
 PROJECT_ROOT = _resolve_project_root()
 
 # ---------------------------------------------------------------------------
-# Config — Load from ui_config.json
+# Config - load workspace path settings
 # ---------------------------------------------------------------------------
 
-UI_CONFIG_PATH = str(PROJECT_ROOT / "ui_config.json")
-DEFAULT_ROOT_PATH = r"E:\ADAS"
+WORKSPACE_PATHS_PATH = str(PROJECT_ROOT / "workspace_paths.json")
+DEFAULT_WORKSPACE_ROOT = r"E:\ADAS"
+DEFAULT_WORKSPACE_PATHS = {
+    "projects_dir": "projects",
+    "requests_dir": "requests",
+}
 
 
-def load_ui_config() -> Dict[str, Any]:
-    """Load configuration from ui_config.json."""
+def _read_json_file(path: str) -> Dict[str, Any]:
     try:
-        with open(UI_CONFIG_PATH, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             raw = json.load(f)
     except Exception:
-        raw = {}
+        return {}
 
     if not isinstance(raw, dict):
-        raw = {}
+        return {}
+    return raw
 
-    root_path = raw.get("root_path")
-    if not isinstance(root_path, str) or not root_path.strip():
-        root_path = DEFAULT_ROOT_PATH
+
+def _clean_path_segment(value: Any, default: str) -> str:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return default
+
+
+def load_workspace_paths() -> Dict[str, Any]:
+    """Load runtime workspace path configuration."""
+    raw = _read_json_file(WORKSPACE_PATHS_PATH)
+
+    workspace_root = raw.get("workspace_root")
+    if not isinstance(workspace_root, str) or not workspace_root.strip():
+        workspace_root = DEFAULT_WORKSPACE_ROOT
 
     paths = raw.get("paths")
     if not isinstance(paths, dict):
         paths = {}
 
-    return {"root_path": root_path, "paths": paths}
+    projects_dir = _clean_path_segment(
+        paths.get("projects_dir"),
+        DEFAULT_WORKSPACE_PATHS["projects_dir"],
+    )
+    requests_dir = _clean_path_segment(
+        paths.get("requests_dir"),
+        DEFAULT_WORKSPACE_PATHS["requests_dir"],
+    )
+
+    return {
+        "workspace_root": str(workspace_root).strip(),
+        "paths": {
+            "projects_dir": projects_dir,
+            "requests_dir": requests_dir,
+        },
+    }
+
+
+def save_workspace_paths(cfg: Dict[str, Any]) -> None:
+    """Persist normalized workspace path configuration."""
+    with open(WORKSPACE_PATHS_PATH, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2, ensure_ascii=False)
 
 
 def get_root_path() -> str:
-    """Get the root path from config."""
-    return load_ui_config()["root_path"]
+    """Get the workspace root path from config."""
+    return load_workspace_paths()["workspace_root"]
 
 
 def get_path(subpath: str) -> str:
-    """Get a full path by joining root_path with subpath."""
+    """Get a full path by joining the workspace root with subpath."""
     return os.path.join(get_root_path(), subpath)
 
 
-# Derived paths (loaded dynamically from config)
-def _get_data_dir() -> str:
-    cfg = load_ui_config()
-    return get_path(cfg.get("paths", {}).get("web_ui", "Web UI"))
-
-
 def _get_project_map_dir() -> str:
-    cfg = load_ui_config()
-    return get_path(cfg.get("paths", {}).get("project_map", "projects"))
-
-
-def _get_virtual_projects_dir() -> str:
-    cfg = load_ui_config()
-    return get_path(cfg.get("paths", {}).get("virtual_projects", "Virtual Projects"))
-
-
-def _get_data_base() -> str:
-    cfg = load_ui_config()
-    return get_path(cfg.get("paths", {}).get("data", "data"))
+    cfg = load_workspace_paths()
+    return get_path(cfg.get("paths", {}).get("projects_dir", DEFAULT_WORKSPACE_PATHS["projects_dir"]))
 
 
 def _get_requests_dir() -> str:
-    cfg = load_ui_config()
-    return get_path(cfg.get("paths", {}).get("requests", "requests"))
+    cfg = load_workspace_paths()
+    return get_path(cfg.get("paths", {}).get("requests_dir", DEFAULT_WORKSPACE_PATHS["requests_dir"]))
 
 
 def _get_workflow_dir() -> str:
@@ -125,14 +148,12 @@ WORKFLOW_DIR: str = ""
 SCRIPTING_DIR: str = ""
 ALLOWED_BOOK_DIRS: List[Path] = []
 REQUEST_DIR: str = ""
-DATA_BASE: str = ""
 
 
 def refresh_runtime_paths() -> None:
-    """Refresh runtime directories from ui_config.json."""
+    """Refresh runtime directories from workspace path config."""
     global DATA_DIR, PROJECT_SETTINGS_DIR, PROJECT_BOOK, WORKFLOW_DIR, SCRIPTING_DIR
-    global ALLOWED_BOOK_DIRS, REQUEST_DIR, DATA_BASE
-    DATA_DIR = _get_data_dir()
+    global ALLOWED_BOOK_DIRS, REQUEST_DIR
     PROJECT_SETTINGS_DIR = _get_project_map_dir()
     PROJECT_BOOK = os.path.join(
         PROJECT_SETTINGS_DIR,
@@ -140,12 +161,11 @@ def refresh_runtime_paths() -> None:
     )
     WORKFLOW_DIR = _get_workflow_dir()
     SCRIPTING_DIR = _get_scripting_dir()
+    DATA_DIR = SCRIPTING_DIR
     ALLOWED_BOOK_DIRS = [
-        Path(_get_virtual_projects_dir()).resolve(),
-        # add more if needed
+        Path(PROJECT_SETTINGS_DIR).resolve(),
     ]
     REQUEST_DIR = _get_requests_dir()
-    DATA_BASE = _get_data_base()
 
 
 # In-memory dataset cache

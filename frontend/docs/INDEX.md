@@ -5,7 +5,7 @@
 This is the top-level navigation hub for code agents.
 
 System map:
-- Electron host/runtime: `electron_main.js`, `electron_preload.js`, `app_shell.py`.
+- Electron host/runtime: `electron/main.js`, `electron/preload.js`, `app_shell.py`.
 - Frontend pages/features: shell + dataset + DFM + workflow + project settings + pop-out.
 - App-server API: FastAPI app in `app_server/main.py` with domain routers in `app_server/api`.
 - Runtime/config state: path resolution and cache constants in `app_server/config.py`.

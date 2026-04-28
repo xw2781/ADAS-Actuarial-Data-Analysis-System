@@ -20,22 +20,22 @@ Detected `fetch(...)` targets in key JS files:
 - `/workflow/save`
 - `/workflow/save_as`
 
-Detected `adas:*` message types in key JS files:
-- `adas:close-active-tab`
-- `adas:close-shell-menus`
-- `adas:dfm-save`
-- `adas:get-dataset-settings`
-- `adas:get-dfm-settings`
-- `adas:hotkey`
-- `adas:set-app-font`
-- `adas:set-zoom`
-- `adas:tooltip`
-- `adas:update-workflow-tab-title`
-- `adas:workflow-dirty`
-- `adas:workflow-global-changed`
-- `adas:workflow-import`
-- `adas:workflow-saved`
-- `adas:zoom`
+Detected `arcrho:*` message types in key JS files:
+- `arcrho:close-active-tab`
+- `arcrho:close-shell-menus`
+- `arcrho:dfm-save`
+- `arcrho:get-dataset-settings`
+- `arcrho:get-dfm-settings`
+- `arcrho:hotkey`
+- `arcrho:set-app-font`
+- `arcrho:set-zoom`
+- `arcrho:tooltip`
+- `arcrho:update-workflow-tab-title`
+- `arcrho:workflow-dirty`
+- `arcrho:workflow-global-changed`
+- `arcrho:workflow-import`
+- `arcrho:workflow-saved`
+- `arcrho:zoom`
 <!-- AUTO-GEN:END -->
 
 ## Key Files
@@ -58,7 +58,7 @@ Detected `adas:*` message types in key JS files:
 - Persists workflow tab state using per-instance storage keys.
 - Uses imported/exported `.arcwf` payloads.
 - Enforces a single `global_control` step per workflow; duplicate instances are blocked or normalized to `picker`.
-- Stores DFM step settings snapshots (including optional `outputType`) via `adas:get-dfm-settings` / `adas:dfm-settings`.
+- Stores DFM step settings snapshots (including optional `outputType`) via `arcrho:get-dfm-settings` / `arcrho:dfm-settings`.
 - Reserving-class tree view toggle preferences (auto-expand/auto-close/double-click) are shared globally across projects.
 <!-- MANUAL:END -->
 

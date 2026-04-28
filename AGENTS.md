@@ -13,10 +13,11 @@ Before changing files under `frontend/`, read `frontend/AGENTS.md` and follow it
 When future component-specific `AGENTS.md` files are added, read the nearest one before editing that component.
 
 ## Commit and Push Workflow
-When the user asks an agent to commit and push ArcRho code:
+When the user asks an agent to commit and/or push ArcRho code:
 1. Inspect the final root-level diff/status and make sure the commit scope matches the current conversation.
-2. Write a fresh, specific commit message from the actual updates in that conversation. Do not reuse a generic message.
-3. Run the root helper from `ArcRho/`:
+2. Decide whether the work should stay on the current branch or move to a new branch. Consider a new branch for larger changes, multi-commit work, experimental changes, PR review, CI validation before merging, or when unrelated local changes make scope separation important. Present the recommendation and ask the user for the final branch decision before committing or pushing.
+3. Write a fresh, specific commit message from the actual updates in that conversation. Do not reuse a generic message.
+4. Run the root helper from `ArcRho/`:
    `powershell -ExecutionPolicy Bypass -File tools\agent_commit_push.ps1 -Message "Describe the current update"`
-4. Use `-DryRun` when reviewing commit scope, `-NoPush` for a local commit only, and a comma-list such as `-Pathspec frontend,data-engine` when intentionally limiting scope.
-5. Report the commit hash and push result back to the user.
+5. Use `-DryRun` when reviewing commit scope, `-NoPush` for a local commit only, and a comma-list such as `-Pathspec frontend,data-engine` when intentionally limiting scope.
+6. Report the commit hash and push result back to the user.

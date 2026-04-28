@@ -21,8 +21,8 @@ App-server domain map for FastAPI routers, schemas, and services.
 | `project_settings` | [`app_server/api/project_settings_router.py`](../../app_server/api/project_settings_router.py) | 11 | [`project_settings.md`](domains/project_settings.md) |
 | `reserving_class` | [`app_server/api/reserving_class_router.py`](../../app_server/api/reserving_class_router.py) | 11 | [`reserving_class.md`](domains/reserving_class.md) |
 | `table_summary` | [`app_server/api/table_summary_router.py`](../../app_server/api/table_summary_router.py) | 2 | [`table_summary.md`](domains/table_summary.md) |
-| `ui_config` | [`app_server/api/ui_config_router.py`](../../app_server/api/ui_config_router.py) | 2 | [`ui_config.md`](domains/ui_config.md) |
 | `workflow` | [`app_server/api/workflow_router.py`](../../app_server/api/workflow_router.py) | 5 | [`workflow.md`](domains/workflow.md) |
+| `workspace_paths` | [`app_server/api/workspace_paths_router.py`](../../app_server/api/workspace_paths_router.py) | 2 | [`workspace_paths.md`](domains/workspace_paths.md) |
 <!-- AUTO-GEN:END -->
 
 ## Key Files

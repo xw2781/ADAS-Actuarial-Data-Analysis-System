@@ -19,7 +19,7 @@ function updateNotebookTitleUI() {
     toolbarNotebookTitleEl.textContent = title;
   }
   try {
-    window.parent?.postMessage({ type: "adas:update-active-tab-title", title }, "*");
+    window.parent?.postMessage({ type: "arcrho:update-active-tab-title", title }, "*");
   } catch {}
 }
 
@@ -46,7 +46,7 @@ function postShellStatus(text) {
   const msg = String(text || "").trim();
   if (!msg) return;
   try {
-    window.parent?.postMessage({ type: "adas:status", text: msg }, "*");
+    window.parent?.postMessage({ type: "arcrho:status", text: msg }, "*");
   } catch {}
 }
 

@@ -31,7 +31,7 @@ let outputTypeRequestSeq = 0;
 let triangleInputRequestSeq = 0;
 let methodNameRequestSeq = 0;
 let pendingOutputTypeFromUrl = null;
-const DFM_METHOD_NAME_INDEX_UPDATED_EVENT = "adas:dfm-method-name-index-updated";
+const DFM_METHOD_NAME_INDEX_UPDATED_EVENT = "arcrho:dfm-method-name-index-updated";
 
 function toText(value) {
   return String(value ?? "").trim();
@@ -185,7 +185,7 @@ function postDfmStatus(text, options = {}) {
   try {
     window.parent.postMessage(
       {
-        type: "adas:status",
+        type: "arcrho:status",
         text: String(text || ""),
         ...(options?.tone ? { tone: options.tone } : {}),
       },
@@ -463,7 +463,7 @@ function renderOutputTypeDropdown(names, options = {}) {
       e.preventDefault();
       e.stopPropagation();
       applyOutputTypeSelection(name);
-      input.dispatchEvent(new CustomEvent("adas:output-type-selected", { detail: { value: name } }));
+      input.dispatchEvent(new CustomEvent("arcrho:output-type-selected", { detail: { value: name } }));
       closeOutputTypeDropdown();
     });
     dropdown.appendChild(option);
@@ -569,7 +569,7 @@ export function syncOutputTypeFromProject(options = {}) {
 export function updateAppTabTitle(title, userAction) {
   if (!title) return;
   const inst = getDfmInst();
-  window.parent.postMessage({ type: "adas:update-active-tab-title", title, inst, userAction: !!userAction }, "*");
+  window.parent.postMessage({ type: "arcrho:update-active-tab-title", title, inst, userAction: !!userAction }, "*");
 }
 
 export function syncMethodNameFromInputs() {
@@ -967,7 +967,7 @@ function wireOutputTypePicker() {
         const selected = toText(name);
         if (!selected) return;
         applyOutputTypeSelection(selected);
-        input.dispatchEvent(new CustomEvent("adas:output-type-selected", { detail: { value: selected } }));
+        input.dispatchEvent(new CustomEvent("arcrho:output-type-selected", { detail: { value: selected } }));
       },
     });
     if (out?.ok) {
@@ -1052,7 +1052,7 @@ function wireOutputTypePicker() {
     closeOutputTypeDropdown();
   });
 
-  input.addEventListener("adas:output-type-selected", () => {
+  input.addEventListener("arcrho:output-type-selected", () => {
     committedOutputType = toText(input.value);
   });
 

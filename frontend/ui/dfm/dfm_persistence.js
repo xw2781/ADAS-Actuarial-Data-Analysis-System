@@ -62,10 +62,10 @@ import { getDfmNotesText, setDfmNotesText } from "/ui/dfm/dfm_notes_tab.js";
 
 let ratioLoadTimer = null;
 let ratioLoadPendingReason = "";
-const DFM_INSTANCE_PRESENCE_EVENT = "adas:dfm-instance-presence";
+const DFM_INSTANCE_PRESENCE_EVENT = "arcrho:dfm-instance-presence";
 const DFM_LOCAL_LOOKUP_DEBUG_STATUS = true; // Temporary debug aid.
 const DFM_METHOD_NAME_INDEX_FILENAME = "dfm_method_names.json";
-const DFM_METHOD_NAME_INDEX_UPDATED_EVENT = "adas:dfm-method-name-index-updated";
+const DFM_METHOD_NAME_INDEX_UPDATED_EVENT = "arcrho:dfm-method-name-index-updated";
 const dfmMethodNameIndexCache = new Map();
 
 function getRatioLoadReasonPriority(reason) {
@@ -209,7 +209,7 @@ function getTrimmedInputValue(id) {
 function postDfmStatus(text, options = {}) {
   window.parent.postMessage(
     {
-      type: "adas:status",
+      type: "arcrho:status",
       text: String(text || ""),
       ...(options?.tone ? { tone: options.tone } : {}),
     },
@@ -295,7 +295,7 @@ function applySavedOutputTypeToUi(rawValue) {
   input.value = next;
   // Keep the picker module's committed value in sync without opening/revalidating
   // the dropdown during programmatic load.
-  input.dispatchEvent(new CustomEvent("adas:output-type-selected", { detail: { value: next } }));
+  input.dispatchEvent(new CustomEvent("arcrho:output-type-selected", { detail: { value: next } }));
 }
 
 function applySavedInputTriangleToUi(rawValue) {
@@ -823,7 +823,7 @@ export async function saveRatioSelectionPattern(forceSaveAs) {
   const hostApi = getHostApi();
   if (!hostApi || typeof hostApi.saveJsonFile !== "function") {
     alert("Save requires the desktop app.");
-    window.parent.postMessage({ type: "adas:status", text: "Save failed: desktop app required." }, "*");
+    window.parent.postMessage({ type: "arcrho:status", text: "Save failed: desktop app required." }, "*");
     return { ok: false, error: "desktop app required" };
   }
   const pattern = buildRatioSelectionPattern();
@@ -939,15 +939,15 @@ export async function saveRatioSelectionPattern(forceSaveAs) {
       statusText += ` | CSV save failed: ${csvError}`;
     }
     window.parent.postMessage(
-      { type: "adas:status", text: statusText },
+      { type: "arcrho:status", text: statusText },
       "*"
     );
     return { ok: true, path: result.path, csvPath, csvError, aggregatedCsvPaths };
   } else if (result && result.error) {
-    window.parent.postMessage({ type: "adas:status", text: `Save failed: ${result.error}` }, "*");
+    window.parent.postMessage({ type: "arcrho:status", text: `Save failed: ${result.error}` }, "*");
     return { ok: false, error: result.error };
   } else {
-    window.parent.postMessage({ type: "adas:status", text: "Save canceled." }, "*");
+    window.parent.postMessage({ type: "arcrho:status", text: "Save canceled." }, "*");
     return { ok: false, canceled: true };
   }
 }
@@ -956,7 +956,7 @@ export async function saveDfmTemplate() {
   const hostApi = getHostApi();
   if (!hostApi || typeof hostApi.saveJsonFile !== "function") {
     alert("Save requires the desktop app.");
-    window.parent.postMessage({ type: "adas:status", text: "Save failed: desktop app required." }, "*");
+    window.parent.postMessage({ type: "arcrho:status", text: "Save failed: desktop app required." }, "*");
     return;
   }
 
@@ -1009,11 +1009,11 @@ export async function saveDfmTemplate() {
 
   if (result && result.path) {
     const time = new Date().toLocaleTimeString();
-    window.parent.postMessage({ type: "adas:status", text: `Template saved at ${time}: ${result.path}` }, "*");
+    window.parent.postMessage({ type: "arcrho:status", text: `Template saved at ${time}: ${result.path}` }, "*");
   } else if (result && result.error) {
-    window.parent.postMessage({ type: "adas:status", text: `Template save failed: ${result.error}` }, "*");
+    window.parent.postMessage({ type: "arcrho:status", text: `Template save failed: ${result.error}` }, "*");
   } else {
-    window.parent.postMessage({ type: "adas:status", text: "Template save canceled." }, "*");
+    window.parent.postMessage({ type: "arcrho:status", text: "Template save canceled." }, "*");
   }
 }
 
@@ -1047,7 +1047,7 @@ export async function loadDfmTemplate() {
 
   const fileResult = await hostApi.readJsonFile({ path: filePath });
   if (!fileResult || !fileResult.exists || !fileResult.data) {
-    window.parent.postMessage({ type: "adas:status", text: "Failed to read template file." }, "*");
+    window.parent.postMessage({ type: "arcrho:status", text: "Failed to read template file." }, "*");
     return;
   }
 
@@ -1095,5 +1095,5 @@ export async function loadDfmTemplate() {
   if (isRatiosTabVisible()) renderRatioTable();
   if (isResultsTabVisible()) renderResultsTable();
 
-  window.parent.postMessage({ type: "adas:status", text: `Template loaded: ${filePath}` }, "*");
+  window.parent.postMessage({ type: "arcrho:status", text: `Template loaded: ${filePath}` }, "*");
 }

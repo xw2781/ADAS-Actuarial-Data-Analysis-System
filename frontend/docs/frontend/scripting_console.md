@@ -1,0 +1,59 @@
+# Frontend: Scripting Console
+
+## Purpose
+<!-- MANUAL:BEGIN -->
+Notebook-style scripting workspace for code, markdown, raw cells, execution output, and sidebar panels.
+<!-- MANUAL:END -->
+
+## Entry Points
+<!-- AUTO-GEN:BEGIN frontend.scripting_console.entry_points -->
+- `ui/scripting_console/scripting_console.html`: external scripts `/ui/libs/monaco-editor/min/vs/loader.js`, `/ui/scripting_console/scripting_console.js`, `/ui/scripting_console/scripting_console_cells.js`, `/ui/scripting_console/scripting_console_core.js`, `/ui/scripting_console/scripting_console_execution.js`, `/ui/scripting_console/scripting_console_notebook_io.js`, `/ui/scripting_console/scripting_console_panels.js`, `/ui/scripting_console/scripting_console_shortcuts.js`; inline imports _none_.
+
+Detected `fetch(...)` targets in key JS files:
+- `${API_BASE}${path}`
+
+Detected `arcrho:*` message types in key JS files:
+- `arcrho:hotkey`
+- `arcrho:status`
+- `arcrho:update-active-tab-title`
+<!-- AUTO-GEN:END -->
+
+## Key Files
+<!-- AUTO-GEN:BEGIN frontend.scripting_console.key_files -->
+- [`ui/scripting_console/scripting_console.html`](../../ui/scripting_console/scripting_console.html) - Notebook-style scripting console page layout.
+- [`ui/scripting_console/scripting_console.js`](../../ui/scripting_console/scripting_console.js) - Scripting console bootstrap and shell integration.
+- [`ui/scripting_console/scripting_console_core.js`](../../ui/scripting_console/scripting_console_core.js) - Notebook state, cell model, and command-mode helpers.
+- [`ui/scripting_console/scripting_console_cells.js`](../../ui/scripting_console/scripting_console_cells.js) - Cell rendering, selection, markdown, and drag/drop behavior.
+- [`ui/scripting_console/scripting_console_execution.js`](../../ui/scripting_console/scripting_console_execution.js) - Code execution, streaming output, and cancellation handling.
+- [`ui/scripting_console/scripting_console_shortcuts.js`](../../ui/scripting_console/scripting_console_shortcuts.js) - Keyboard shortcut parsing, customization, and persistence.
+- [`ui/scripting_console/scripting_console_panels.js`](../../ui/scripting_console/scripting_console_panels.js) - Sidebar, TOC, variables, and API reference panels.
+- [`ui/scripting_console/scripting_console_notebook_io.js`](../../ui/scripting_console/scripting_console_notebook_io.js) - Notebook save/open and `.ipynb` import/export helpers.
+<!-- AUTO-GEN:END -->
+
+## External Interfaces
+<!-- MANUAL:BEGIN -->
+- Called from shell as a scripting tab iframe.
+- Uses `/scripting/*` app-server routes for execution, variables, preferences, and notebook persistence.
+- Sends `arcrho:*` status and command messages to/from the shell.
+<!-- MANUAL:END -->
+
+## Data/State/Caches
+<!-- MANUAL:BEGIN -->
+- Stores per-tab draft notebook state with tab-scoped browser storage keys.
+- Saves notebooks as `.ipynb` files under the user scripting directory by default.
+- Persists keyboard shortcut preferences under APPDATA with browser storage fallback.
+<!-- MANUAL:END -->
+
+## Common Change Tasks
+<!-- MANUAL:BEGIN -->
+1. Change notebook model or persistence: update core state, notebook I/O, app-server scripting routes if needed, and docs together.
+2. Change cell behavior or shortcuts: update cells/core/shortcuts modules and verify command/edit mode interactions.
+3. Change sidebar or visual layout: update panels/cells/html together and keep INDEX.md as a short pointer only.
+<!-- MANUAL:END -->
+
+## Known Risks
+<!-- MANUAL:BEGIN -->
+- Keyboard handling is sensitive to edit mode, command mode, IME/composition, and Monaco focus.
+- Multi-cell selection, queueing, markdown folding, and drag/drop share state and can regress each other.
+- Long feature notes should stay in this module doc or release fragments, not in `docs/frontend/INDEX.md`.
+<!-- MANUAL:END -->

@@ -15,11 +15,11 @@ Detected `fetch(...)` targets in key JS files:
 - `/dataset_types?project_name=${encodeURIComponent(projectName)}`
 - `/template/default_dir`
 
-Detected `adas:*` message types in key JS files:
-- `adas:dfm-settings`
-- `adas:dfm-tab-changed`
-- `adas:status`
-- `adas:update-active-tab-title`
+Detected `arcrho:*` message types in key JS files:
+- `arcrho:dfm-settings`
+- `arcrho:dfm-tab-changed`
+- `arcrho:status`
+- `arcrho:update-active-tab-title`
 <!-- AUTO-GEN:END -->
 
 ## Key Files
@@ -35,7 +35,7 @@ Detected `adas:*` message types in key JS files:
 
 ## External Interfaces
 <!-- MANUAL:BEGIN -->
-- Exchanges `adas:*` messages with shell and workflow iframe.
+- Exchanges `arcrho:*` messages with shell and workflow iframe.
 - Reuses dataset APIs and reserving class selectors.
 - DFM Data grid reuses shared dataset `#tableWrap` frame/border rendering (native square `border` stroke with no outline/pseudo overlay to keep corners stable and avoid border paint overlapping grid cells after table render at non-integer zoom/scaling).
 - Shared dataset/DFM table keeps native smooth scrolling inside `#tableWrap`; after scroll idle, viewport position auto-snaps to nearest row/column grid boundaries to reduce sticky-header partial-overlap artifacts from sub-cell offsets.

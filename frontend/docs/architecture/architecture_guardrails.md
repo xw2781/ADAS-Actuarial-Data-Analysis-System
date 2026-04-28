@@ -28,7 +28,7 @@ MUST NOT:
 MUST:
 - Keep `ui/shell/ui_shell.js` as tab/iframe orchestration layer.
 - Keep feature pages (`dataset`, `workflow`, `DFM`, `project_settings`) isolated in iframe contexts.
-- Keep cross-context communication via explicit `adas:*` messages.
+- Keep cross-context communication via explicit `arcrho:*` messages.
 
 MUST NOT:
 - Collapse all feature logic into shell context.
@@ -36,9 +36,10 @@ MUST NOT:
 
 ## AR-4 Stable Public Contracts
 MUST:
-- Treat route paths and high-traffic message names as stable contracts.
-- Document any contract changes in MANUAL docs and contract files.
-- Preserve backward compatibility by default.
+- Treat route paths, persisted file schemas, and high-traffic message names as coordinated contracts.
+- Update all known producers and consumers in the same change when renaming or reshaping a contract.
+- Document intentional contract changes in MANUAL docs and contract files.
+- Prefer clean coordinated refactors over compatibility shims while the app is pre-production, unless the user explicitly asks for migration support.
 
 MUST NOT:
 - Rename/reshape contracts silently.

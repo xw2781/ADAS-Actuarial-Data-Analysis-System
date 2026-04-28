@@ -5,7 +5,7 @@ block_cipher = None
 build_dir = Path(SPECPATH)
 repo_root = build_dir.parent
 
-# Collect the served frontend tree and packaged config file.
+# Collect the served frontend tree and packaged workspace path config file.
 static_files = []
 ui_dir = repo_root / 'ui'
 if ui_dir.exists():
@@ -13,9 +13,9 @@ if ui_dir.exists():
         if f.is_file():
             static_files.append((str(f), str(f.relative_to(repo_root).parent)))
 
-ui_config = repo_root / 'ui_config.json'
-if ui_config.exists():
-    static_files.append((str(ui_config), '.'))
+workspace_paths = repo_root / 'workspace_paths.json'
+if workspace_paths.exists():
+    static_files.append((str(workspace_paths), '.'))
 
 a = Analysis(
     [str(build_dir / 'server_entry.py')],

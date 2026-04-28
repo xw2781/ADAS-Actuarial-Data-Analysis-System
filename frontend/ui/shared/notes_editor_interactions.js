@@ -419,7 +419,7 @@ export function wireNotesEditorInteractions(deps = {}) {
 
       const onMessage = (evt) => {
         const msg = evt?.data;
-        if (!msg || msg.type !== "adas:open-path-result") return;
+        if (!msg || msg.type !== "arcrho:open-path-result") return;
         if (String(msg.requestId || "") !== requestId) return;
         finish({ ok: !!msg.ok, error: String(msg.error || "") });
       };
@@ -430,7 +430,7 @@ export function wireNotesEditorInteractions(deps = {}) {
       }, 5000);
 
       try {
-        window.parent.postMessage({ type: "adas:open-path", requestId, path: targetPath }, "*");
+        window.parent.postMessage({ type: "arcrho:open-path", requestId, path: targetPath }, "*");
       } catch {
         finish({ ok: false, error: "Open path requires desktop app." });
       }

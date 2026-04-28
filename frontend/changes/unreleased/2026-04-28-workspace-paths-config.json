@@ -1,0 +1,9 @@
+{
+  "type": "feature",
+  "scope": "settings",
+  "audience": "user",
+  "summary": "Renamed the runtime path configuration to workspace paths with a simpler workspace root and subpath schema.",
+  "details": [
+    "The app now uses workspace_paths.json and /workspace_paths without carrying legacy ui_config aliases."
+  ]
+}

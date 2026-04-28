@@ -1,0 +1,9 @@
+{
+  "type": "breaking",
+  "scope": "frontend messaging",
+  "audience": "internal",
+  "summary": "Renamed the frontend cross-frame message namespace from adas to arcrho.",
+  "details": [
+    "Electron menu relays, shell iframe coordination, feature-page messages, pop-out channels, and documentation now use arcrho:* message names."
+  ]
+}

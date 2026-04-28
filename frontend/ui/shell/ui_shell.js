@@ -149,14 +149,14 @@ function broadcastForceRebuildToggle() {
     if (!t.iframe || !t.iframe.contentWindow) continue;
     try {
       t.iframe.contentWindow.postMessage(
-        { type: "adas:force-rebuild-toggle", enabled: forceRebuildEnabled },
+        { type: "arcrho:force-rebuild-toggle", enabled: forceRebuildEnabled },
         "*",
       );
     } catch {
       // ignore
     }
   }
-  relayToPopoutChannels({ type: "adas:force-rebuild-toggle", enabled: forceRebuildEnabled });
+  relayToPopoutChannels({ type: "arcrho:force-rebuild-toggle", enabled: forceRebuildEnabled });
 }
 
 function setForceRebuildEnabled(enabled, { persist = true, notify = true } = {}) {
@@ -214,7 +214,7 @@ function broadcastAutoSaveToggle() {
     if (t.type !== "workflow") continue;
     if (!t.iframe || !t.iframe.contentWindow) continue;
     try {
-      t.iframe.contentWindow.postMessage({ type: "adas:autosave-toggle", enabled: autoSaveEnabled }, "*");
+      t.iframe.contentWindow.postMessage({ type: "arcrho:autosave-toggle", enabled: autoSaveEnabled }, "*");
     } catch {
       // ignore
     }
@@ -313,10 +313,10 @@ async function openRootPathSettingsModal() {
   
   // Load current value from the app server.
   try {
-    const res = await fetch("/ui_config");
+    const res = await fetch("/workspace_paths");
     if (res.ok) {
       const data = await res.json();
-      input.value = data.config?.root_path || "E:\\ADAS";
+      input.value = data.config?.workspace_root || "E:\\ADAS";
     } else {
       input.value = "E:\\ADAS";
     }
@@ -352,10 +352,10 @@ function initRootPathSettingsModal() {
       return;
     }
     try {
-      const res = await fetch("/ui_config", {
+      const res = await fetch("/workspace_paths", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ root_path: newPath })
+        body: JSON.stringify({ workspace_root: newPath })
       });
       if (res.ok) {
         closeRootPathSettingsModal();
@@ -548,7 +548,7 @@ function broadcastZoomToIframes() {
     if (!t.iframe || !t.iframe.contentWindow) continue;
     try {
       t.iframe.contentWindow.postMessage(
-        { type: "adas:set-zoom", zoom: z, statusBarHeight: statusH },
+        { type: "arcrho:set-zoom", zoom: z, statusBarHeight: statusH },
         "*"
       );
     } catch {
@@ -556,7 +556,7 @@ function broadcastZoomToIframes() {
     }
   }
   // Also relay zoom to pop-out windows
-  relayToPopoutChannels({ type: "adas:set-zoom", zoom: z, statusBarHeight: statusH });
+  relayToPopoutChannels({ type: "arcrho:set-zoom", zoom: z, statusBarHeight: statusH });
 }
 
 function broadcastAppFont(font) {
@@ -565,7 +565,7 @@ function broadcastAppFont(font) {
     if (!t.iframe || !t.iframe.contentWindow) continue;
     try {
       t.iframe.contentWindow.postMessage(
-        { type: "adas:set-app-font", font },
+        { type: "arcrho:set-app-font", font },
         "*"
       );
     } catch {
@@ -573,7 +573,7 @@ function broadcastAppFont(font) {
     }
   }
   // Also relay font to pop-out windows
-  relayToPopoutChannels({ type: "adas:set-app-font", font });
+  relayToPopoutChannels({ type: "arcrho:set-app-font", font });
 }
 
 function getStatusBarHeight() {
@@ -630,42 +630,42 @@ function runHotkeyAction(action) {
     return;
   }
   if (action === "dfm_exclude_high") {
-    if (isActiveDFMTab()) sendDFMCommand("adas:dfm-exclude-high");
+    if (isActiveDFMTab()) sendDFMCommand("arcrho:dfm-exclude-high");
     return;
   }
   if (action === "dfm_exclude_low") {
-    if (isActiveDFMTab()) sendDFMCommand("adas:dfm-exclude-low");
+    if (isActiveDFMTab()) sendDFMCommand("arcrho:dfm-exclude-low");
     return;
   }
   if (action === "dfm_include_all") {
-    if (isActiveDFMTab()) sendDFMCommand("adas:dfm-include-all");
+    if (isActiveDFMTab()) sendDFMCommand("arcrho:dfm-include-all");
     return;
   }
   if (action === "file_save") {
     if (isActiveWorkflowTab()) {
-      sendWorkflowCommand("adas:workflow-save");
+      sendWorkflowCommand("arcrho:workflow-save");
     } else if (isActiveDFMTab()) {
-      sendDFMCommand("adas:dfm-save");
+      sendDFMCommand("arcrho:dfm-save");
     } else if (isActiveScriptingTab()) {
-      sendScriptingCommand("adas:scripting-save");
+      sendScriptingCommand("arcrho:scripting-save");
     } else if (isActiveProjectSettingsReservingClassTypesTab()) {
-      sendProjectSettingsCommand("adas:project-settings-reserving-class-types-save-local");
+      sendProjectSettingsCommand("arcrho:project-settings-reserving-class-types-save-local");
     } else if (isActiveProjectSettingsDatasetTypesTab()) {
-      sendProjectSettingsCommand("adas:project-settings-dataset-types-save-local");
+      sendProjectSettingsCommand("arcrho:project-settings-dataset-types-save-local");
     }
     return;
   }
   if (action === "file_save_as") {
     if (isActiveWorkflowTab()) {
-      sendWorkflowCommand("adas:workflow-save-as");
+      sendWorkflowCommand("arcrho:workflow-save-as");
     } else if (isActiveDFMTab()) {
-      sendDFMCommand(isActiveDFMDetailsTab() ? "adas:dfm-save-template" : "adas:dfm-save-as");
+      sendDFMCommand(isActiveDFMDetailsTab() ? "arcrho:dfm-save-template" : "arcrho:dfm-save-as");
     } else if (isActiveScriptingTab()) {
-      sendScriptingCommand("adas:scripting-save-as");
+      sendScriptingCommand("arcrho:scripting-save-as");
     } else if (isActiveProjectSettingsReservingClassTypesTab()) {
-      sendProjectSettingsCommand("adas:project-settings-reserving-class-types-load-local");
+      sendProjectSettingsCommand("arcrho:project-settings-reserving-class-types-load-local");
     } else if (isActiveProjectSettingsDatasetTypesTab()) {
-      sendProjectSettingsCommand("adas:project-settings-dataset-types-load-local");
+      sendProjectSettingsCommand("arcrho:project-settings-dataset-types-load-local");
     }
     return;
   }
@@ -683,13 +683,13 @@ function runHotkeyAction(action) {
   }
   if (action === "view_toggle_line_numbers") {
     if (isActiveScriptingTab()) {
-      sendScriptingCommand("adas:scripting-toggle-line-numbers");
+      sendScriptingCommand("arcrho:scripting-toggle-line-numbers");
     }
     return;
   }
   if (action === "view_toggle_exec_time") {
     if (isActiveScriptingTab()) {
-      sendScriptingCommand("adas:scripting-toggle-exec-time");
+      sendScriptingCommand("arcrho:scripting-toggle-exec-time");
     }
     return;
   }
@@ -1141,7 +1141,7 @@ function notifyBrowsingHistoryTabs(message = {}) {
     ensureIframe(t);
     if (!t.iframe || !t.iframe.contentWindow) continue;
     try {
-      t.iframe.contentWindow.postMessage({ type: "adas:browsing-history-updated", ...message }, "*");
+      t.iframe.contentWindow.postMessage({ type: "arcrho:browsing-history-updated", ...message }, "*");
     } catch {
       // ignore
     }
@@ -1647,7 +1647,7 @@ function sendProjectSettingsCommand(type) {
 }
 
 function toggleNavigationPanel() {
-  sendWorkflowCommand("adas:workflow-toggle-nav");
+  sendWorkflowCommand("arcrho:workflow-toggle-nav");
 }
 
 function getWorkflowTabState(tab) {
@@ -1859,7 +1859,7 @@ async function importWorkflow() {
   }
 
   if (!targetTab) return;
-  postToWorkflowTab(targetTab, { type: "adas:workflow-load", data });
+  postToWorkflowTab(targetTab, { type: "arcrho:workflow-load", data });
 }
 
 function waitForServerThenReload(timeoutMs = 15000) {
@@ -2043,48 +2043,48 @@ fileMenuDropdown?.addEventListener("click", (e) => {
   toggleFileMenu(false);
   if (action === "save-workflow") {
     updateStatusBar("Saving...");
-    sendWorkflowCommand("adas:workflow-save");
+    sendWorkflowCommand("arcrho:workflow-save");
   } else if (action === "save-workflow-as") {
     updateStatusBar("Saving as...");
-    sendWorkflowCommand("adas:workflow-save-as");
+    sendWorkflowCommand("arcrho:workflow-save-as");
   } else if (action === "save") {
     if (isActiveWorkflowTab()) {
       updateStatusBar("Saving...");
-      sendWorkflowCommand("adas:workflow-save");
+      sendWorkflowCommand("arcrho:workflow-save");
     } else if (isActiveDFMTab()) {
       updateStatusBar("Saving...");
-      sendDFMCommand("adas:dfm-save");
+      sendDFMCommand("arcrho:dfm-save");
     } else if (isActiveScriptingTab()) {
       updateStatusBar("Saving...");
-      sendScriptingCommand("adas:scripting-save");
+      sendScriptingCommand("arcrho:scripting-save");
     } else if (isActiveProjectSettingsReservingClassTypesTab()) {
       updateStatusBar("Saving reserving class types to local file...");
-      sendProjectSettingsCommand("adas:project-settings-reserving-class-types-save-local");
+      sendProjectSettingsCommand("arcrho:project-settings-reserving-class-types-save-local");
     } else if (isActiveProjectSettingsDatasetTypesTab()) {
       updateStatusBar("Saving dataset types to local file...");
-      sendProjectSettingsCommand("adas:project-settings-dataset-types-save-local");
+      sendProjectSettingsCommand("arcrho:project-settings-dataset-types-save-local");
     }
   } else if (action === "save-as") {
     if (isActiveWorkflowTab()) {
       updateStatusBar("Saving as...");
-      sendWorkflowCommand("adas:workflow-save-as");
+      sendWorkflowCommand("arcrho:workflow-save-as");
     } else if (isActiveDFMTab()) {
       if (isActiveDFMDetailsTab()) {
         updateStatusBar("Saving template...");
-        sendDFMCommand("adas:dfm-save-template");
+        sendDFMCommand("arcrho:dfm-save-template");
       } else {
         updateStatusBar("Saving as...");
-        sendDFMCommand("adas:dfm-save-as");
+        sendDFMCommand("arcrho:dfm-save-as");
       }
     } else if (isActiveScriptingTab()) {
       updateStatusBar("Saving as...");
-      sendScriptingCommand("adas:scripting-save-as");
+      sendScriptingCommand("arcrho:scripting-save-as");
     } else if (isActiveProjectSettingsReservingClassTypesTab()) {
       updateStatusBar("Loading reserving class types from local file...");
-      sendProjectSettingsCommand("adas:project-settings-reserving-class-types-load-local");
+      sendProjectSettingsCommand("arcrho:project-settings-reserving-class-types-load-local");
     } else if (isActiveProjectSettingsDatasetTypesTab()) {
       updateStatusBar("Loading dataset types from local file...");
-      sendProjectSettingsCommand("adas:project-settings-dataset-types-load-local");
+      sendProjectSettingsCommand("arcrho:project-settings-dataset-types-load-local");
     }
   } else if (action === "import-workflow") {
     importWorkflow();
@@ -2108,9 +2108,9 @@ viewMenuDropdown?.addEventListener("click", (e) => {
   if (action === "toggle-nav") {
     toggleNavigationPanel();
   } else if (action === "toggle-line-numbers") {
-    sendScriptingCommand("adas:scripting-toggle-line-numbers");
+    sendScriptingCommand("arcrho:scripting-toggle-line-numbers");
   } else if (action === "toggle-exec-time") {
-    sendScriptingCommand("adas:scripting-toggle-exec-time");
+    sendScriptingCommand("arcrho:scripting-toggle-exec-time");
   }
 });
 
@@ -2137,13 +2137,13 @@ editMenuDropdown?.addEventListener("click", (e) => {
   if (item.classList.contains("disabled")) return;
   toggleEditMenu(false);
   if (action === "dfm-exclude-high") {
-    sendDFMCommand("adas:dfm-exclude-high");
+    sendDFMCommand("arcrho:dfm-exclude-high");
   } else if (action === "dfm-exclude-low") {
-    sendDFMCommand("adas:dfm-exclude-low");
+    sendDFMCommand("arcrho:dfm-exclude-low");
   } else if (action === "dfm-include-all") {
-    sendDFMCommand("adas:dfm-include-all");
+    sendDFMCommand("arcrho:dfm-include-all");
   } else if (action === "render-all-markdown") {
-    sendScriptingCommand("adas:scripting-render-all-markdown");
+    sendScriptingCommand("arcrho:scripting-render-all-markdown");
   }
 });
 
@@ -2997,7 +2997,7 @@ function ensureIframe(tab) {
     tab.wfFresh = false;
     iframe.addEventListener("load", () => {
       try {
-        iframe.contentWindow?.postMessage({ type: "adas:autosave-toggle", enabled: autoSaveEnabled }, "*");
+        iframe.contentWindow?.postMessage({ type: "arcrho:autosave-toggle", enabled: autoSaveEnabled }, "*");
       } catch {
         // ignore
       }
@@ -3134,7 +3134,7 @@ function renderContent() {
     if (autoRefreshDatasetOnce(activeTab)) return;
     try {
       activeTab.iframe.contentWindow.postMessage(
-        { type: "adas:tab-activated" },
+        { type: "arcrho:tab-activated" },
         "*"
       );
     } catch {
@@ -3145,7 +3145,7 @@ function renderContent() {
   if (activeTab.iframe && activeTab.type === "dfm") {
     try {
       activeTab.iframe.contentWindow.postMessage(
-        { type: "adas:dfm-tab-activated" },
+        { type: "arcrho:dfm-tab-activated" },
         "*"
       );
     } catch {
@@ -3156,7 +3156,7 @@ function renderContent() {
   if (activeTab.iframe && activeTab.type === "browsing_history") {
     try {
       activeTab.iframe.contentWindow.postMessage(
-        { type: "adas:tab-activated" },
+        { type: "arcrho:tab-activated" },
         "*"
       );
     } catch {
@@ -3326,18 +3326,18 @@ function wire() {
     const msg = e.data;
     if (!msg) return;
 
-    if (msg.type === "adas:close-shell-menus") {
+    if (msg.type === "arcrho:close-shell-menus") {
       closeAllShellMenus();
       return;
     }
 
-    if (msg.type === "adas:dfm-edit-state") {
+    if (msg.type === "arcrho:dfm-edit-state") {
       dfmEditEnabled = !!msg.enabled;
       updateEditMenuState();
       return;
     }
 
-    if (msg.type === "adas:project-settings-ribbon-changed") {
+    if (msg.type === "arcrho:project-settings-ribbon-changed") {
       const ribbon = String(msg.ribbon || "").trim().toLowerCase();
       let updated = false;
       for (const tab of state.tabs || []) {
@@ -3361,7 +3361,7 @@ function wire() {
       return;
     }
 
-    if (msg.type === "adas:update-workflow-tab-title") {
+    if (msg.type === "arcrho:update-workflow-tab-title") {
       const title = String(msg.title || "").trim();
       const inst = String(msg.inst || "");
       if (!title || !inst) return;
@@ -3375,7 +3375,7 @@ function wire() {
       return;
     }
 
-    if (msg.type === "adas:workflow-saved") {
+    if (msg.type === "arcrho:workflow-saved") {
       const path = String(msg.path || "").trim();
       if (!path) return;
       const inst = String(msg.inst || "");
@@ -3391,7 +3391,7 @@ function wire() {
       return;
     }
 
-    if (msg.type === "adas:workflow-dirty") {
+    if (msg.type === "arcrho:workflow-dirty") {
       const inst = String(msg.inst || "");
       if (!inst) return;
       const tab = state.tabs.find(t => t.type === "workflow" && t.wfInst === inst);
@@ -3405,7 +3405,7 @@ function wire() {
       return;
     }
 
-    if (msg.type === "adas:dfm-tab-changed") {
+    if (msg.type === "arcrho:dfm-tab-changed") {
       const inst = String(msg.inst || "");
       const dfmTab = msg.tab;
       if (!inst || !dfmTab) return;
@@ -3420,7 +3420,7 @@ function wire() {
       return;
     }
 
-    if (msg.type === "adas:dfm-dirty") {
+    if (msg.type === "arcrho:dfm-dirty") {
       const inst = String(msg.inst || "");
       if (!inst) return;
       const tab = state.tabs.find(t => t.type === "dfm" && t.dsInst === inst);
@@ -3434,32 +3434,32 @@ function wire() {
       return;
     }
 
-    if (msg.type === "adas:zoom") {
+    if (msg.type === "arcrho:zoom") {
       const deltaY = Number(msg.deltaY || 0);
       adjustZoomByDelta(deltaY);
       return;
     }
 
-    if (msg.type === "adas:zoom-step") {
+    if (msg.type === "arcrho:zoom-step") {
       const delta = Number(msg.delta || 0);
       if (!Number.isFinite(delta) || !delta) return;
       setZoomPercent(zoomPercent + delta * ZOOM_STEP, true);
       return;
     }
 
-    if (msg.type === "adas:zoom-reset") {
+    if (msg.type === "arcrho:zoom-reset") {
       setZoomPercent(100, true);
       return;
     }
 
-    if (msg.type === "adas:open-path") {
+    if (msg.type === "arcrho:open-path") {
       const requestId = String(msg.requestId || "").trim();
       const targetPath = String(msg.path || "").trim();
       const source = e?.source;
       const reply = (payload) => {
         if (!requestId || !source || typeof source.postMessage !== "function") return;
         try {
-          source.postMessage({ type: "adas:open-path-result", requestId, ...payload }, "*");
+          source.postMessage({ type: "arcrho:open-path-result", requestId, ...payload }, "*");
         } catch {
           // ignore
         }
@@ -3491,13 +3491,13 @@ function wire() {
       return;
     }
 
-    if (msg.type === "adas:status") {
+    if (msg.type === "arcrho:status") {
       const text = String(msg.text || "").trim();
       if (text) updateStatusBar(text, { tone: msg.tone || msg.level || "" });
       return;
     }
 
-    if (msg.type === "adas:dataset-settings-changed") {
+    if (msg.type === "arcrho:dataset-settings-changed") {
       const active = state.tabs.find(t => t.id === state.activeId);
       const resolved = normalizeBrowsingHistoryEntry(msg?.resolved || null);
       if (active && active.type === "dataset" && resolved) {
@@ -3508,7 +3508,7 @@ function wire() {
       return;
     }
 
-    if (msg.type === "adas:browsing-history-updated") {
+    if (msg.type === "arcrho:browsing-history-updated") {
       const active = state.tabs.find(t => t.id === state.activeId);
       const entry = normalizeBrowsingHistoryEntry(msg?.entry || null);
       if (active && active.type === "dataset" && entry) {
@@ -3519,14 +3519,14 @@ function wire() {
       return;
     }
 
-    if (msg.type === "adas:open-dataset-from-history") {
+    if (msg.type === "arcrho:open-dataset-from-history") {
       const entry = normalizeBrowsingHistoryEntry(msg?.entry || null);
       if (!entry) return;
       openDatasetTab({ datasetInputs: entry });
       return;
     }
 
-    if (msg.type === "adas:tooltip") {
+    if (msg.type === "arcrho:tooltip") {
       if (msg.show) {
         let x = Number(msg.x) || 0;
         let y = Number(msg.y) || 0;
@@ -3554,28 +3554,28 @@ function wire() {
       return;
     }
 
-    if (msg.type === "adas:workflow-import") {
+    if (msg.type === "arcrho:workflow-import") {
       importWorkflow();
       return;
     }
 
-    if (msg.type === "adas:close-active-tab") {
+    if (msg.type === "arcrho:close-active-tab") {
       closeTab(state.activeId);
       return;
     }
 
-    if (msg.type === "adas:app-shutdown") {
+    if (msg.type === "arcrho:app-shutdown") {
       shutdownApplication();
       return;
     }
 
-    if (msg.type === "adas:hotkey") {
+    if (msg.type === "arcrho:hotkey") {
       const action = String(msg.action || "");
       if (action) runHotkeyAction(action);
       return;
     }
 
-    if (msg.type !== "adas:update-active-tab-title") return;
+    if (msg.type !== "arcrho:update-active-tab-title") return;
 
     const title = String(msg.title || "").trim();
     if (!title) return;

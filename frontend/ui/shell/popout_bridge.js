@@ -1,7 +1,7 @@
 /**
  * Pop-Out Bridge — BroadcastChannel wrapper for pop-out window communication.
  *
- * Channel name: "adas:popout:{inst}" (unique per tab instance)
+ * Channel name: "arcrho:popout:{inst}" (unique per tab instance)
  *
  * Message types:
  *   popout-ready       — pop-out loaded and ready
@@ -10,7 +10,7 @@
  *   relay-to-iframe    — shell→iframe message relayed to pop-out
  */
 
-const CHANNEL_PREFIX = "adas:popout:";
+const CHANNEL_PREFIX = "arcrho:popout:";
 
 /**
  * Creates a BroadcastChannel for a specific tab instance.

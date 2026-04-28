@@ -15,7 +15,7 @@ Document Electron + Python packaging inputs and scripts.
 | `npm run clean:python-artifacts` | `node -e "const fs=require('fs'); ['python_dist','python_build'].forEach((p)=>fs.rmSync(p,{recursive:true,force:true}));"` |
 | `npm run electron` | `electron .` |
 
-Electron main entry: `electron_main.js`
+Electron main entry: `electron/main.js`
 <!-- AUTO-GEN:END -->
 
 ## Key Files
@@ -24,7 +24,7 @@ Electron main entry: `electron_main.js`
 - [`build/server.spec`](../../build/server.spec) - PyInstaller spec for Python app-server executable.
 - [`build/server_entry.py`](../../build/server_entry.py) - PyInstaller entrypoint for the bundled app server.
 - [`build/release_notes.py`](../../build/release_notes.py) - Release fragment validator and versioned release note generator.
-- [`electron_main.js`](../../electron_main.js) - Electron main process entry.
+- [`electron/main.js`](../../electron/main.js) - Electron main process entry.
 - [`app_launcher.py`](../../app_launcher.py) - Python host launcher used by packaged runtime.
 - [`build/installer.nsh`](../../build/installer.nsh) - NSIS custom installer script include.
 - [`build/build_app.bat`](../../build/build_app.bat) - Convenience build script wrapper.

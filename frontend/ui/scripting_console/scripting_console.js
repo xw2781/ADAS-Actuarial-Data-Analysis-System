@@ -332,7 +332,7 @@ document.addEventListener("keydown", (event) => {
     event.preventDefault();
     event.stopPropagation();
     window.parent?.postMessage(
-      { type: "adas:hotkey", action: event.shiftKey ? "file_save_as" : "file_save" },
+      { type: "arcrho:hotkey", action: event.shiftKey ? "file_save_as" : "file_save" },
       "*",
     );
     return;
@@ -363,23 +363,23 @@ document.addEventListener("keydown", (event) => {
 
 window.addEventListener("message", (event) => {
   const type = event?.data?.type;
-  if (type === "adas:scripting-save") {
+  if (type === "arcrho:scripting-save") {
     void requestNotebookSave(false);
     return;
   }
-  if (type === "adas:scripting-save-as") {
+  if (type === "arcrho:scripting-save-as") {
     void requestNotebookSave(true);
     return;
   }
-  if (type === "adas:scripting-toggle-line-numbers") {
+  if (type === "arcrho:scripting-toggle-line-numbers") {
     toggleCodeCellLineNumbers();
     return;
   }
-  if (type === "adas:scripting-toggle-exec-time") {
+  if (type === "arcrho:scripting-toggle-exec-time") {
     toggleExecTimeVisible();
     return;
   }
-  if (type === "adas:scripting-render-all-markdown") {
+  if (type === "arcrho:scripting-render-all-markdown") {
     renderAllMarkdownCells({ setStatusMessage: true });
   }
 });

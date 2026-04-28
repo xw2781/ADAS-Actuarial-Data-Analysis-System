@@ -19,7 +19,7 @@ function formatTimestamp(ts) {
 }
 
 function postOpenDataset(entry) {
-  const payload = { type: "adas:open-dataset-from-history", entry };
+  const payload = { type: "arcrho:open-dataset-from-history", entry };
   try {
     if (window.parent && window.parent !== window) {
       window.parent.postMessage(payload, "*");
@@ -108,7 +108,7 @@ listEl?.addEventListener("click", (e) => {
 
 window.addEventListener("message", (e) => {
   const type = String(e?.data?.type || "");
-  if (type === "adas:browsing-history-updated" || type === "adas:tab-activated") {
+  if (type === "arcrho:browsing-history-updated" || type === "arcrho:tab-activated") {
     render();
   }
 });

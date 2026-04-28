@@ -58,6 +58,7 @@ FRONTEND_ENTRY_HTMLS = [
     "ui/dfm/dfm.html",
     "ui/workflow/workflow.html",
     "ui/project_settings/project_settings.html",
+    "ui/scripting_console/scripting_console.html",
     "ui/shell/popout_shell.html",
 ]
 
@@ -368,7 +369,7 @@ def parse_js_interface_patterns(paths: Sequence[str]) -> Tuple[List[str], List[s
                 endpoints.add(endpoint)
         for msg in POST_MESSAGE_TYPE_RE.findall(text):
             msg = msg.strip()
-            if msg.startswith("adas:"):
+            if msg.startswith("arcrho:"):
                 message_types.add(msg)
     return sorted(endpoints), sorted(message_types)
 
@@ -411,7 +412,7 @@ def parse_config_signals() -> Tuple[List[str], List[str]]:
     for node in tree.body:
         if isinstance(node, ast.FunctionDef):
             name = node.name
-            if "path" in name or "dir" in name or name.startswith("get_") or name in {"load_ui_config", "refresh_runtime_paths"}:
+            if "path" in name or "dir" in name or name.startswith("get_") or name in {"load_workspace_paths", "refresh_runtime_paths"}:
                 functions.append(name)
         elif isinstance(node, ast.Assign):
             for tgt in node.targets:
@@ -441,8 +442,8 @@ FRONTEND_DOC_META: Mapping[str, Dict[str, object]] = {
         "files": [
             ("ui/index.html", "Main desktop shell page and menu structure."),
             ("ui/shell/ui_shell.js", "Tab orchestration, iframe lifecycle, menus, and hotkeys."),
-            ("electron_preload.js", "Renderer-safe host bridge APIs."),
-            ("electron_main.js", "Window lifecycle and shell-to-host wiring."),
+            ("electron/preload.js", "Renderer-safe host bridge APIs."),
+            ("electron/main.js", "Window lifecycle and shell-to-host wiring."),
             ("ui/shell/popout_bridge.js", "BroadcastChannel helper for pop-out tabs."),
         ],
     },
@@ -492,6 +493,20 @@ FRONTEND_DOC_META: Mapping[str, Dict[str, object]] = {
             ("ui/project_settings/project_settings_audit.js", "Audit log UI helper."),
         ],
     },
+    "scripting_console": {
+        "doc": "docs/frontend/scripting_console.md",
+        "html": ["ui/scripting_console/scripting_console.html"],
+        "files": [
+            ("ui/scripting_console/scripting_console.html", "Notebook-style scripting console page layout."),
+            ("ui/scripting_console/scripting_console.js", "Scripting console bootstrap and shell integration."),
+            ("ui/scripting_console/scripting_console_core.js", "Notebook state, cell model, and command-mode helpers."),
+            ("ui/scripting_console/scripting_console_cells.js", "Cell rendering, selection, markdown, and drag/drop behavior."),
+            ("ui/scripting_console/scripting_console_execution.js", "Code execution, streaming output, and cancellation handling."),
+            ("ui/scripting_console/scripting_console_shortcuts.js", "Keyboard shortcut parsing, customization, and persistence."),
+            ("ui/scripting_console/scripting_console_panels.js", "Sidebar, TOC, variables, and API reference panels."),
+            ("ui/scripting_console/scripting_console_notebook_io.js", "Notebook save/open and `.ipynb` import/export helpers."),
+        ],
+    },
     "popout": {
         "doc": "docs/frontend/popout.md",
         "html": ["ui/shell/popout_shell.html"],
@@ -512,13 +527,13 @@ BACKEND_DOMAIN_META: Mapping[str, Dict[str, object]] = {
             ("app_server/schemas/workflow.py", "Workflow request models."),
         ],
     },
-    "ui_config": {
-        "doc": "docs/app_server/domains/ui_config.md",
+    "workspace_paths": {
+        "doc": "docs/app_server/domains/workspace_paths.md",
         "files": [
-            ("app_server/api/ui_config_router.py", "Read/update root path config."),
+            ("app_server/api/workspace_paths_router.py", "Read/update workspace path config."),
             ("app_server/config.py", "Config loader and runtime path refresh."),
-            ("app_server/schemas/ui_config.py", "UI config request model."),
-            ("ui_config.json", "Persistent root/path configuration."),
+            ("app_server/schemas/workspace_paths.py", "Workspace path request models."),
+            ("workspace_paths.json", "Persistent workspace path configuration."),
         ],
     },
     "app_control": {
@@ -527,7 +542,7 @@ BACKEND_DOMAIN_META: Mapping[str, Dict[str, object]] = {
             ("app_server/api/app_control_router.py", "Restart/shutdown control endpoints."),
             ("app_server/config.py", "Flag-file paths for app control."),
             ("app_launcher.py", "Launcher process watching control flags."),
-            ("electron_main.js", "Electron host restart/shutdown integration."),
+            ("electron/main.js", "Electron host restart/shutdown integration."),
         ],
     },
     "audit_log": {
@@ -639,7 +654,7 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
                 This is the top-level navigation hub for code agents.
 
                 System map:
-                - Electron host/runtime: `electron_main.js`, `electron_preload.js`, `app_shell.py`.
+                - Electron host/runtime: `electron/main.js`, `electron/preload.js`, `app_shell.py`.
                 - Frontend pages/features: shell + dataset + DFM + workflow + project settings + pop-out.
                 - App-server API: FastAPI app in `app_server/main.py` with domain routers in `app_server/api`.
                 - Runtime/config state: path resolution and cache constants in `app_server/config.py`.
@@ -705,7 +720,7 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
             "External Interfaces": dedent(
                 """
                 - App-server HTTP interface via `fetch(...)` calls.
-                - Cross-iframe messaging via `window.postMessage` (`adas:*` message types).
+                - Cross-iframe messaging via `window.postMessage` (`arcrho:*` message types).
                 """
             ),
             "Data/State/Caches": dedent(
@@ -721,7 +736,8 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
                 3. DFM behavior change -> [`dfm.md`](dfm.md).
                 4. Workflow editor change -> [`workflow.md`](workflow.md).
                 5. Project settings flow change -> [`project_settings.md`](project_settings.md).
-                6. Pop-out/dock behavior change -> [`popout.md`](popout.md).
+                6. Scripting console change -> [`scripting_console.md`](scripting_console.md).
+                7. Pop-out/dock behavior change -> [`popout.md`](popout.md).
                 """
             ),
             "Known Risks": dedent(
@@ -781,7 +797,7 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
     frontend_manual = {
         "shell": {
             "purpose": "Shell-level tab/iframe host for all feature pages.",
-            "external": "- Communicates with child iframes via `adas:*` postMessage events.\n- Invokes app-server endpoints for workflow import helpers and configuration endpoints.",
+            "external": "- Communicates with child iframes via `arcrho:*` postMessage events.\n- Invokes app-server endpoints for workflow import helpers and configuration endpoints.",
             "data": "- Persists tab state, zoom, and toggles in `localStorage`.\n- Tracks popped-out tabs via `BroadcastChannel`.",
             "tasks": "1. Add a new tab type: update tab creation + iframe source logic in `ui_shell.js`.\n2. Add shell menu action: wire menu item + action handler + hotkey map.",
             "risks": "- DOM replacement in shell can invalidate iframe references.\n- Unsaved-state handling must stay consistent for close/close-all flows.",
@@ -795,7 +811,7 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
         },
         "dfm": {
             "purpose": "DFM feature (details/ratios/results/notes) on top of dataset context.",
-            "external": "- Exchanges `adas:*` messages with shell and workflow iframe.\n- Reuses dataset APIs and reserving class selectors.",
+            "external": "- Exchanges `arcrho:*` messages with shell and workflow iframe.\n- Reuses dataset APIs and reserving class selectors.",
             "data": "- Persists ratio selection/templates via DFM persistence modules.\n- Tracks dirty flags and active DFM tab state.",
             "tasks": "1. Add a DFM tab capability: update orchestrator + tab module.\n2. Modify ratio/result behavior: sync `dfm_ratios_tab.js` and `dfm_results_tab.js`.",
             "risks": "- Cross-tab sync is message-driven and easy to desynchronize.\n- Persistence schema changes can break saved templates.",
@@ -814,9 +830,16 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
             "tasks": "1. Add settings source behavior: update source key logic + endpoint calls.\n2. Update one feature pane: modify corresponding `project_settings_*` module.",
             "risks": "- Folder rename/duplicate/delete flows have rollback branches.\n- Large settings payload edits can impact response timing.",
         },
+        "scripting_console": {
+            "purpose": "Notebook-style scripting workspace for code, markdown, raw cells, execution output, and sidebar panels.",
+            "external": "- Called from shell as a scripting tab iframe.\n- Uses `/scripting/*` app-server routes for execution, variables, preferences, and notebook persistence.\n- Sends `arcrho:*` status and command messages to/from the shell.",
+            "data": "- Stores per-tab draft notebook state with tab-scoped browser storage keys.\n- Saves notebooks as `.ipynb` files under the user scripting directory by default.\n- Persists keyboard shortcut preferences under APPDATA with browser storage fallback.",
+            "tasks": "1. Change notebook model or persistence: update core state, notebook I/O, app-server scripting routes if needed, and docs together.\n2. Change cell behavior or shortcuts: update cells/core/shortcuts modules and verify command/edit mode interactions.\n3. Change sidebar or visual layout: update panels/cells/html together and keep INDEX.md as a short pointer only.",
+            "risks": "- Keyboard handling is sensitive to edit mode, command mode, IME/composition, and Monaco focus.\n- Multi-cell selection, queueing, markdown folding, and drag/drop share state and can regress each other.\n- Long feature notes should stay in this module doc or release fragments, not in `docs/frontend/INDEX.md`.",
+        },
         "popout": {
             "purpose": "Standalone pop-out window to host one tab outside main shell.",
-            "external": "- Uses `BroadcastChannel` for shell <-> popout message relays.\n- Forwards `adas:*` iframe messages back to shell.",
+            "external": "- Uses `BroadcastChannel` for shell <-> popout message relays.\n- Forwards `arcrho:*` iframe messages back to shell.",
             "data": "- Carries tab identity/state via URL params and channel payloads.",
             "tasks": "1. Add popout tab type support: update src construction + dock-back state mapping.\n2. Change popout controls: adjust `popout_shell.html` and bridge handling.",
             "risks": "- Channel lifecycle race conditions during window close/dock-back.\n- Mismatched tab instance IDs can orphan popout state.",
@@ -849,12 +872,12 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
             "1. Add a workflow route: update router + schema + service.\n2. Keep backward compatibility when changing saved payload shape.",
             "- File I/O errors and path permissions are common failure modes.",
         ),
-        "ui_config": (
-            "Runtime UI config read/update domain.",
+        "workspace_paths": (
+            "Runtime workspace path read/update domain.",
             "- Used by shell root-path settings modal.\n- Triggers `config.refresh_runtime_paths()` on updates.",
-            "- Persists config in `ui_config.json`.",
-            "1. Add config field: update schema + router serialization + config readers.",
-            "- Invalid config writes can impact all path-dependent domains.",
+            "- Persists config in `workspace_paths.json`.",
+            "1. Add config field: update schema + router serialization + config readers.\n2. Rename config fields by updating producers, consumers, docs, and packaging together.",
+            "- Invalid path config writes can impact all path-dependent domains.",
         ),
         "app_control": (
             "Application lifecycle control domain (restart/shutdown flags).",
@@ -965,9 +988,9 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
         title="Runtime: Config and Path Resolution",
         manual_sections={
             "Purpose": "Document path/config setup and runtime path refresh behavior.",
-            "External Interfaces": "- Frontend shell settings modal calls `/ui_config` routes.\n- App-server modules import `app_server.config` for runtime path resolution.",
-            "Data/State/Caches": "- `ui_config.json` is persistent source-of-truth for root/path mapping.\n- Runtime globals in `app_server/config.py` are refreshed from config.",
-            "Common Change Tasks": "1. Add a new configurable path: update `ui_config.json` contract + `app_server/config.py` getters.\n2. Change path refresh behavior: validate all services that depend on runtime globals.",
+            "External Interfaces": "- Frontend shell settings modal calls `/workspace_paths` routes.\n- App-server modules import `app_server.config` for runtime path resolution.",
+            "Data/State/Caches": "- `workspace_paths.json` is persistent source-of-truth for workspace root/path mapping.\n- Runtime globals in `app_server/config.py` are refreshed from config.",
+            "Common Change Tasks": "1. Add a new configurable path: update `workspace_paths.json` contract + `app_server/config.py` getters.\n2. Change path refresh behavior: validate all services that depend on runtime globals.",
             "Known Risks": "- Path changes affect every filesystem-backed domain.\n- Environment-specific path assumptions can break packaged deployments.",
         },
         auto_sections={
@@ -1162,8 +1185,10 @@ def render_frontend_index_entrypoints(entrypoints: Mapping[str, FrontendEntrypoi
     rows: List[List[str]] = []
     for html in FRONTEND_ENTRY_HTMLS:
         info = entrypoints.get(html)
-        ext = ", ".join(f"`{x}`" for x in (info.external_scripts if info else ())) or "-"
-        imp = ", ".join(f"`{x}`" for x in (info.inline_imports if info else ())) or "-"
+        ext_count = len(info.external_scripts) if info else 0
+        imp_count = len(info.inline_imports) if info else 0
+        ext = f"{ext_count} external script{'s' if ext_count != 1 else ''}" if ext_count else "-"
+        imp = f"{imp_count} inline import{'s' if imp_count != 1 else ''}" if imp_count else "-"
         rows.append([f"`{html}`", ext, imp])
     return md_table(["HTML Entrypoint", "External Scripts", "Inline Imports"], rows)
 
@@ -1211,12 +1236,13 @@ def render_frontend_index_key_files(doc_path: str) -> str:
         ("docs/frontend/dfm.md", "DFM feature index."),
         ("docs/frontend/workflow.md", "Workflow feature index."),
         ("docs/frontend/project_settings.md", "Project settings feature index."),
+        ("docs/frontend/scripting_console.md", "Scripting console feature index."),
         ("docs/frontend/popout.md", "Pop-out window feature index."),
     ]
     return render_key_files_block(doc_path, files)
 
 
-def render_runtime_config_entrypoints(path_functions: Sequence[str], ui_config_routes: Sequence[RouteEntry]) -> str:
+def render_runtime_config_entrypoints(path_functions: Sequence[str], workspace_path_routes: Sequence[RouteEntry]) -> str:
     lines: List[str] = []
     if path_functions:
         lines.append("- Path/config helper functions in `app_server/config.py`:")
@@ -1224,9 +1250,9 @@ def render_runtime_config_entrypoints(path_functions: Sequence[str], ui_config_r
     else:
         lines.append("- No config helper functions discovered.")
 
-    if ui_config_routes:
-        lines.append("- UI config routes:")
-        for r in ui_config_routes:
+    if workspace_path_routes:
+        lines.append("- Workspace path config routes:")
+        for r in workspace_path_routes:
             lines.append(f"  - `{r.method}` `{r.path}` handled by `{r.handler}`")
     return "\n".join(lines)
 
@@ -1253,8 +1279,8 @@ def render_runtime_data_key_files(doc_path: str, constants: Sequence[str]) -> st
 def render_runtime_config_key_files(doc_path: str) -> str:
     files = [
         ("app_server/config.py", "Primary runtime path + config module."),
-        ("app_server/api/ui_config_router.py", "HTTP interface for root path updates."),
-        ("ui_config.json", "Persisted root path and subpath config."),
+        ("app_server/api/workspace_paths_router.py", "HTTP interface for workspace path updates."),
+        ("workspace_paths.json", "Persisted workspace root and subpath config."),
         ("app_server/main.py", "App bootstrap and static path mounting."),
     ]
     return render_key_files_block(doc_path, files)
@@ -1280,7 +1306,7 @@ def render_build_key_files(doc_path: str) -> str:
         ("build/server.spec", "PyInstaller spec for Python app-server executable."),
         ("build/server_entry.py", "PyInstaller entrypoint for the bundled app server."),
         ("build/release_notes.py", "Release fragment validator and versioned release note generator."),
-        ("electron_main.js", "Electron main process entry."),
+        ("electron/main.js", "Electron main process entry."),
         ("app_launcher.py", "Python host launcher used by packaged runtime."),
         ("build/installer.nsh", "NSIS custom installer script include."),
         ("build/build_app.bat", "Convenience build script wrapper."),
@@ -1316,7 +1342,7 @@ def build_autogen_blocks(
             entry_block += "\n\nDetected `fetch(...)` targets in key JS files:\n"
             entry_block += "\n".join(f"- `{e}`" for e in endpoints)
         if messages:
-            entry_block += "\n\nDetected `adas:*` message types in key JS files:\n"
+            entry_block += "\n\nDetected `arcrho:*` message types in key JS files:\n"
             entry_block += "\n".join(f"- `{m}`" for m in messages)
 
         blocks[f"frontend.{name}.entry_points"] = entry_block
@@ -1327,8 +1353,8 @@ def build_autogen_blocks(
         blocks[f"app_server.{domain}.entry_points"] = render_route_table_for_doc(meta["doc"], domain_routes)  # type: ignore[index]
         blocks[f"app_server.{domain}.key_files"] = render_key_files_block(meta["doc"], meta["files"])  # type: ignore[index]
 
-    ui_config_routes = by_domain.get("ui_config", [])
-    blocks["runtime.config_paths.entry_points"] = render_runtime_config_entrypoints(path_functions, ui_config_routes)
+    workspace_path_routes = by_domain.get("workspace_paths", [])
+    blocks["runtime.config_paths.entry_points"] = render_runtime_config_entrypoints(path_functions, workspace_path_routes)
     blocks["runtime.config_paths.key_files"] = render_runtime_config_key_files("docs/runtime/config_paths.md")
     blocks["runtime.data_cache_files.entry_points"] = render_runtime_data_entrypoints(routes)
     blocks["runtime.data_cache_files.key_files"] = render_runtime_data_key_files("docs/runtime/data_cache_files.md", constants)

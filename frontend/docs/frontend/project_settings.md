@@ -27,15 +27,15 @@ Detected `fetch(...)` targets in key JS files:
 - `/table_summary/refresh`
 - `/table_summary?${q.toString()}`
 
-Detected `adas:*` message types in key JS files:
-- `adas:close-active-tab`
-- `adas:close-shell-menus`
-- `adas:hotkey`
-- `adas:open-project`
-- `adas:open-workbook`
-- `adas:project-settings-ribbon-changed`
-- `adas:status`
-- `adas:zoom`
+Detected `arcrho:*` message types in key JS files:
+- `arcrho:close-active-tab`
+- `arcrho:close-shell-menus`
+- `arcrho:hotkey`
+- `arcrho:open-project`
+- `arcrho:open-workbook`
+- `arcrho:project-settings-ribbon-changed`
+- `arcrho:status`
+- `arcrho:zoom`
 <!-- AUTO-GEN:END -->
 
 ## Key Files

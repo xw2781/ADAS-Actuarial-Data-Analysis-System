@@ -8,7 +8,7 @@ Top menubar supports mixed-scope actions: global actions are always shown, share
 When Project Settings is active and its `Dataset Types` ribbon is selected, `File -> Save` / `Save As...` are relabeled and dispatched as `Save Dataset Types` / `Load Dataset Types` to the Project Settings iframe while keeping the same keyboard shortcuts. When Project Settings is active and its `Reserving Class Types` ribbon is selected, those same File actions are relabeled/dispatched as `Save Reserving Class Types As...` / `Load Reserving Class Types From...`.
 When DFM is active and the internal DFM tab is `Details`, `File -> Save As...` is relabeled to `Save as Template` and dispatches DFM template save; on other DFM internal tabs, `Save As...` keeps normal DFM method Save-As behavior.
 Dataset and DFM iframe URLs include a shell `v` token so reopening tabs picks up the latest static page assets instead of stale cached HTML/CSS.
-Electron host bridge exposes local path open support; shell relays iframe `adas:open-path` requests to host and replies with `adas:open-path-result` so Dataset Notes click-to-open works from iframe pages.
+Electron host bridge exposes local path open support; shell relays iframe `arcrho:open-path` requests to host and replies with `arcrho:open-path-result` so Dataset Notes click-to-open works from iframe pages.
 <!-- MANUAL:END -->
 
 ## Entry Points
@@ -21,43 +21,43 @@ Detected `fetch(...)` targets in key JS files:
 - `/app/restart_electron`
 - `/app/shutdown`
 - `/restart`
-- `/ui_config`
 - `/workflow/default_dir`
 - `/workflow/load`
+- `/workspace_paths`
 
-Detected `adas:*` message types in key JS files:
-- `adas:autosave-toggle`
-- `adas:browsing-history-updated`
-- `adas:close-active-tab`
-- `adas:dfm-tab-activated`
-- `adas:force-rebuild-toggle`
-- `adas:hotkey`
-- `adas:open-path-result`
-- `adas:set-app-font`
-- `adas:set-zoom`
-- `adas:tab-activated`
-- `adas:workflow-load`
-- `adas:zoom`
-- `adas:zoom-reset`
-- `adas:zoom-step`
+Detected `arcrho:*` message types in key JS files:
+- `arcrho:autosave-toggle`
+- `arcrho:browsing-history-updated`
+- `arcrho:close-active-tab`
+- `arcrho:dfm-tab-activated`
+- `arcrho:force-rebuild-toggle`
+- `arcrho:hotkey`
+- `arcrho:open-path-result`
+- `arcrho:set-app-font`
+- `arcrho:set-zoom`
+- `arcrho:tab-activated`
+- `arcrho:workflow-load`
+- `arcrho:zoom`
+- `arcrho:zoom-reset`
+- `arcrho:zoom-step`
 <!-- AUTO-GEN:END -->
 
 ## Key Files
 <!-- AUTO-GEN:BEGIN frontend.shell.key_files -->
 - [`ui/index.html`](../../ui/index.html) - Main desktop shell page and menu structure.
 - [`ui/shell/ui_shell.js`](../../ui/shell/ui_shell.js) - Tab orchestration, iframe lifecycle, menus, and hotkeys.
-- [`electron_preload.js`](../../electron_preload.js) - Renderer-safe host bridge APIs.
-- [`electron_main.js`](../../electron_main.js) - Window lifecycle and shell-to-host wiring.
+- [`electron/preload.js`](../../electron/preload.js) - Renderer-safe host bridge APIs.
+- [`electron/main.js`](../../electron/main.js) - Window lifecycle and shell-to-host wiring.
 - [`ui/shell/popout_bridge.js`](../../ui/shell/popout_bridge.js) - BroadcastChannel helper for pop-out tabs.
 <!-- AUTO-GEN:END -->
 
 ## External Interfaces
 <!-- MANUAL:BEGIN -->
-- Communicates with child iframes via `adas:*` postMessage events.
+- Communicates with child iframes via `arcrho:*` postMessage events.
 - Invokes app-server endpoints for workflow import helpers and configuration endpoints.
 - Uses Electron host bridge for shutdown/clear-cache actions; app-server startup is host-managed with retry on transient launch failures.
-- Consumes dataset-page browsing updates (`adas:dataset-settings-changed`, `adas:browsing-history-updated`) and forwards updates to any open Browsing History tab.
-- Receives `adas:open-dataset-from-history` from Browsing History tab to open dataset tabs with selected inputs.
+- Consumes dataset-page browsing updates (`arcrho:dataset-settings-changed`, `arcrho:browsing-history-updated`) and forwards updates to any open Browsing History tab.
+- Receives `arcrho:open-dataset-from-history` from Browsing History tab to open dataset tabs with selected inputs.
 <!-- MANUAL:END -->
 
 ## Data/State/Caches

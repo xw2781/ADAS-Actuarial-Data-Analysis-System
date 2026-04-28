@@ -22,6 +22,8 @@ const UI_VERSION = process.env.ADAS_UI_VERSION || String(Date.now());
 const URL = `http://${HOST}:${PORT}/ui/?v=${encodeURIComponent(UI_VERSION)}`;
 const START_BACKEND = process.env.ADAS_START_BACKEND !== "0";
 const PYTHON_EXE = process.env.PYTHON_EXE || process.env.PYTHON || "python";
+const APP_ROOT = path.resolve(__dirname, "..");
+const PRELOAD_PATH = path.join(__dirname, "preload.js");
 const MAIN_WINDOW_PREFS_FILE = "main_window_prefs.json";
 const SCRIPTING_SHORTCUTS_FILE = "scripting_shortcuts.json";
 const BACKEND_CONTROL_FLAGS = [
@@ -125,13 +127,13 @@ function createSplashWindow() {
     alwaysOnTop: false,
     skipTaskbar: true,
     webPreferences: {
-      preload: path.join(__dirname, "electron_preload.js"),
+      preload: PRELOAD_PATH,
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
 
-  splashWin.loadFile(path.join(__dirname, "ui", "splash.html"));
+  splashWin.loadFile(path.join(APP_ROOT, "ui", "splash.html"));
   return splashWin;
 }
 
@@ -166,7 +168,7 @@ function httpPost(pathname) {
 }
 
 function getBackendFlagRoots() {
-  const roots = new Set([__dirname]);
+  const roots = new Set([APP_ROOT]);
   const bundledServer = getBundledServerPath();
   if (bundledServer) roots.add(path.dirname(bundledServer));
   return Array.from(roots);
@@ -211,7 +213,7 @@ function forceKillBackendProc(proc) {
 
 function startBackend() {
   const env = { ...process.env };
-  env.TRI_DATA_DIR = env.TRI_DATA_DIR || __dirname;
+  env.TRI_DATA_DIR = env.TRI_DATA_DIR || APP_ROOT;
   env.ADAS_WORKFLOW_DIR =
     env.ADAS_WORKFLOW_DIR ||
     path.join(require("os").homedir(), "Documents", "ArcRho", "workflows");
@@ -230,11 +232,11 @@ function startBackend() {
     });
   } else {
     // Development mode: use Python
-    const appShell = path.join(__dirname, "app_shell.py");
+    const appShell = path.join(APP_ROOT, "app_shell.py");
     const cmd = [appShell, "--host", HOST, "--port", String(PORT)];
     const args = ["-u", cmd[0], ...cmd.slice(1)];
     serverProc = spawn(PYTHON_EXE, args, {
-      cwd: __dirname,
+      cwd: APP_ROOT,
       env,
       stdio: "ignore",
       windowsHide: true,
@@ -352,7 +354,7 @@ function createWindow() {
     show: false,  // Hidden until splash closes
     backgroundColor: "#ffffff",
     webPreferences: {
-      preload: path.join(__dirname, "electron_preload.js"),
+      preload: PRELOAD_PATH,
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -367,7 +369,7 @@ function createWindow() {
       );
       if (shouldIntercept) {
         win.webContents.executeJavaScript(
-          "window.postMessage({type:'adas:close-active-tab'}, '*');"
+          "window.postMessage({type:'arcrho:close-active-tab'}, '*');"
         );
         return;
       }
@@ -422,30 +424,30 @@ function createWindow() {
     const type = String(input.type || "");
 
     const sendHotkey = (action) => {
-      win.webContents.send("adas:hotkey", { action });
+      win.webContents.send("arcrho:hotkey", { action });
     };
 
     if (type === "mouseWheel" && ctrl) {
       event.preventDefault();
       const deltaY = Number(input.deltaY || 0);
-      win.webContents.send("adas:zoom", { deltaY });
+      win.webContents.send("arcrho:zoom", { deltaY });
       return;
     }
 
     // Zoom shortcuts (Ctrl +/-/0)
     if (ctrl && !alt && (key === "-" || key === "_")) {
       event.preventDefault();
-      win.webContents.send("adas:zoom-step", { delta: -1 });
+      win.webContents.send("arcrho:zoom-step", { delta: -1 });
       return;
     }
     if (ctrl && !alt && (key === "=" || key === "+")) {
       event.preventDefault();
-      win.webContents.send("adas:zoom-step", { delta: 1 });
+      win.webContents.send("arcrho:zoom-step", { delta: 1 });
       return;
     }
     if (ctrl && !alt && key === "0") {
       event.preventDefault();
-      win.webContents.send("adas:zoom-reset");
+      win.webContents.send("arcrho:zoom-reset");
       return;
     }
 
@@ -511,12 +513,12 @@ function createWindow() {
     // Tab management
     if (alt && !ctrl && !shift && key === "W") {
       event.preventDefault();
-      win.webContents.send("adas:close-active-tab");
+      win.webContents.send("arcrho:close-active-tab");
       return;
     }
     if (ctrl && !alt && !shift && key === "W") {
       event.preventDefault();
-      win.webContents.send("adas:close-active-tab");
+      win.webContents.send("arcrho:close-active-tab");
     }
   });
 }
@@ -530,7 +532,7 @@ function createDetachedWindow(loadUrl, title, opts = {}) {
     autoHideMenuBar: !!opts.hideMenu,
     alwaysOnTop: !!opts.alwaysOnTop,
     webPreferences: {
-      preload: path.join(__dirname, "electron_preload.js"),
+      preload: PRELOAD_PATH,
       contextIsolation: true,
       nodeIntegration: false,
     },

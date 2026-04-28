@@ -21,7 +21,7 @@ from .reserving_class import (
 from .dataset_types import DatasetTypesSaveRequest
 from .table_summary import TableSummaryRefreshRequest
 from .audit_log import AuditLogWriteRequest
-from .ui_config import UIConfigUpdateRequest
+from .workspace_paths import WorkspacePathsUpdateRequest
 from .scripting import ScriptRunRequest, ScriptDeleteVarRequest, ScriptNotebookSaveRequest, ScriptNotebookLoadRequest
 
 __all__ = [
@@ -39,7 +39,7 @@ __all__ = [
     "DatasetTypesSaveRequest",
     "TableSummaryRefreshRequest",
     "AuditLogWriteRequest",
-    "UIConfigUpdateRequest",
+    "WorkspacePathsUpdateRequest",
     "ScriptRunRequest",
     "ScriptDeleteVarRequest",
     "ScriptNotebookSaveRequest",

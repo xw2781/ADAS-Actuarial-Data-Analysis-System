@@ -53,41 +53,41 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-ipcRenderer.on("adas:close-active-tab", () => {
+ipcRenderer.on("arcrho:close-active-tab", () => {
   try {
-    window.postMessage({ type: "adas:close-active-tab" }, "*");
+    window.postMessage({ type: "arcrho:close-active-tab" }, "*");
   } catch {
     // ignore
   }
 });
 
-ipcRenderer.on("adas:hotkey", (_event, payload) => {
+ipcRenderer.on("arcrho:hotkey", (_event, payload) => {
   try {
-    window.postMessage({ type: "adas:hotkey", action: payload?.action }, "*");
+    window.postMessage({ type: "arcrho:hotkey", action: payload?.action }, "*");
   } catch {
     // ignore
   }
 });
 
-ipcRenderer.on("adas:zoom", (_event, payload) => {
+ipcRenderer.on("arcrho:zoom", (_event, payload) => {
   try {
-    window.postMessage({ type: "adas:zoom", deltaY: payload?.deltaY }, "*");
+    window.postMessage({ type: "arcrho:zoom", deltaY: payload?.deltaY }, "*");
   } catch {
     // ignore
   }
 });
 
-ipcRenderer.on("adas:zoom-step", (_event, payload) => {
+ipcRenderer.on("arcrho:zoom-step", (_event, payload) => {
   try {
-    window.postMessage({ type: "adas:zoom-step", delta: payload?.delta }, "*");
+    window.postMessage({ type: "arcrho:zoom-step", delta: payload?.delta }, "*");
   } catch {
     // ignore
   }
 });
 
-ipcRenderer.on("adas:zoom-reset", () => {
+ipcRenderer.on("arcrho:zoom-reset", () => {
   try {
-    window.postMessage({ type: "adas:zoom-reset" }, "*");
+    window.postMessage({ type: "arcrho:zoom-reset" }, "*");
   } catch {
     // ignore
   }

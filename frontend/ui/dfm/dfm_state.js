@@ -152,7 +152,7 @@ function notifyDfmDirtyState(dirty) {
   if (dfmIsDirty === dirty) return;
   dfmIsDirty = dirty;
   const inst = getDfmInst();
-  window.parent.postMessage({ type: "adas:dfm-dirty", inst, dirty }, "*");
+  window.parent.postMessage({ type: "arcrho:dfm-dirty", inst, dirty }, "*");
 }
 
 export function markDfmDirty() {
@@ -194,10 +194,10 @@ export function getResolvedReservingClass() {
 export async function getRootPath() {
   if (cachedRootPath) return cachedRootPath;
   try {
-    const res = await fetch("/ui_config");
+    const res = await fetch("/workspace_paths");
     if (res.ok) {
       const data = await res.json();
-      cachedRootPath = data.config?.root_path || "E:\\ADAS";
+      cachedRootPath = data.config?.workspace_root || "E:\\ADAS";
     } else {
       cachedRootPath = "E:\\ADAS";
     }
@@ -586,5 +586,5 @@ export function isResultsTabVisible() {
 
 export function notifyDfmEditState() {
   const enabled = isRatiosTabVisible() && (ratioColAllActive || activeRatioCols.size > 0);
-  window.parent.postMessage({ type: "adas:dfm-edit-state", enabled }, "*");
+  window.parent.postMessage({ type: "arcrho:dfm-edit-state", enabled }, "*");
 }

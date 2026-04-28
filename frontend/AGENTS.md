@@ -11,10 +11,10 @@ Before changing frontend, app-server API behavior, or runtime architecture, read
 These contracts are mandatory whenever a task touches:
 - Frontend shell or feature entry/coordinator files under `ui/` (for example shell, dataset, workflow, DFM, or project settings).
 - App-server API, service, or runtime config files under `app_server/api/`, `app_server/services/`, or `app_server/config.py`.
-- Electron runtime bridge/host files such as `electron_main.js` or `electron_preload.js`.
+- Electron runtime bridge/host files under `electron/`.
 
 ## Hard Rules (MUST)
-1. Keep `adas:*` message names backward-compatible unless all producers/consumers are updated in the same change.
+1. Keep `arcrho:*` message names backward-compatible unless all producers/consumers are updated in the same change.
 2. Preserve tab dirty-state semantics and close-confirmation behavior.
 3. Keep workflow save/load payload compatibility unless explicitly approved to break.
 4. Keep router -> service -> config/schema layering; do not move business logic into routers.
@@ -24,19 +24,18 @@ These contracts are mandatory whenever a task touches:
 ## Required Documentation Workflow
 After relevant code changes:
 1. Update contract docs (or explicitly state "no contract impact").
-2. Run `python tools/docs_index_builder.py --write`.
-3. Run `python tools/docs_index_builder.py --check`.
-4. If `--check` fails, fix docs before finishing.
+2. Keep index docs concise. Put feature-specific behavior notes in the relevant module doc under `docs/frontend/`, `docs/app_server/domains/`, or `docs/runtime/`; do not paste long changelog/spec text into `INDEX.md` files.
+3. Run `python tools/docs_index_builder.py --write`.
+4. Run `python tools/docs_index_builder.py --check`.
+5. If `--check` fails, fix docs before finishing.
 
 ## Commit and Push Workflow
-When the user asks an agent to commit and push frontend code:
-1. Inspect the final diff/status first and make sure the commit scope matches the current conversation.
-2. Write a fresh, specific commit message from the actual updates in that conversation. Do not reuse a generic message.
-3. Use the root helper from `ArcRho/`, for example:
-   `powershell -ExecutionPolicy Bypass -File tools\agent_commit_push.ps1 -Message "Reorganize frontend UI entrypoints"`
-   The compatibility wrapper at `frontend/tools/agent_commit_push.ps1` delegates to the same root helper.
-4. Use `-DryRun` when reviewing commit scope, `-NoPush` when the user asks for a local commit only, `-StageMode none` only when intentionally committing already staged changes, and `-Pathspec frontend` or a comma-list such as `-Pathspec frontend,tools` when intentionally limiting commit scope.
-5. Report the commit hash and push result back to the user.
+When the user asks an agent to commit and/or push frontend code, follow the root `AGENTS.md` Commit and Push Workflow.
+
+Frontend-specific additions:
+1. Use `-Pathspec frontend` or a comma-list such as `-Pathspec frontend,tools` when intentionally limiting commit scope.
+2. Use `-StageMode none` only when intentionally committing already staged changes.
+3. The compatibility wrapper at `frontend/tools/agent_commit_push.ps1` delegates to the same root helper, but prefer running the root helper from `ArcRho/`.
 
 ## Decision Priority
 When code and docs conflict:

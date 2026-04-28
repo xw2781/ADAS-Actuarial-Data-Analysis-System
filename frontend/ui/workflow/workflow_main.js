@@ -91,7 +91,7 @@ function applyAppFont(font) {
   for (const [, frame] of datasetEmbedCache) {
     if (!frame || !frame.contentWindow) continue;
     try {
-      frame.contentWindow.postMessage({ type: "adas:set-app-font", font }, "*");
+      frame.contentWindow.postMessage({ type: "arcrho:set-app-font", font }, "*");
     } catch {
       // ignore
     }
@@ -99,7 +99,7 @@ function applyAppFont(font) {
   for (const [, frame] of dfmEmbedCache) {
     if (!frame || !frame.contentWindow) continue;
     try {
-      frame.contentWindow.postMessage({ type: "adas:set-app-font", font }, "*");
+      frame.contentWindow.postMessage({ type: "arcrho:set-app-font", font }, "*");
     } catch {
       // ignore
     }
@@ -130,7 +130,7 @@ function broadcastZoomToEmbeddedDatasets() {
     if (!frame || !frame.contentWindow) continue;
     try {
       frame.contentWindow.postMessage(
-        { type: "adas:set-zoom", zoom: lastZoomValue, statusBarHeight: lastStatusBarHeight },
+        { type: "arcrho:set-zoom", zoom: lastZoomValue, statusBarHeight: lastStatusBarHeight },
         "*"
       );
     } catch {
@@ -141,7 +141,7 @@ function broadcastZoomToEmbeddedDatasets() {
     if (!frame || !frame.contentWindow) continue;
     try {
       frame.contentWindow.postMessage(
-        { type: "adas:set-zoom", zoom: lastZoomValue, statusBarHeight: lastStatusBarHeight },
+        { type: "arcrho:set-zoom", zoom: lastZoomValue, statusBarHeight: lastStatusBarHeight },
         "*"
       );
     } catch {
@@ -204,20 +204,20 @@ applyZoomValue(loadZoomFromStorage(), loadStatusBarHeight());
 applyAppFont(loadAppFontFromStorage());
 
 window.addEventListener("message", (e) => {
-  if (e?.data?.type === "adas:set-zoom") {
+  if (e?.data?.type === "arcrho:set-zoom") {
     applyZoomValue(e.data.zoom, e.data.statusBarHeight);
     return;
   }
-  if (e?.data?.type === "adas:set-app-font") {
+  if (e?.data?.type === "arcrho:set-app-font") {
     applyAppFont(e.data.font);
     return;
   }
-  if (e?.data?.type === "adas:autosave-toggle") {
+  if (e?.data?.type === "arcrho:autosave-toggle") {
     autoSaveEnabled = !!e.data.enabled;
     try { localStorage.setItem(AUTOSAVE_KEY, autoSaveEnabled ? "1" : "0"); } catch {}
     return;
   }
-  if (e?.data?.type === "adas:dfm-tab-changed") {
+  if (e?.data?.type === "arcrho:dfm-tab-changed") {
     const inst = e.data.inst;
     const tab = e.data.tab;
     if (inst && tab) {
@@ -231,7 +231,7 @@ window.addEventListener("message", (e) => {
 });
 
 window.addEventListener("mousedown", () => {
-  window.parent.postMessage({ type: "adas:close-shell-menus" }, "*");
+  window.parent.postMessage({ type: "arcrho:close-shell-menus" }, "*");
 }, { capture: true });
 
 function applySidebarWidth(w) {
@@ -359,7 +359,7 @@ function saveGlobalControlToStorage(value) {
 
 function broadcastGlobalControlChange() {
   const payload = normalizeGlobalControl(state.globalControl);
-  const msg = { type: "adas:workflow-global-changed", globalControl: payload, wf: instanceId };
+  const msg = { type: "arcrho:workflow-global-changed", globalControl: payload, wf: instanceId };
   for (const [, frame] of dfmEmbedCache) {
     if (!frame || !frame.contentWindow) continue;
     try { frame.contentWindow.postMessage(msg, "*"); } catch { /* ignore */ }
@@ -390,7 +390,7 @@ function setWorkflowTitle(title) {
   try { localStorage.setItem(WF_TITLE_KEY, title); } catch {}
   if (!suppressDirty) markWorkflowDirty();
   // Sync to shell tab
-  window.parent.postMessage({ type: "adas:update-workflow-tab-title", title, inst: instanceId }, "*");
+  window.parent.postMessage({ type: "arcrho:update-workflow-tab-title", title, inst: instanceId }, "*");
 }
 
 function getWorkflowTitle() {
@@ -420,7 +420,7 @@ function setWorkflowDirty(next) {
   const dirty = !!next;
   if (workflowDirty === dirty) return;
   workflowDirty = dirty;
-  window.parent.postMessage({ type: "adas:workflow-dirty", dirty, inst: instanceId }, "*");
+  window.parent.postMessage({ type: "arcrho:workflow-dirty", dirty, inst: instanceId }, "*");
 }
 
 function markWorkflowDirty() {
@@ -484,13 +484,13 @@ function requestDatasetSettingsFromIframe(stepId) {
     }
     const requestId = `ds-settings-${stepId}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const onMsg = (e) => {
-      if (e?.data?.type !== "adas:dataset-settings") return;
+      if (e?.data?.type !== "arcrho:dataset-settings") return;
       if (e.data.requestId !== requestId) return;
       window.removeEventListener("message", onMsg);
       resolve(e.data.settings || null);
     };
     window.addEventListener("message", onMsg);
-    iframe.contentWindow.postMessage({ type: "adas:get-dataset-settings", requestId }, "*");
+    iframe.contentWindow.postMessage({ type: "arcrho:get-dataset-settings", requestId }, "*");
     setTimeout(() => {
       window.removeEventListener("message", onMsg);
       resolve(null);
@@ -513,13 +513,13 @@ function requestDfmSettingsFromIframe(stepId) {
     }
     const requestId = `dfm-settings-${stepId}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const onMsg = (e) => {
-      if (e?.data?.type !== "adas:dfm-settings") return;
+      if (e?.data?.type !== "arcrho:dfm-settings") return;
       if (e.data.requestId !== requestId) return;
       window.removeEventListener("message", onMsg);
       resolve(e.data.settings || null);
     };
     window.addEventListener("message", onMsg);
-    iframe.contentWindow.postMessage({ type: "adas:get-dfm-settings", requestId }, "*");
+    iframe.contentWindow.postMessage({ type: "arcrho:get-dfm-settings", requestId }, "*");
     setTimeout(() => {
       window.removeEventListener("message", onMsg);
       resolve(null);
@@ -568,7 +568,7 @@ async function saveWorkflowToDefaultDir({ force = false, source = "auto" } = {})
 
   /* Tell all embedded DFM iframes to save their method settings to local JSON */
   for (const [, frame] of dfmEmbedCache) {
-    try { frame?.contentWindow?.postMessage({ type: "adas:dfm-save" }, "*"); } catch {}
+    try { frame?.contentWindow?.postMessage({ type: "arcrho:dfm-save" }, "*"); } catch {}
   }
 
   const snapshot = await buildWorkflowSnapshot();
@@ -597,7 +597,7 @@ async function saveWorkflowToDefaultDir({ force = false, source = "auto" } = {})
     const savedPath = out.path || lastSavedPath;
     updateSaveStatus(`Saved: ${savedPath || ""}`);
     if (savedPath) {
-      window.parent.postMessage({ type: "adas:workflow-saved", path: savedPath, source, inst: instanceId }, "*");
+      window.parent.postMessage({ type: "arcrho:workflow-saved", path: savedPath, source, inst: instanceId }, "*");
     }
   } catch {
     updateSaveStatus("Save failed");
@@ -635,7 +635,7 @@ async function saveWorkflowAs() {
         setWorkflowDirty(false);
         updateSaveStatus(`Exported: ${exportedPath || ""}`);
         if (exportedPath) {
-          window.parent.postMessage({ type: "adas:workflow-saved", path: exportedPath, source: "manual", inst: instanceId }, "*");
+          window.parent.postMessage({ type: "arcrho:workflow-saved", path: exportedPath, source: "manual", inst: instanceId }, "*");
         }
         return;
       }
@@ -683,7 +683,7 @@ async function saveWorkflowAs() {
     setWorkflowDirty(false);
     updateSaveStatus(`Exported: ${exportedPath || ""}`);
     if (exportedPath) {
-      window.parent.postMessage({ type: "adas:workflow-saved", path: exportedPath, source: "manual", inst: instanceId }, "*");
+      window.parent.postMessage({ type: "arcrho:workflow-saved", path: exportedPath, source: "manual", inst: instanceId }, "*");
     }
   } catch {
     updateSaveStatus("Export failed");
@@ -1015,7 +1015,7 @@ function renderEmbeddedDataset(step) {
     iframe.addEventListener("load", () => {
       try {
         iframe.contentWindow?.postMessage(
-          { type: "adas:set-zoom", zoom: lastZoomValue, statusBarHeight: lastStatusBarHeight },
+          { type: "arcrho:set-zoom", zoom: lastZoomValue, statusBarHeight: lastStatusBarHeight },
           "*"
         );
       } catch {
@@ -1062,7 +1062,7 @@ function renderEmbeddedDfm(step) {
     iframe.addEventListener("load", () => {
       try {
         iframe.contentWindow?.postMessage(
-          { type: "adas:set-zoom", zoom: lastZoomValue, statusBarHeight: lastStatusBarHeight },
+          { type: "arcrho:set-zoom", zoom: lastZoomValue, statusBarHeight: lastStatusBarHeight },
           "*"
         );
       } catch {
@@ -1071,7 +1071,7 @@ function renderEmbeddedDfm(step) {
       try {
         const font = loadAppFontFromStorage();
         if (font) {
-          iframe.contentWindow?.postMessage({ type: "adas:set-app-font", font }, "*");
+          iframe.contentWindow?.postMessage({ type: "arcrho:set-app-font", font }, "*");
         }
       } catch {
         // ignore
@@ -1450,7 +1450,7 @@ function bindDatasetTitleUpdates() {
   window.__workflowTitleWired = true;
 
   window.addEventListener("message", (e) => {
-    if (e?.data?.type === "adas:dataset-settings-changed") {
+    if (e?.data?.type === "arcrho:dataset-settings-changed") {
       const stepId = e.data.stepId;
       if (!stepId) return;
       const step = state.steps.find(s => s.id === stepId);
@@ -1460,7 +1460,7 @@ function bindDatasetTitleUpdates() {
       return;
     }
 
-    if (e?.data?.type === "adas:update-active-tab-title") {
+    if (e?.data?.type === "arcrho:update-active-tab-title") {
       if (!e.data.userAction) return; // ignore sync/init, only react to user changes
       const inst = e.data.inst;
       const title = (e.data.title || "").trim();
@@ -1479,7 +1479,7 @@ function bindDatasetTitleUpdates() {
       return;
     }
 
-    if (e?.data?.type !== "adas:update-workflow-step-title") return;
+    if (e?.data?.type !== "arcrho:update-workflow-step-title") return;
     const stepId = e.data.stepId;
     const title = (e.data.title || "").trim();
     if (!stepId || !title) return;
@@ -1504,14 +1504,14 @@ function wireWorkflowCommands() {
 
   window.addEventListener("message", (e) => {
     const type = e?.data?.type;
-    if (type === "adas:workflow-save") {
+    if (type === "arcrho:workflow-save") {
       void saveWorkflowToDefaultDir({ force: true, source: "manual" });
-    } else if (type === "adas:workflow-save-as") {
+    } else if (type === "arcrho:workflow-save-as") {
       void saveWorkflowAs();
-    } else if (type === "adas:workflow-toggle-nav") {
+    } else if (type === "arcrho:workflow-toggle-nav") {
       const collapsed = document.body.classList.contains("sidebar-collapsed");
       setSidebarCollapsed(!collapsed);
-    } else if (type === "adas:workflow-load") {
+    } else if (type === "arcrho:workflow-load") {
       void loadWorkflowSnapshot(e.data.data);
     }
   });
@@ -1535,7 +1535,7 @@ function wireWorkflowHotkeys() {
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
-    window.parent.postMessage({ type: "adas:zoom", deltaY: e.deltaY }, "*");
+    window.parent.postMessage({ type: "arcrho:zoom", deltaY: e.deltaY }, "*");
   }, { capture: true, passive: false });
 
   window.addEventListener("keydown", (e) => {
@@ -1545,7 +1545,7 @@ function wireWorkflowHotkeys() {
     if (e.altKey && key === "w") {
       e.preventDefault();
       e.stopPropagation();
-      window.parent.postMessage({ type: "adas:close-active-tab" }, "*");
+      window.parent.postMessage({ type: "arcrho:close-active-tab" }, "*");
       return;
     }
 
@@ -1557,42 +1557,42 @@ function wireWorkflowHotkeys() {
       e.preventDefault();
       e.stopPropagation();
       const action = e.shiftKey ? "file_save_as" : "file_save";
-      window.parent.postMessage({ type: "adas:hotkey", action }, "*");
+      window.parent.postMessage({ type: "arcrho:hotkey", action }, "*");
       return;
     }
 
     if (key === "o") {
       e.preventDefault();
       e.stopPropagation();
-      window.parent.postMessage({ type: "adas:hotkey", action: "file_import" }, "*");
+      window.parent.postMessage({ type: "arcrho:hotkey", action: "file_import" }, "*");
       return;
     }
 
     if (key === "p") {
       e.preventDefault();
       e.stopPropagation();
-      window.parent.postMessage({ type: "adas:hotkey", action: "file_print" }, "*");
+      window.parent.postMessage({ type: "arcrho:hotkey", action: "file_print" }, "*");
       return;
     }
 
     if (key === "q") {
       e.preventDefault();
       e.stopPropagation();
-      window.parent.postMessage({ type: "adas:hotkey", action: "app_shutdown" }, "*");
+      window.parent.postMessage({ type: "arcrho:hotkey", action: "app_shutdown" }, "*");
       return;
     }
 
     if (e.shiftKey && key === "f") {
       e.preventDefault();
       e.stopPropagation();
-      window.parent.postMessage({ type: "adas:hotkey", action: "view_toggle_nav" }, "*");
+      window.parent.postMessage({ type: "arcrho:hotkey", action: "view_toggle_nav" }, "*");
       return;
     }
 
     if (e.altKey && key === "r" && hasMod) {
       e.preventDefault();
       e.stopPropagation();
-      window.parent.postMessage({ type: "adas:hotkey", action: "file_restart" }, "*");
+      window.parent.postMessage({ type: "arcrho:hotkey", action: "file_restart" }, "*");
     }
   }, { capture: true });
 }
@@ -1895,11 +1895,11 @@ function renderStepsList() {
 
     const sendHoverTooltip = (show, evt) => {
       if (!document.body.classList.contains("sidebar-collapsed")) {
-        window.parent.postMessage({ type: "adas:tooltip", show: false }, "*");
+        window.parent.postMessage({ type: "arcrho:tooltip", show: false }, "*");
         return;
       }
       if (!show) {
-        window.parent.postMessage({ type: "adas:tooltip", show: false }, "*");
+        window.parent.postMessage({ type: "arcrho:tooltip", show: false }, "*");
         return;
       }
       const targetEl = indexEl || btn;
@@ -1909,7 +1909,7 @@ function renderStepsList() {
       const x = Number.isFinite(clientX) ? (clientX + 10) : (rect.right + 6);
       const y = Number.isFinite(clientY) ? clientY : (rect.top + rect.height / 2);
       window.parent.postMessage({
-        type: "adas:tooltip",
+        type: "arcrho:tooltip",
         show: true,
         text: label,
         x,
@@ -2064,7 +2064,7 @@ addStepTile?.addEventListener("click", () => {
   addStep();
 });
 importWorkflowTile?.addEventListener("click", () => {
-  window.parent.postMessage({ type: "adas:workflow-import" }, "*");
+  window.parent.postMessage({ type: "arcrho:workflow-import" }, "*");
 });
 
 // ===== Sidebar collapse logic =====

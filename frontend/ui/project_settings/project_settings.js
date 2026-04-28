@@ -38,41 +38,41 @@ applyZoomValue(loadZoomFromStorage());
 
 window.addEventListener("message", (e) => {
   const msgType = String(e?.data?.type || "");
-  if (msgType === "adas:set-zoom") {
+  if (msgType === "arcrho:set-zoom") {
     applyZoomValue(e.data.zoom);
     return;
   }
-  if (msgType === "adas:project-settings-reserving-class-types-save-local") {
+  if (msgType === "arcrho:project-settings-reserving-class-types-save-local") {
     handleShellReservingClassTypesLocalSave();
     return;
   }
-  if (msgType === "adas:project-settings-reserving-class-types-load-local") {
+  if (msgType === "arcrho:project-settings-reserving-class-types-load-local") {
     handleShellReservingClassTypesLocalLoad();
     return;
   }
-  if (msgType === "adas:project-settings-dataset-types-save-local") {
+  if (msgType === "arcrho:project-settings-dataset-types-save-local") {
     handleShellDatasetTypesLocalSave();
     return;
   }
-  if (msgType === "adas:project-settings-dataset-types-load-local") {
+  if (msgType === "arcrho:project-settings-dataset-types-load-local") {
     handleShellDatasetTypesLocalLoad();
   }
 });
 
 window.addEventListener("mousedown", () => {
-  window.parent.postMessage({ type: "adas:close-shell-menus" }, "*");
+  window.parent.postMessage({ type: "arcrho:close-shell-menus" }, "*");
 }, { capture: true });
 
 window.addEventListener("keydown", (e) => {
   const key = (e.key || "").toLowerCase();
   if (e.altKey && key === "w") {
     e.preventDefault();
-    window.parent.postMessage({ type: "adas:close-active-tab" }, "*");
+    window.parent.postMessage({ type: "arcrho:close-active-tab" }, "*");
     return;
   }
   if (e.ctrlKey && key === "q") {
     e.preventDefault();
-    window.parent.postMessage({ type: "adas:hotkey", action: "app_shutdown" }, "*");
+    window.parent.postMessage({ type: "arcrho:hotkey", action: "app_shutdown" }, "*");
     return;
   }
 }, { capture: true });
@@ -80,7 +80,7 @@ window.addEventListener("keydown", (e) => {
 document.addEventListener("wheel", (e) => {
   if (!e.ctrlKey) return;
   e.preventDefault();
-  window.parent.postMessage({ type: "adas:zoom", deltaY: e.deltaY }, "*");
+  window.parent.postMessage({ type: "arcrho:zoom", deltaY: e.deltaY }, "*");
 }, { capture: true, passive: false });
 
 // ============ State ============
@@ -355,13 +355,13 @@ function initTableColumnResizing(tableId, minWidths) {
 
 function setStatus(msg) {
   // Send status to app's statusbar
-  window.parent.postMessage({ type: "adas:status", text: msg || "" }, "*");
+  window.parent.postMessage({ type: "arcrho:status", text: msg || "" }, "*");
 }
 
 function notifyProjectSettingsRibbonChanged() {
   window.parent.postMessage(
     {
-      type: "adas:project-settings-ribbon-changed",
+      type: "arcrho:project-settings-ribbon-changed",
       ribbon: String(activeProjectSettingsRibbon || "").trim().toLowerCase(),
     },
     "*",
@@ -2260,7 +2260,7 @@ function escapeHtml(str) {
 function openProjectInNewTab(project) {
   // Send message to parent to open project in new tab
   window.parent.postMessage({
-    type: "adas:open-project",
+    type: "arcrho:open-project",
     project: {
       name: project.name,
       settings: project.settings,
@@ -2282,7 +2282,7 @@ function openProjectSettings(project) {
 
   // Send message to open settings workbook
   window.parent.postMessage({
-    type: "adas:open-workbook",
+    type: "arcrho:open-workbook",
     path: settingsPath
   }, "*");
 

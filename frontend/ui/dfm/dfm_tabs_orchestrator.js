@@ -109,7 +109,7 @@ function initDfmTabs() {
         syncOutputTypeFromProject();
       }
       const inst = getDfmInst();
-      window.parent.postMessage({ type: "adas:dfm-tab-changed", inst, tab: tabId }, "*");
+      window.parent.postMessage({ type: "arcrho:dfm-tab-changed", inst, tab: tabId }, "*");
     }
   });
 
@@ -129,7 +129,7 @@ export function initDfmRatios() {
   }, 500);
 
   document.getElementById("loadDfmSettingsBtn")?.addEventListener("click", () => loadDfmTemplate());
-  window.addEventListener("adas:workflow-defaults-updated", () => {
+  window.addEventListener("arcrho:workflow-defaults-updated", () => {
     syncMethodNameFromInputs();
     syncOutputTypeFromProject();
     updatePathBar();
@@ -137,7 +137,7 @@ export function initDfmRatios() {
   wireRatioSyncChannel();
   requestRatioStateSync();
 
-  window.addEventListener("adas:dataset-updated", handleDatasetUpdated);
+  window.addEventListener("arcrho:dataset-updated", handleDatasetUpdated);
 
   /* ---- Apply project/class from URL params when embedded in workflow ---- */
   const _qs = new URLSearchParams(window.location.search);
@@ -156,7 +156,7 @@ export function initDfmRatios() {
 
   window.addEventListener("message", (e) => {
     /* Respond to workflow requesting DFM step settings for snapshot */
-    if (e?.data?.type === "adas:get-dfm-settings") {
+    if (e?.data?.type === "arcrho:get-dfm-settings") {
       const settings = {
         project: document.getElementById("projectSelect")?.value?.trim() || "",
         reservingClass: document.getElementById("pathInput")?.value?.trim() || "",
@@ -165,11 +165,11 @@ export function initDfmRatios() {
         originLen: document.getElementById("originLenSelect")?.value?.trim() || "",
         devLen: document.getElementById("devLenSelect")?.value?.trim() || "",
       };
-      window.parent.postMessage({ type: "adas:dfm-settings", settings, requestId: e.data.requestId }, "*");
+      window.parent.postMessage({ type: "arcrho:dfm-settings", settings, requestId: e.data.requestId }, "*");
       return;
     }
     /* Handle global control changes from workflow */
-    if (e?.data?.type === "adas:workflow-global-changed") {
+    if (e?.data?.type === "arcrho:workflow-global-changed") {
       const vars = e.data.globalControl?.vars || [];
       const proj = vars.find(v => v.key === "project")?.value || "";
       const rc = vars.find(v => v.key === "reservingClass")?.value || "";
@@ -183,38 +183,38 @@ export function initDfmRatios() {
       scheduleRatioSelectionLoad("global-changed");
       return;
     }
-    if (e?.data?.type === "adas:dfm-request-state" || e?.data?.type === "adas:dfm-tab-activated") {
+    if (e?.data?.type === "arcrho:dfm-request-state" || e?.data?.type === "arcrho:dfm-tab-activated") {
       notifyDfmEditState();
       scheduleRatioSelectionLoad("tab-activated");
       return;
     }
-    if (e?.data?.type === "adas:dfm-exclude-high") {
+    if (e?.data?.type === "arcrho:dfm-exclude-high") {
       const ratiosPage = document.getElementById("dfmRatiosPage");
       if (!ratiosPage || ratiosPage.style.display === "none") return;
       excludeExtremeInActiveCol("high");
       return;
     }
-    if (e?.data?.type === "adas:dfm-exclude-low") {
+    if (e?.data?.type === "arcrho:dfm-exclude-low") {
       const ratiosPage = document.getElementById("dfmRatiosPage");
       if (!ratiosPage || ratiosPage.style.display === "none") return;
       excludeExtremeInActiveCol("low");
       return;
     }
-    if (e?.data?.type === "adas:dfm-include-all") {
+    if (e?.data?.type === "arcrho:dfm-include-all") {
       const ratiosPage = document.getElementById("dfmRatiosPage");
       if (!ratiosPage || ratiosPage.style.display === "none") return;
       includeAllInActiveCol();
       return;
     }
-    if (e?.data?.type === "adas:dfm-save") {
+    if (e?.data?.type === "arcrho:dfm-save") {
       saveRatioSelectionPattern(false);
       return;
     }
-    if (e?.data?.type === "adas:dfm-save-as") {
+    if (e?.data?.type === "arcrho:dfm-save-as") {
       saveRatioSelectionPattern(true);
       return;
     }
-    if (e?.data?.type === "adas:dfm-save-template") {
+    if (e?.data?.type === "arcrho:dfm-save-template") {
       saveDfmTemplate();
       return;
     }

@@ -11,7 +11,7 @@ let dfmLastSavedNotesText = "";
 
 function setStatus(text) {
   try {
-    window.parent.postMessage({ type: "adas:status", text: String(text || "") }, "*");
+    window.parent.postMessage({ type: "arcrho:status", text: String(text || "") }, "*");
   } catch {
     // ignore
   }

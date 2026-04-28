@@ -4,7 +4,7 @@
 <!-- MANUAL:BEGIN -->
 Dataset editing/analysis page used inside shell tabs.
 Dataset tab strip includes `Details`, `Data`, `Chart`, `Notes`, and `Audit Log`; default active tab remains `Data`.
-Dataset runtime internals are split into controller/modules (`dataset_input_controller.js`, `dataset_run_controller.js`, `dataset_dependency_guard.js`, `dataset_headers_service.js`, `dataset_grid_interactions.js`, `dataset_host_bridge.js`, `dataset_notes_editor.js`, `notes_editor_interactions.js`, `dataset_name_picker.js`, `dataset_types_source.js`, `dataset_types_view_model.js`) while keeping existing UI behavior and `adas:*`/HTTP contracts unchanged; `notes_editor_interactions.js` contains reusable Notes-editor interaction behavior intended for Dataset and DFM Notes UIs to share while persistence logic remains page-specific, `dataset_name_picker.js` provides a reusable dataset-selection window with caller-supplied filtering options (used by Dataset and DFM pickers) plus header-level `Name Search`, `Data Format`, `Category`, and `Calculated` filter popups, and shared dataset-types data normalization/filter/sort helpers are being extracted into `dataset_types_source.js` and `dataset_types_view_model.js` for reuse across picker and project-settings table features. In the shared picker, long `Name` values wrap within the first column instead of truncating, header column widths reserve space for sort/filter controls so labels remain readable, sort direction indicators use filled SVG triangles to match Project Settings table semantics, and internal column boundaries can be drag-resized from the header grid lines (the dragged left column changes width while the last column auto-compensates to keep total table width constant). The `Calculated` column renders disabled checkboxes in rows (while its filter options remain `Yes` / `No`). Titlebar tools now include a category-group collapse/expand toggle and `Clear all filters` (placed left of picker preferences). The picker opens at an initial height of about two-thirds of the host app viewport height. The picker window's resize max bounds are refreshed when the host app window is resized so enlarging the app window also expands the picker's available resize range; vertical resize max is based on host-window height (not the picker's current top position). During dragging, the picker may move beyond the host window's left/right/bottom edges (top edge remains constrained so the title bar stays reachable). Picker `Data Format`/`Category`/`Calculated` filter popups use `(All)` as the explicit no-filter state (default open state: only `(All)` checked); choosing a specific option clears `(All)`, clicking `(All)` clears specific checks, and right-clicking an option row inverts all non-`(All)` selections.
+Dataset runtime internals are split into controller/modules (`dataset_input_controller.js`, `dataset_run_controller.js`, `dataset_dependency_guard.js`, `dataset_headers_service.js`, `dataset_grid_interactions.js`, `dataset_host_bridge.js`, `dataset_notes_editor.js`, `notes_editor_interactions.js`, `dataset_name_picker.js`, `dataset_types_source.js`, `dataset_types_view_model.js`) while keeping existing UI behavior and `arcrho:*`/HTTP contracts unchanged; `notes_editor_interactions.js` contains reusable Notes-editor interaction behavior intended for Dataset and DFM Notes UIs to share while persistence logic remains page-specific, `dataset_name_picker.js` provides a reusable dataset-selection window with caller-supplied filtering options (used by Dataset and DFM pickers) plus header-level `Name Search`, `Data Format`, `Category`, and `Calculated` filter popups, and shared dataset-types data normalization/filter/sort helpers are being extracted into `dataset_types_source.js` and `dataset_types_view_model.js` for reuse across picker and project-settings table features. In the shared picker, long `Name` values wrap within the first column instead of truncating, header column widths reserve space for sort/filter controls so labels remain readable, sort direction indicators use filled SVG triangles to match Project Settings table semantics, and internal column boundaries can be drag-resized from the header grid lines (the dragged left column changes width while the last column auto-compensates to keep total table width constant). The `Calculated` column renders disabled checkboxes in rows (while its filter options remain `Yes` / `No`). Titlebar tools now include a category-group collapse/expand toggle and `Clear all filters` (placed left of picker preferences). The picker opens at an initial height of about two-thirds of the host app viewport height. The picker window's resize max bounds are refreshed when the host app window is resized so enlarging the app window also expands the picker's available resize range; vertical resize max is based on host-window height (not the picker's current top position). During dragging, the picker may move beyond the host window's left/right/bottom edges (top edge remains constrained so the title bar stays reachable). Picker `Data Format`/`Category`/`Calculated` filter popups use `(All)` as the explicit no-filter state (default open state: only `(All)` checked); choosing a specific option clears `(All)`, clicking `(All)` clears specific checks, and right-clicking an option row inverts all non-`(All)` selections.
 Dataset `Details` tab uses a two-column form layout with right-aligned labels and left-aligned input controls, and includes a read-only `Formula` field that reflects the current Dataset Type `Formula` value loaded from project `dataset_types`.
 Project Name, Reserving Class, and top-row Dataset Type inputs enforce valid-value lists before running ADASTri.
 Reserving Class validation uses `reserving_class_types` Name values: a path is valid when each `\`-separated segment exists in the project's reserving class type names, while literal `/` characters inside a class name are preserved and are not treated as path delimiters.
@@ -45,15 +45,15 @@ Detected `fetch(...)` targets in key JS files:
 - `${config.API_BASE}/excel/wait_for_enter`
 - `/adas/tri/precheck`
 
-Detected `adas:*` message types in key JS files:
-- `adas:browsing-history-updated`
-- `adas:close-active-tab`
-- `adas:close-shell-menus`
-- `adas:dataset-settings-changed`
-- `adas:hotkey`
-- `adas:status`
-- `adas:update-active-tab-title`
-- `adas:zoom`
+Detected `arcrho:*` message types in key JS files:
+- `arcrho:browsing-history-updated`
+- `arcrho:close-active-tab`
+- `arcrho:close-shell-menus`
+- `arcrho:dataset-settings-changed`
+- `arcrho:hotkey`
+- `arcrho:status`
+- `arcrho:update-active-tab-title`
+- `arcrho:zoom`
 <!-- AUTO-GEN:END -->
 
 ## Key Files
@@ -70,7 +70,7 @@ Detected `adas:*` message types in key JS files:
 - Calls app-server dataset/adas endpoints plus valid-value list endpoints (`/dataset_types`, `/reserving_class_*`, `/adas/projects`).
 - Uses `/scripting/preferences` to persist and restore the last resolved Project + Reserving Class pair in APPDATA.
 - Sends status/hotkey/close signals to parent shell.
-- Publishes dataset input updates and browsing-history updates to shell via `adas:dataset-settings-changed` and `adas:browsing-history-updated`.
+- Publishes dataset input updates and browsing-history updates to shell via `arcrho:dataset-settings-changed` and `arcrho:browsing-history-updated`.
 <!-- MANUAL:END -->
 
 ## Data/State/Caches

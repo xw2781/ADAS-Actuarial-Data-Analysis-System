@@ -89,8 +89,8 @@
     window.addEventListener("message", (e) => {
       const msg = e.data;
       if (!msg || typeof msg.type !== "string") return;
-      // Only relay adas: messages from the iframe
-      if (!msg.type.startsWith("adas:")) return;
+      // Only relay arcrho: messages from the iframe
+      if (!msg.type.startsWith("arcrho:")) return;
       channel.send({ type: "relay-to-shell", inst, msg });
     });
 
@@ -111,7 +111,7 @@
       try {
         const zoom = Number(localStorage.getItem("adas_ui_zoom_pct")) || 100;
         iframe.contentWindow.postMessage(
-          { type: "adas:set-zoom", zoom, statusBarHeight: 0 },
+          { type: "arcrho:set-zoom", zoom, statusBarHeight: 0 },
           "*"
         );
       } catch { /* ignore */ }
