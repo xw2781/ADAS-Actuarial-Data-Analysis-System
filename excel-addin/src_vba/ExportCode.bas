@@ -2,7 +2,7 @@ Attribute VB_Name = "ExportCode"
 Option Explicit
 
 Private Const REPO_ROOT As String = "E:\ADAS\repos\ADAS-Actuarial-Data-Analytics-System"
-Private Const OUT_DIR As String = "excel\src_vba"
+Private Const OUT_DIR As String = "excel-addin\src_vba"
 
 Public Sub ExportProjectToRepo()
     Dim vbProj As Object ' VBIDE.VBProject
