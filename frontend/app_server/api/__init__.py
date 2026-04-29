@@ -5,7 +5,7 @@ from .audit_log_router import router as audit_log_router
 from .dataset_router import router as dataset_router
 from .book_router import router as book_router
 from .excel_router import router as excel_router
-from .adas_router import router as adas_router
+from .arcrho_router import router as arcrho_router
 from .project_settings_router import router as project_settings_router
 from .project_book_router import router as project_book_router
 from .table_summary_router import router as table_summary_router
@@ -22,7 +22,7 @@ __all__ = [
     "dataset_router",
     "book_router",
     "excel_router",
-    "adas_router",
+    "arcrho_router",
     "project_settings_router",
     "project_book_router",
     "table_summary_router",

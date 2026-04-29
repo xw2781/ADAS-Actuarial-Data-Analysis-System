@@ -16,9 +16,9 @@ import {
   tokenizeDatasetTypeNameSearch,
 } from "/ui/dataset/dataset_types_view_model.js";
 
-const STYLE_ID = "adas-dataset-name-picker-style";
+const STYLE_ID = "arcrho-dataset-name-picker-style";
 const WINDOW_MARGIN_PX = 8;
-const PREFS_KEY = "adas_dataset_name_picker_prefs_v1";
+const PREFS_KEY = "arcrho_dataset_name_picker_prefs_v1";
 const APPDATA_PREFS_ENDPOINT = "/scripting/preferences";
 const APPDATA_PREFS_KEY = "dataset_name_picker_prefs_v1";
 const PREFS_SAVE_DEBOUNCE_MS = 250;

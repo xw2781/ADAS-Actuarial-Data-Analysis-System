@@ -1,4 +1,4 @@
-"""ADAS triangle analysis operations."""
+"""ArcRho runtime request operations."""
 from __future__ import annotations
 
 import os
@@ -12,7 +12,7 @@ from app_server.helpers import set_data_path_like_vba, send_request_like_vba, wa
 from app_server.services import book_service
 
 
-def adas_headers(pairs: list, timeout_sec: float) -> Dict[str, Any]:
+def arcrho_headers(pairs: list, timeout_sec: float) -> Dict[str, Any]:
     data_path = set_data_path_like_vba(pairs)
     request_file = None
 
@@ -42,7 +42,7 @@ def adas_headers(pairs: list, timeout_sec: float) -> Dict[str, Any]:
     }
 
 
-def clear_adas_headers_cache(project_name: str) -> Dict[str, Any]:
+def clear_arcrho_headers_cache(project_name: str) -> Dict[str, Any]:
     project_name_clean = str(project_name or "").strip()
     if not project_name_clean:
         raise HTTPException(400, "ProjectName is required")
@@ -70,14 +70,14 @@ def clear_adas_headers_cache(project_name: str) -> Dict[str, Any]:
                 name_l = entry.name.strip().lower()
                 if not name_l.endswith(".csv"):
                     continue
-                if not name_l.startswith("adasheaders"):
+                if not name_l.startswith("arcrhoheaders"):
                     continue
                 os.remove(entry.path)
                 cleared_files.append(entry.name)
     except PermissionError:
-        raise HTTPException(423, "Cannot clear ADASHeaders cache files because the project data folder is locked.")
+        raise HTTPException(423, "Cannot clear ArcRhoHeaders cache files because the project data folder is locked.")
     except OSError as e:
-        raise HTTPException(500, f"Failed to clear ADASHeaders cache files: {str(e)}")
+        raise HTTPException(500, f"Failed to clear ArcRhoHeaders cache files: {str(e)}")
 
     return {
         "ok": True,
@@ -88,7 +88,7 @@ def clear_adas_headers_cache(project_name: str) -> Dict[str, Any]:
     }
 
 
-def adas_projects() -> Dict[str, Any]:
+def arcrho_projects() -> Dict[str, Any]:
     if not os.path.exists(config.PROJECT_BOOK):
         raise HTTPException(404, f"Project map file not found: {config.PROJECT_BOOK}")
 
@@ -124,7 +124,7 @@ def adas_projects() -> Dict[str, Any]:
     return {"sheet": first_sheet, "projects": out}
 
 
-def run_adas_tri(pairs: list, data_path: str, timeout_sec: float, force_refresh: bool = False) -> Dict[str, Any]:
+def run_arcrho_tri(pairs: list, data_path: str, timeout_sec: float, force_refresh: bool = False) -> Dict[str, Any]:
     request_file = None
     cache_cleared = False
 
@@ -133,7 +133,7 @@ def run_adas_tri(pairs: list, data_path: str, timeout_sec: float, force_refresh:
             os.remove(data_path)
             cache_cleared = True
         except OSError as e:
-            raise HTTPException(423, f"Cannot clear cached ADAS tri file: {str(e)}")
+            raise HTTPException(423, f"Cannot clear cached ArcRho tri file: {str(e)}")
 
     need_request = force_refresh or (not os.path.exists(data_path))
     if need_request:
@@ -153,7 +153,7 @@ def run_adas_tri(pairs: list, data_path: str, timeout_sec: float, force_refresh:
                 timeout_out["cache_cleared"] = cache_cleared
             return timeout_out
 
-    ds_id = "adastri_" + hashlib.sha1(data_path.encode("utf-8")).hexdigest()[:16]
+    ds_id = "arcrhotri_" + hashlib.sha1(data_path.encode("utf-8")).hexdigest()[:16]
     config.DATASETS[ds_id] = data_path
 
     out: Dict[str, Any] = {

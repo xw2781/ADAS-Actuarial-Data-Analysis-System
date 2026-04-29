@@ -11,7 +11,7 @@ Source Data tab derives origin/development date boundary inputs from table summa
 - `ui/project_settings/project_settings.html`: external scripts `/ui/project_settings/project_settings.js?v=2026040309`; inline imports _none_.
 
 Detected `fetch(...)` targets in key JS files:
-- `/adas/headers/cache/clear`
+- `/arcrho/headers/cache/clear`
 - `/field_mapping?project_name=${encodeURIComponent(name)}`
 - `/general_settings`
 - `/general_settings?project_name=${encodeURIComponent(name)}`
@@ -50,7 +50,7 @@ Detected `arcrho:*` message types in key JS files:
 
 ## External Interfaces
 <!-- MANUAL:BEGIN -->
-- Calls `/project_settings/*`, `/table_summary*`, `/field_mapping`, `/general_settings`, `/adas/headers/cache/clear`, and related endpoints.
+- Calls `/project_settings/*`, `/table_summary*`, `/field_mapping`, `/general_settings`, `/arcrho/headers/cache/clear`, and related endpoints.
 - Uses `POST /project_settings/{source}/open_project_folder` from the detail header action to open the selected project's folder in the OS file explorer.
 - Folder tree "Create New Project" action calls `POST /project_settings/{source}/create_project_folder` before saving folder structure + settings JSON.
 - Dataset Types pane persists changes through `POST /dataset_types` (debounced auto-save).
@@ -91,7 +91,7 @@ Detected `arcrho:*` message types in key JS files:
 - `general_settings.json` stores `auto_generated`; derived writes set it `true`, user edits set it `false`.
 - When `auto_generated` is `false`, table reload will not overwrite the 3 date values unless `project_name` in JSON mismatches the project folder name (stale duplicated settings).
 - Source Data date inputs auto-derive from table summary + field mapping when values are missing, stale mismatch is detected, or reload is requested while `auto_generated=true`.
-- Source Data table reload clears project-level `ADASHeaders*.csv` cache files under the project `data` folder before refreshing table summary.
+- Source Data table reload clears project-level `ArcRhoHeaders*.csv` cache files under the project `data` folder before refreshing table summary.
 - Folder-node context menu supports `Create New Project`, prompts for a project name, creates an empty project folder (with `data` subfolder) via the app server, then persists folder-tree mapping + blank project row with rollback on intermediate failures.
 <!-- MANUAL:END -->
 

@@ -16,11 +16,11 @@ function isWindows11() {
 
 const IS_WIN11 = isWindows11();
 
-const HOST = process.env.ADAS_HOST || "127.0.0.1";
-const PORT = parseInt(process.env.ADAS_PORT || "8000", 10);
-const UI_VERSION = process.env.ADAS_UI_VERSION || String(Date.now());
+const HOST = process.env.ARCRHO_HOST || "127.0.0.1";
+const PORT = parseInt(process.env.ARCRHO_PORT || "8000", 10);
+const UI_VERSION = process.env.ARCRHO_UI_VERSION || String(Date.now());
 const URL = `http://${HOST}:${PORT}/ui/?v=${encodeURIComponent(UI_VERSION)}`;
-const START_BACKEND = process.env.ADAS_START_BACKEND !== "0";
+const START_BACKEND = process.env.ARCRHO_START_BACKEND !== "0";
 const PYTHON_EXE = process.env.PYTHON_EXE || process.env.PYTHON || "python";
 const APP_ROOT = path.resolve(__dirname, "..");
 const PRELOAD_PATH = path.join(__dirname, "preload.js");
@@ -34,19 +34,19 @@ const BACKEND_CONTROL_FLAGS = [
 ];
 const BACKEND_STARTUP_TIMEOUT_MS = Math.max(
   5000,
-  parseInt(process.env.ADAS_BACKEND_STARTUP_TIMEOUT_MS || "30000", 10) || 30000
+  parseInt(process.env.ARCRHO_BACKEND_STARTUP_TIMEOUT_MS || "30000", 10) || 30000
 );
 const BACKEND_STARTUP_ATTEMPTS = Math.max(
   1,
-  parseInt(process.env.ADAS_BACKEND_STARTUP_ATTEMPTS || "2", 10) || 2
+  parseInt(process.env.ARCRHO_BACKEND_STARTUP_ATTEMPTS || "2", 10) || 2
 );
 
 function getBundledServerPath() {
   // Check if running as packaged app
   if (app.isPackaged) {
-    // In packaged app, server is in resources/adas_server/adas_server.exe
+    // In packaged app, server is in resources/arcrho_server/arcrho_server.exe
     const resourcesPath = process.resourcesPath;
-    return path.join(resourcesPath, "adas_server", "adas_server.exe");
+    return path.join(resourcesPath, "arcrho_server", "arcrho_server.exe");
   }
   return null;
 }
@@ -59,7 +59,6 @@ let pseudoMaximized = false;
 let lastBounds = null;
 let serverSpawnError = null;
 let backendShutdownPromise = null;
-const extraWindows = new Set();
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -70,7 +69,7 @@ function getMainWindowPrefsPath() {
 }
 
 function getPrefsDir() {
-  return path.join(app.getPath("appData"), "ArcRho", "WebUI", "prefs");
+  return path.join(app.getPath("appData"), "ArcRho", "prefs");
 }
 
 function getScriptingShortcutsPath() {
@@ -214,8 +213,8 @@ function forceKillBackendProc(proc) {
 function startBackend() {
   const env = { ...process.env };
   env.TRI_DATA_DIR = env.TRI_DATA_DIR || APP_ROOT;
-  env.ADAS_WORKFLOW_DIR =
-    env.ADAS_WORKFLOW_DIR ||
+  env.ARCRHO_WORKFLOW_DIR =
+    env.ARCRHO_WORKFLOW_DIR ||
     path.join(require("os").homedir(), "Documents", "ArcRho", "workflows");
   serverSpawnError = null;
 
@@ -365,7 +364,7 @@ function createWindow() {
     e.preventDefault();
     try {
       const shouldIntercept = await win.webContents.executeJavaScript(
-        "window.__adas_should_intercept_close && window.__adas_should_intercept_close()"
+        "window.__arcrho_should_intercept_close && window.__arcrho_should_intercept_close()"
       );
       if (shouldIntercept) {
         win.webContents.executeJavaScript(
@@ -379,7 +378,7 @@ function createWindow() {
 
     try {
       const confirmed = await win.webContents.executeJavaScript(
-        "window.__adas_confirm_app_shutdown ? window.__adas_confirm_app_shutdown() : true"
+        "window.__arcrho_confirm_app_shutdown ? window.__arcrho_confirm_app_shutdown() : true"
       );
       if (!confirmed) {
         return;
@@ -523,36 +522,6 @@ function createWindow() {
   });
 }
 
-function createDetachedWindow(loadUrl, title, opts = {}) {
-  const child = new BrowserWindow({
-    width: Math.max(400, Number(opts.width || 1200)),
-    height: Math.max(300, Number(opts.height || 820)),
-    frame: opts.frame !== false,
-    backgroundColor: "#ffffff",
-    autoHideMenuBar: !!opts.hideMenu,
-    alwaysOnTop: !!opts.alwaysOnTop,
-    webPreferences: {
-      preload: PRELOAD_PATH,
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-  if (title) {
-    child.setTitle(String(title));
-  }
-  if (opts.hideMenu) {
-    try { child.setMenu(null); } catch {}
-    try { child.setMenuBarVisibility(false); } catch {}
-    try { child.setAutoHideMenuBar(true); } catch {}
-  }
-  child.loadURL(loadUrl);
-  child.on("closed", () => {
-    extraWindows.delete(child);
-  });
-  extraWindows.add(child);
-  return child;
-}
-
 ipcMain.handle("pick-open-workflow", async (_event, payload) => {
   const startDir = payload?.startDir || "";
   const result = await dialog.showOpenDialog(win, {
@@ -576,6 +545,33 @@ ipcMain.handle("pick-open-table-file", async (_event, payload) => {
   });
   if (result.canceled || !result.filePaths?.length) return "";
   return result.filePaths[0];
+});
+
+ipcMain.handle("pick-folder", async (_event, payload) => {
+  const startDir = String(payload?.startDir || "").trim();
+  const defaultPath = startDir && fs.existsSync(startDir) ? startDir : undefined;
+  const result = await dialog.showOpenDialog(win, {
+    defaultPath,
+    properties: ["openDirectory"],
+  });
+  if (result.canceled || !result.filePaths?.length) return "";
+  return result.filePaths[0];
+});
+
+ipcMain.handle("find-arcrho-server-root", async () => {
+  if (process.platform !== "win32") return { found: false, path: "" };
+  for (let code = 68; code <= 90; code++) {
+    const drive = `${String.fromCharCode(code)}:\\`;
+    const candidate = path.join(drive, "ArcRho Server");
+    try {
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
+        return { found: true, path: candidate };
+      }
+    } catch {
+      // Skip unavailable or inaccessible drives.
+    }
+  }
+  return { found: false, path: "" };
 });
 
 ipcMain.handle("pick-save-workflow", async (_event, payload) => {
@@ -950,14 +946,6 @@ ipcMain.handle("window-resize", (_e, payload) => {
   if (w && h) win.setSize(Math.round(w), Math.round(h));
 });
 
-ipcMain.handle("window-resize-self", (e, payload) => {
-  const target = BrowserWindow.fromWebContents(e.sender);
-  if (!target) return;
-  const w = Math.max(200, Number(payload?.width || 0));
-  const h = Math.max(200, Number(payload?.height || 0));
-  if (w && h) target.setSize(Math.round(w), Math.round(h));
-});
-
 ipcMain.handle("zoom-get", () => {
   if (!win) return 1;
   return win.webContents.getZoomFactor();
@@ -989,53 +977,6 @@ ipcMain.handle("window-restore-to-last", () => {
   if (!win) return;
   if (lastBounds) win.setBounds(lastBounds, true);
   pseudoMaximized = false;
-});
-
-ipcMain.handle("open-tab-window", (_e, payload) => {
-  try {
-    let url = String(payload?.url || "").trim();
-
-    // Preferred: shell passes a relative pop-out URL.
-    if (url && url.startsWith("/")) {
-      url = `http://${HOST}:${PORT}${url}`;
-    }
-
-    // Backward-compatible fallback for older dataset payloads.
-    if (!url) {
-      const type = String(payload?.type || "");
-      if (type !== "dataset") return false;
-      const params = new URLSearchParams();
-      if (payload?.datasetId) params.set("ds", String(payload.datasetId));
-      if (payload?.dsInst) params.set("inst", String(payload.dsInst));
-      params.set("v", UI_VERSION);
-      url = `http://${HOST}:${PORT}/ui/dataset/dataset_viewer.html?${params.toString()}`;
-    }
-
-    createDetachedWindow(url, payload?.title || "Pop-out");
-    return true;
-  } catch (err) {
-    console.error("Failed to open tab window:", err);
-    return false;
-  }
-});
-
-ipcMain.handle("open-dfm-results-window", (_e, payload) => {
-  const params = new URLSearchParams();
-  if (payload?.datasetId) params.set("ds", String(payload.datasetId));
-  if (payload?.inst) params.set("inst", String(payload.inst));
-  params.set("tab", "results");
-  params.set("results_only", "1");
-  if (payload?.title) params.set("results_title", String(payload.title));
-  params.set("v", UI_VERSION);
-  const url = `http://${HOST}:${PORT}/ui/dfm/dfm.html?${params.toString()}`;
-  createDetachedWindow(url, payload?.title || "Results", {
-    hideMenu: true,
-    width: 1000,
-    height: 700,
-    frame: false,
-    alwaysOnTop: true,
-  });
-  return true;
 });
 
 app.whenReady().then(async () => {

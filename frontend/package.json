@@ -38,12 +38,8 @@
     ],
     "extraResources": [
       {
-        "from": "python_dist/adas_server",
-        "to": "adas_server"
-      },
-      {
-        "from": "workspace_paths.json",
-        "to": "workspace_paths.json"
+        "from": "python_dist/arcrho_server",
+        "to": "arcrho_server"
       }
     ],
     "win": {

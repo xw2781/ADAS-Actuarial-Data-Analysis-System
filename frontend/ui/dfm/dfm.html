@@ -29,14 +29,6 @@
       margin: 0;
       overflow: hidden;
     }
-    html.results-only body {
-      margin: 0;
-      padding: 0;
-      background: #fff;
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
     .dfmPathBar {
       padding: 6px 10px;
       font-size: 13px;
@@ -303,108 +295,6 @@
     }
     #dfmResultsPage { display: none; }
     #dfmNotesPage { display: none; }
-    html.results-only .dfmPathBar,
-    html.results-only .dfmTabBar {
-      display: none;
-    }
-    html.results-only #dfmDetailsPage,
-    html.results-only #dfmDataPage,
-    html.results-only #dfmRatiosPage,
-    html.results-only #dfmNotesPage {
-      display: none !important;
-    }
-    html.results-only #dfmResultsPage {
-      display: block;
-      border: none;
-      border-radius: 0;
-      padding: 8px;
-      flex: 1 1 auto;
-      overflow: auto;
-    }
-    html.results-only #dfmResultsPage .panel {
-      border: none;
-      padding: 0;
-    }
-    html.results-only #dfmResultsPage .panelInner {
-      padding: 0;
-    }
-    html.results-only #dfmResultsPage .small {
-      margin-bottom: 6px;
-    }
-    html.results-only #dfmAvgMenu,
-    html.results-only #dfmRatioMenu,
-    html.results-only #dfmResultsTabMenu,
-    html.results-only #ctxMenu {
-      display: none !important;
-    }
-
-    #resultsTitlebar {
-      display: none;
-      height: 30px;
-      background: #a5a5a559;
-      border-bottom: 1px solid #cfcfcf;
-      display: none;
-      align-items: center;
-      padding: 0 10px;
-      font-size: 13px;
-      color: #222;
-      box-sizing: border-box;
-    }
-    html.results-only #resultsTitlebar {
-      display: flex;
-    }
-    .host-drag-region {
-      cursor: default;
-      -webkit-app-region: drag;
-    }
-    .host-nodrag { -webkit-app-region: no-drag; }
-    #resultsTitleText {
-      flex: 1 1 auto;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .titlebarControls {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-    }
-    .titlebarBtn {
-      width: 28px;
-      height: 20px;
-      border: 1px solid #bdbdbd;
-      border-radius: 4px;
-      background: #efefef;
-      color: #333;
-      font-size: 12px;
-      line-height: 18px;
-      text-align: left;
-      cursor: pointer;
-      user-select: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .titlebarBtn:hover { background: #e2e2e2; }
-    .titlebarBtn:active { background: #d8d8d8; }
-    #resultsMinBtn:hover,
-    #resultsMaxBtn:hover {
-      background: #dbeafe;
-      border-color: #93c5fd;
-    }
-    #resultsCloseBtn:hover {
-      background: #fee2e2;
-      border-color: #fca5a5;
-    }
-    .titlebarIcon {
-      width: 10px;
-      height: 10px;
-      stroke: #333;
-      stroke-width: 1.2;
-      fill: none;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
     #dfmDetailsPage .dfmDetailsBlock {
       border: 1px solid #d7dde7;
       border-radius: 5px;
@@ -1447,37 +1337,9 @@
       text-align: right;
     }
   </style>
-  <script>
-    (function () {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("results_only") === "1") {
-        document.documentElement.classList.add("results-only");
-      }
-    })();
-  </script>
 </head>
 
 <body>
-  <div id="resultsTitlebar" class="host-drag-region">
-    <div id="resultsTitleText">Results</div>
-    <div class="titlebarControls host-nodrag">
-      <div class="titlebarBtn" id="resultsMinBtn" title="Minimize" aria-label="Minimize">
-        <svg class="titlebarIcon" viewBox="0 0 10 10" aria-hidden="true">
-          <path d="M2 8 L8 8"></path>
-        </svg>
-      </div>
-      <div class="titlebarBtn" id="resultsMaxBtn" title="Maximize" aria-label="Maximize">
-        <svg class="titlebarIcon" viewBox="0 0 10 10" aria-hidden="true">
-          <rect x="2" y="2" width="6" height="6"></rect>
-        </svg>
-      </div>
-      <div class="titlebarBtn" id="resultsCloseBtn" title="Close" aria-label="Close">
-        <svg class="titlebarIcon" viewBox="0 0 10 10" aria-hidden="true">
-          <path d="M2 2 L8 8 M8 2 L2 8"></path>
-        </svg>
-      </div>
-    </div>
-  </div>
   <div class="dfmPathBar" id="dfmPathBar">
     <span id="dfmPathProject">-</span><span class="pathSep">&gt;</span><span id="dfmPathClass">-</span>
   </div>
@@ -1721,12 +1583,6 @@
     <button class="dfmCtxItem" data-action="copy-ratio-patterns">Copy Ratio Patterns</button>
     <button class="dfmCtxItem" data-action="apply-ratio-patterns">Apply Ratio Patterns</button>
   </div>
-  <div id="dfmResultsTabMenu" class="ctx-menu" style="display:none;">
-    <div class="ctx-menu-inner">
-      <button class="ctx-item" data-action="open-results-window">View in a New Window</button>
-    </div>
-  </div>
-
   <div id="dfmAvgModal" class="dfmModal">
     <div class="dfmModalBackdrop"></div>
     <div class="dfmModalCard">

@@ -1131,8 +1131,8 @@ async function saveReservingClassFilterSpec(projectName, filterSpec, preferences
   };
 }
 
-const FILTER_STYLE_ID = "adas-reserving-class-filter-style";
-const TREE_NODE_MENU_STYLE_ID = "adas-reserving-class-node-menu-style";
+const FILTER_STYLE_ID = "arcrho-reserving-class-filter-style";
+const TREE_NODE_MENU_STYLE_ID = "arcrho-reserving-class-node-menu-style";
 let activeFilterWindow = null;
 let activePreferencesWindow = null;
 let activeTreeNodeMenu = null;

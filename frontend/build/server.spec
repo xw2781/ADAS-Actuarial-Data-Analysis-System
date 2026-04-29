@@ -5,17 +5,13 @@ block_cipher = None
 build_dir = Path(SPECPATH)
 repo_root = build_dir.parent
 
-# Collect the served frontend tree and packaged workspace path config file.
+# Collect the served frontend tree.
 static_files = []
 ui_dir = repo_root / 'ui'
 if ui_dir.exists():
     for f in ui_dir.rglob('*'):
         if f.is_file():
             static_files.append((str(f), str(f.relative_to(repo_root).parent)))
-
-workspace_paths = repo_root / 'workspace_paths.json'
-if workspace_paths.exists():
-    static_files.append((str(workspace_paths), '.'))
 
 a = Analysis(
     [str(build_dir / 'server_entry.py')],
@@ -70,7 +66,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='adas_server',
+    name='arcrho_server',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -91,5 +87,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='adas_server',
+    name='arcrho_server',
 )

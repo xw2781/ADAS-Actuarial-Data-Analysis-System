@@ -5,8 +5,8 @@ export function wireDatasetGridInteractions(deps) {
   wireRectSelectionAndCopy();
 
   function wireArrowKeyNavigation() {
-    if (window.__adasArrowNavWired) return;
-    window.__adasArrowNavWired = true;
+    if (window.__arcRhoArrowNavWired) return;
+    window.__arcRhoArrowNavWired = true;
 
     document.addEventListener("keydown", (e) => {
       const isArrow = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key);
@@ -281,8 +281,8 @@ export function wireDatasetGridInteractions(deps) {
   }
 
   function wireTableScrollSnapAfterIdle(wrap) {
-    if (!wrap || wrap.__adasSnapWired) return;
-    wrap.__adasSnapWired = true;
+    if (!wrap || wrap.__arcRhoSnapWired) return;
+    wrap.__arcRhoSnapWired = true;
 
     let snapTimer = null;
     let wheelActiveTimer = null;
@@ -317,11 +317,11 @@ export function wireDatasetGridInteractions(deps) {
     const leftBtn = document.getElementById("tableScrollLeftBtn");
     const rightBtn = document.getElementById("tableScrollRightBtn");
     if (!host || !upBtn || !downBtn || !leftBtn || !rightBtn) return;
-    if (host.__adasScrollArrowWired) {
+    if (host.__arcRhoScrollArrowWired) {
       updateArrowState();
       return;
     }
-    host.__adasScrollArrowWired = true;
+    host.__arcRhoScrollArrowWired = true;
 
     function updateArrowState() {
       const canVert = wrap.scrollHeight - wrap.clientHeight > 1;
@@ -356,8 +356,8 @@ export function wireDatasetGridInteractions(deps) {
   }
 
   function wireRectSelectionAndCopy() {
-    if (window.__adasRectSelWired) return;
-    window.__adasRectSelWired = true;
+    if (window.__arcRhoRectSelWired) return;
+    window.__arcRhoRectSelWired = true;
 
     // state containers
     if (!Array.isArray(state.selRanges)) state.selRanges = [];

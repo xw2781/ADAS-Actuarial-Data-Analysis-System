@@ -9,13 +9,13 @@ from pathlib import Path
 
 
 def start_app(
-    project_dir: str | Path = os.getcwd() + "\\Web UI",
+    project_dir: str | Path = Path(__file__).resolve().parent,
     host: str = "127.0.0.1",
     port: int = 8000,
     reload: bool = True,
 ) -> None:
     """
-    Launch the FastAPI triangle demo and optionally open the UI in the default browser.
+    Launch the ArcRho FastAPI app and optionally open the UI in the default browser.
     """
     
     project_dir = Path(project_dir)
@@ -40,7 +40,7 @@ def start_app(
     env = os.environ.copy()
     env.setdefault("TRI_DATA_DIR", str(project_dir))
     env.setdefault(
-        "ADAS_WORKFLOW_DIR",
+        "ARCRHO_WORKFLOW_DIR",
         str(Path.home() / "Documents" / "ArcRho" / "workflows"),
     )
 
@@ -94,7 +94,7 @@ def start_browser(
     localappdata = os.environ.get("LOCALAPPDATA") or str(
         Path.home() / "AppData" / "Local"
     )
-    user_data_dir = Path(localappdata) / "ADAS_AppMode_Profile"
+    user_data_dir = Path(localappdata) / "ArcRho_AppMode_Profile"
     user_data_dir.mkdir(parents=True, exist_ok=True)
 
     cmd = [

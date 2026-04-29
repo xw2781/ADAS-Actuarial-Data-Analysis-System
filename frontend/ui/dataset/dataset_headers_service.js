@@ -2,8 +2,8 @@ export function createDatasetHeadersService(deps) {
   const { state, setStatus } = deps;
 
   const HEADER_CACHE_VERSION = "v2";
-  const HEADER_PREFIX_V1 = "adas_header_labels::";
-  const DEV_HEADER_PREFIX_V1 = "adas_dev_header_labels::";
+  const HEADER_PREFIX_V1 = "arcrho_header_labels::";
+  const DEV_HEADER_PREFIX_V1 = "arcrho_dev_header_labels::";
   const HEADER_PREFIX_V2 = `${HEADER_PREFIX_V1}${HEADER_CACHE_VERSION}::`;
   const DEV_HEADER_PREFIX_V2 = `${DEV_HEADER_PREFIX_V1}${HEADER_CACHE_VERSION}::`;
 
@@ -75,7 +75,7 @@ export function createDatasetHeadersService(deps) {
     periodType = 0,
     transposed = false,
   ) {
-    const resp = await fetch("/adas/headers", {
+    const resp = await fetch("/arcrho/headers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -139,7 +139,7 @@ export function createDatasetHeadersService(deps) {
 
     if (!remote || !p) return;
 
-    const resp = await fetch("/adas/headers/cache/clear", {
+    const resp = await fetch("/arcrho/headers/cache/clear", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ProjectName: p }),

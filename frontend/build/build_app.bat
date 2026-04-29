@@ -62,8 +62,8 @@ echo.
 
 echo Step 3: Building Electron app with electron-builder...
 echo ----------------------------------------
-if not exist "python_dist\adas_server\adas_server.exe" (
-    echo ERROR: Missing app-server bundle: python_dist\adas_server\adas_server.exe
+if not exist "python_dist\arcrho_server\arcrho_server.exe" (
+    echo ERROR: Missing app-server bundle: python_dist\arcrho_server\arcrho_server.exe
     echo HINT: PyInstaller step did not produce the server executable.
     echo       Do not continue, otherwise installer may build fast but fail at launch.
     echo.

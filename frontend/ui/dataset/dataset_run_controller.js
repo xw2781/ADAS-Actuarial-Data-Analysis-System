@@ -13,7 +13,7 @@ export function createDatasetRunController(deps) {
     validateTriInputsBeforeRun,
     getTriInputs,
     buildTriRequestPayload,
-    precheckAdasTriCsv,
+    precheckArcRhoTriCsv,
     clearHeadersCacheForProject,
     ensureHeadersForProject,
     ensureDevHeadersForProject,
@@ -34,11 +34,11 @@ export function createDatasetRunController(deps) {
   let datasetLoadingPopupStart = 0;
 
   function ensureDatasetLoadingPopupStyles(doc = document) {
-    if (doc.getElementById("adas-load-popup-style")) return;
+    if (doc.getElementById("arcrho-load-popup-style")) return;
     const style = doc.createElement("style");
-    style.id = "adas-load-popup-style";
+    style.id = "arcrho-load-popup-style";
     style.textContent = `
-      .adas-load-popup-overlay {
+      .arcrho-load-popup-overlay {
         position: fixed;
         inset: 0;
         background: rgba(0, 0, 0, 0.18);
@@ -47,7 +47,7 @@ export function createDatasetRunController(deps) {
         justify-content: center;
         z-index: 100000;
       }
-      .adas-load-popup-card {
+      .arcrho-load-popup-card {
         min-width: 340px;
         max-width: min(92vw, 680px);
         border-radius: 10px;
@@ -58,26 +58,26 @@ export function createDatasetRunController(deps) {
         color: #0f172a;
         font-family: "Segoe UI", Tahoma, Arial, sans-serif;
       }
-      .adas-load-popup-title {
+      .arcrho-load-popup-title {
         font-size: 14px;
         font-weight: 600;
         margin-bottom: 8px;
       }
-      .adas-load-popup-msg {
+      .arcrho-load-popup-msg {
         font-size: 13px;
         line-height: 1.35;
         white-space: normal;
         word-break: break-word;
         color: #334155;
       }
-      .adas-load-popup-spinner {
+      .arcrho-load-popup-spinner {
         width: 34px;
         height: 34px;
         margin: 11px auto 7px;
         border-radius: 50%;
         position: relative;
       }
-      .adas-load-popup-spinner::before {
+      .arcrho-load-popup-spinner::before {
         content: "";
         position: absolute;
         inset: 0;
@@ -87,7 +87,7 @@ export function createDatasetRunController(deps) {
           inset 0 0 10px rgba(116, 182, 235, 0.14),
           0 0 0 1px rgba(134, 188, 229, 0.1);
       }
-      .adas-load-popup-spinner::after {
+      .arcrho-load-popup-spinner::after {
         content: "";
         position: absolute;
         inset: 0;
@@ -106,13 +106,13 @@ export function createDatasetRunController(deps) {
         filter:
           drop-shadow(0 0 6px rgba(95, 196, 255, 0.42))
           drop-shadow(0 0 13px rgba(84, 161, 228, 0.24));
-        animation: adas-load-popup-sweep 1.05s linear infinite;
+        animation: arcrho-load-popup-sweep 1.05s linear infinite;
         pointer-events: none;
       }
-      @keyframes adas-load-popup-sweep {
+      @keyframes arcrho-load-popup-sweep {
         to { transform: rotate(360deg); }
       }
-      .adas-load-popup-elapsed {
+      .arcrho-load-popup-elapsed {
         margin-top: 10px;
         font-size: 12px;
         color: #64748b;
@@ -126,24 +126,24 @@ export function createDatasetRunController(deps) {
     ensureDatasetLoadingPopupStyles(doc);
     if (!datasetLoadingPopupEl || !datasetLoadingPopupEl.isConnected) {
       const overlay = doc.createElement("div");
-      overlay.className = "adas-load-popup-overlay";
+      overlay.className = "arcrho-load-popup-overlay";
       overlay.innerHTML = `
-        <div class="adas-load-popup-card" role="alert" aria-live="polite">
-          <div class="adas-load-popup-title">Loading Dataset</div>
-          <div class="adas-load-popup-msg"></div>
-          <div class="adas-load-popup-spinner" aria-hidden="true"></div>
-          <div class="adas-load-popup-elapsed">Elapsed: 0.0s</div>
+        <div class="arcrho-load-popup-card" role="alert" aria-live="polite">
+          <div class="arcrho-load-popup-title">Loading Dataset</div>
+          <div class="arcrho-load-popup-msg"></div>
+          <div class="arcrho-load-popup-spinner" aria-hidden="true"></div>
+          <div class="arcrho-load-popup-elapsed">Elapsed: 0.0s</div>
         </div>
       `;
       doc.body.appendChild(overlay);
       datasetLoadingPopupEl = overlay;
     }
-    const msgEl = datasetLoadingPopupEl.querySelector(".adas-load-popup-msg");
+    const msgEl = datasetLoadingPopupEl.querySelector(".arcrho-load-popup-msg");
     if (msgEl) msgEl.textContent = String(message || "Loading...");
 
     datasetLoadingPopupStart = performance.now();
     if (datasetLoadingPopupTimer) cancelAnimationFrame(datasetLoadingPopupTimer);
-    const elapsedEl = datasetLoadingPopupEl.querySelector(".adas-load-popup-elapsed");
+    const elapsedEl = datasetLoadingPopupEl.querySelector(".arcrho-load-popup-elapsed");
     const tick = () => {
       if (!datasetLoadingPopupEl) return;
       const sec = (performance.now() - datasetLoadingPopupStart) / 1000;
@@ -197,10 +197,10 @@ export function createDatasetRunController(deps) {
     }
 
     lastAutoKey = key;
-    await runAdasTri({ showValidationMessage: false });
+    await runArcRhoTri({ showValidationMessage: false });
   }
 
-  async function runAdasTri(opts = {}) {
+  async function runArcRhoTri(opts = {}) {
     const showValidationMessage = !!opts?.showValidationMessage;
     const clearCacheRequested = !!opts?.clearCache;
     const forceRebuild = isForceRebuildEnabled();
@@ -208,14 +208,14 @@ export function createDatasetRunController(deps) {
     if (runInFlight) return;
     runInFlight = true;
 
-    const btn = document.getElementById("runAdasTriBtn");
+    const btn = document.getElementById("runArcRhoTriBtn");
     const clearBtn = document.getElementById("clearCacheReloadBtn");
-    const status = document.getElementById("adasTriStatus");
+    const status = document.getElementById("arcrhoTriStatus");
     let validated = null;
     try {
       validated = await validateTriInputsBeforeRun({ showMessage: showValidationMessage });
     } catch (err) {
-      console.error("Failed to validate ADASTri inputs:", err);
+      console.error("Failed to validate ArcRhoTri inputs:", err);
       runInFlight = false;
       if (showValidationMessage) {
         setStatus("Failed to validate inputs. Please check project/reserving class/dataset values.");
@@ -258,17 +258,17 @@ export function createDatasetRunController(deps) {
     if (clearCache) {
       showLoadingPopup();
     } else {
-      const precheckResult = await precheckAdasTriCsv(triRequestInputs);
+      const precheckResult = await precheckArcRhoTriCsv(triRequestInputs);
       if (precheckResult.ok && precheckResult?.data?.ok && precheckResult.data.need_request === true) {
         // Show ASAP after the app server decides a request must be sent.
         showLoadingPopup();
       } else if (!precheckResult.ok && !precheckResult.skipped) {
-        console.warn("ADASTri precheck failed.");
+        console.warn("ArcRhoTri precheck failed.");
       }
     }
 
     try {
-      const endpoint = clearCache ? "/adas/tri/refresh" : "/adas/tri";
+      const endpoint = clearCache ? "/arcrho/tri/refresh" : "/arcrho/tri";
       const resp = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -278,7 +278,7 @@ export function createDatasetRunController(deps) {
       const data = await resp.json();
 
       if (!resp.ok) {
-        logLine(`${clearCache ? "ADASTri refresh" : "ADASTri"} failed: ${resp.status}`);
+        logLine(`${clearCache ? "ArcRhoTri refresh" : "ArcRhoTri"} failed: ${resp.status}`);
         if (status) status.textContent = `Error: ${resp.status}`;
         lastAutoKey = null;
         setStatus(`Error: ${resp.status}`);
@@ -286,14 +286,14 @@ export function createDatasetRunController(deps) {
       }
 
       if (!data.ok) {
-        logLine(`${clearCache ? "ADASTri refresh" : "ADASTri"} timeout. data_path=${data.data_path}`);
+        logLine(`${clearCache ? "ArcRhoTri refresh" : "ArcRhoTri"} timeout. data_path=${data.data_path}`);
         if (status) status.textContent = "Timeout waiting for csv (try again).";
         lastAutoKey = null;
         setStatus("Timeout waiting for csv (try again).");
         return;
       }
 
-      logLine(`${clearCache ? "ADASTri refresh" : "ADASTri"} OK. ds_id=${data.ds_id}`);
+      logLine(`${clearCache ? "ArcRhoTri refresh" : "ArcRhoTri"} OK. ds_id=${data.ds_id}`);
       if (status) status.textContent = `OK: ${data.ds_id}`;
 
       // switch dataset and load (and persist)
@@ -314,7 +314,7 @@ export function createDatasetRunController(deps) {
         try {
           await clearHeadersCacheForProject(project, { remote: true });
         } catch (err) {
-          console.warn("Failed to clear ADASHeaders cache:", err);
+          console.warn("Failed to clear ArcRhoHeaders cache:", err);
         }
         try {
           await ensureHeadersForProject(project, { forceRefresh: true });
@@ -381,7 +381,7 @@ export function createDatasetRunController(deps) {
     const title = updateCurrentTabTitle() || config.DS_ID || "Dataset";
 
     // In DFM context, step title is managed by DFM method naming logic.
-    // Avoid overwriting it with transient dataset ids such as "adastri_*".
+    // Avoid overwriting it with transient dataset ids such as "arcrhotri_*".
     if (stepId && !window.ADA_DFM_CONTEXT) {
       window.parent.postMessage(
         {
@@ -430,7 +430,7 @@ export function createDatasetRunController(deps) {
     hideDatasetLoadingPopup,
     isRunInFlight: () => runInFlight,
     loadDataset,
-    runAdasTri,
+    runArcRhoTri,
     savePatch,
     scheduleAutoRun,
     showDatasetLoadingPopup,

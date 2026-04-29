@@ -18,26 +18,25 @@ Runtime workspace path read/update domain.
 - [`app_server/api/workspace_paths_router.py`](../../../app_server/api/workspace_paths_router.py) - Read/update workspace path config.
 - [`app_server/config.py`](../../../app_server/config.py) - Config loader and runtime path refresh.
 - [`app_server/schemas/workspace_paths.py`](../../../app_server/schemas/workspace_paths.py) - Workspace path request models.
-- [`workspace_paths.json`](../../../workspace_paths.json) - Persistent workspace path configuration.
 <!-- AUTO-GEN:END -->
 
 ## External Interfaces
 <!-- MANUAL:BEGIN -->
 - Used by shell root-path settings modal.
 - Triggers `config.refresh_runtime_paths()` on updates.
-- Keeps legacy `/ui_config` as a compatibility alias.
+- `GET /workspace_paths` reports whether the AppData config file already exists so the shell can detect first-time setup.
 <!-- MANUAL:END -->
 
 ## Data/State/Caches
 <!-- MANUAL:BEGIN -->
-- Persists config in `workspace_paths.json`.
-- Reads legacy `ui_config.json` as a fallback for older installs.
+- Persists config in `%APPDATA%\ArcRho\workspace_paths.json`.
+- Uses built-in defaults until Server Connection is saved.
 <!-- MANUAL:END -->
 
 ## Common Change Tasks
 <!-- MANUAL:BEGIN -->
 1. Add config field: update schema + router serialization + config readers.
-2. Keep legacy aliases stable until an intentional compatibility removal.
+2. Rename config fields by updating producers, consumers, and docs together.
 <!-- MANUAL:END -->
 
 ## Known Risks

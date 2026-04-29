@@ -1,7 +1,7 @@
 import { openFloatingPathTreePicker } from "/ui/shared/path_tree_picker.js";
 
 const DEFAULT_SOURCE = "project_map";
-const PROJECT_NODE_MENU_STYLE_ID = "adas-project-name-node-menu-style";
+const PROJECT_NODE_MENU_STYLE_ID = "arcrho-project-name-node-menu-style";
 let PROJECT_TREE_CACHE = null;
 let activeProjectNodeMenu = null;
 
@@ -230,7 +230,7 @@ function openProjectNodeMenu(options = {}) {
 }
 
 async function fetchProjectNames() {
-  const resp = await fetch("/adas/projects");
+  const resp = await fetch("/arcrho/projects");
   if (!resp.ok) {
     const detail = await resp.text().catch(() => "");
     throw new Error(detail || `Failed to load projects (${resp.status}).`);

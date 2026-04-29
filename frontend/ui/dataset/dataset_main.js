@@ -33,10 +33,10 @@ import {
   normalizeBrowsingHistoryEntry,
 } from "/ui/shell/browsing_history.js";
 
-const ZOOM_STORAGE_KEY = "adas_ui_zoom_pct";
-const ZOOM_MODE_KEY = "adas_zoom_mode";
-const FONT_STORAGE_KEY = "adas_app_font";
-const FORCE_REBUILD_KEY = "adas_force_rebuild_enabled";
+const ZOOM_STORAGE_KEY = "arcrho_ui_zoom_pct";
+const ZOOM_MODE_KEY = "arcrho_zoom_mode";
+const FONT_STORAGE_KEY = "arcrho_app_font";
+const FORCE_REBUILD_KEY = "arcrho_force_rebuild_enabled";
 
 function applyZoomValue(v) {
   try {
@@ -194,8 +194,8 @@ document.addEventListener("wheel", (e) => {
 // -----------------------------
 // Persist dataset across refresh
 // -----------------------------
-const LS_DS_KEY = "adas_last_ds_id";
-const LS_FORM_KEY = "adas_tri_inputs";
+const LS_DS_KEY = "arcrho_last_ds_id";
+const LS_FORM_KEY = "arcrho_tri_inputs";
 
 // Per-instance storage (e.g. workflow embeds)
 const qs = new URLSearchParams(window.location.search);
@@ -203,7 +203,7 @@ const instanceId = qs.get("inst") || "default";
 const stepId = instanceId.startsWith("step_") ? instanceId : null;
 const scopedKey = (k) => `${k}::${instanceId}`;
 const workflowId = qs.get("wf") || "";
-const WF_GLOBAL_CTRL_PREFIX = "adas_workflow_global_ctrl_v1::";
+const WF_GLOBAL_CTRL_PREFIX = "arcrho_workflow_global_ctrl_v1::";
 const DEFAULT_DISPLAY = "Default";
 const DEFAULT_TOKEN = "__DEFAULT__";
 const BROWSING_HISTORY_MAX_ENTRIES = 15;
@@ -1413,7 +1413,7 @@ function loadLastDsId() {
   }
 }
 
-// Persist ADASTri input controls so refresh doesn't reset them.
+// Persist ArcRhoTri input controls so refresh doesn't reset them.
 function saveTriInputsToStorage() {
   try {
     const projectInput = document.getElementById("projectSelect");
@@ -1810,13 +1810,13 @@ function buildTriRequestPayload(rawInputs = {}) {
   };
 }
 
-async function precheckAdasTriCsv(rawInputs = {}) {
+async function precheckArcRhoTriCsv(rawInputs = {}) {
   const resolved = resolveTriRequestInputs(rawInputs);
   if (!resolved.project || !resolved.path || !resolved.tri) {
     return { ok: false, hasExistingCsv: false, skipped: true, data: null };
   }
   try {
-    const precheckResp = await fetch("/adas/tri/precheck", {
+    const precheckResp = await fetch("/arcrho/tri/precheck", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(buildTriRequestPayload(resolved)),
@@ -1840,7 +1840,7 @@ datasetDependencyGuard = createDatasetDependencyGuard({
   normalizeProjectText,
   getResolvedProjectValue,
   getTriInputs,
-  precheckAdasTriCsv,
+  precheckArcRhoTriCsv,
   setInputInvalid,
   clearInputInvalid,
   setStatus,
@@ -2077,8 +2077,8 @@ function bindAutoRunOnEnter(el) {
   return datasetRunController.bindAutoRunOnEnter(el);
 }
 
-function runAdasTri(opts = {}) {
-  return datasetRunController.runAdasTri(opts);
+function runArcRhoTri(opts = {}) {
+  return datasetRunController.runArcRhoTri(opts);
 }
 
 function isRunInFlight() {
@@ -2128,7 +2128,7 @@ datasetRunController = createDatasetRunController({
   validateTriInputsBeforeRun,
   getTriInputs,
   buildTriRequestPayload,
-  precheckAdasTriCsv,
+  precheckArcRhoTriCsv,
   clearHeadersCacheForProject: (project, options = {}) =>
     datasetHeadersService.clearHeadersCacheForProject(project, options),
   ensureHeadersForProject: (project, options = {}) =>
@@ -2416,7 +2416,7 @@ function wireEvents() {
     loadDataset,
     isRunInFlight,
     setStatus,
-    runAdasTri,
+    runArcRhoTri,
     savePatch,
     toggleBlanks,
     wireLenDropdowns,

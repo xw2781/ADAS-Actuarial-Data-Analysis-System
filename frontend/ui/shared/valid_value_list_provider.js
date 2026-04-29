@@ -213,7 +213,7 @@ export async function loadProjectValidValueList(options = {}) {
   const source = toText(options?.source) || PROJECT_SOURCE_DEFAULT;
   void source; // Reserved for future source-specific expansion.
 
-  const payload = await readJson("/adas/projects", "Failed to load projects");
+  const payload = await readJson("/arcrho/projects", "Failed to load projects");
   const items = dedupeAndSortValues(payload?.projects || [], normalizeValidValueKey);
 
   projectListCache.loaded = true;

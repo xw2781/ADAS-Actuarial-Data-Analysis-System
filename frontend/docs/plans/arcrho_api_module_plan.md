@@ -23,7 +23,7 @@ ArcRho 自定义 Python 模块（`arcrho`）子项目计划
 2. 约束与设计原则
 
 必须遵守：
-1. 根目录来源必须是 `workspace_paths.json` / `app_server.config`，禁止硬编码 `E:\\ADAS`。
+1. 根目录来源必须是 `workspace_paths.json` / `app_server.config`，禁止硬编码 `E:\\ArcRho`。
 2. 代码分层保持 `router -> service -> config/schema`，不要把业务逻辑塞进 router。
 3. 对外接口默认向后兼容；新增能力优先增量，不直接重构旧行为。
 4. Scripting 会话隔离语义保持不变（不同会话变量互不污染）。

@@ -36,10 +36,9 @@ export { state };
 const pageParams = new URLSearchParams(window.location.search);
 export const ratioSyncParams = pageParams;
 export const ratioSyncInst = ratioSyncParams.get("inst") || "default";
-export const ratioSyncChannelName = `adas-dfm-ratio-sync::${ratioSyncInst}`;
+export const ratioSyncChannelName = `arcrho-dfm-ratio-sync::${ratioSyncInst}`;
 export const ratioSyncSourceId = `dfm_${Math.random().toString(36).slice(2)}_${Date.now()}`;
-export const resultsOnlyMode = ratioSyncParams.get("results_only") === "1";
-export const RATIO_SAVE_PATH_KEY = `adas_dfm_ratio_save_path_v1::${ratioSyncInst}`;
+export const RATIO_SAVE_PATH_KEY = `arcrho_dfm_ratio_save_path_v1::${ratioSyncInst}`;
 export const ALLOWED_DFM_TABS = new Set(["details", "data", "ratios", "results", "notes"]);
 
 export const BASE_SUMMARY_ROWS = [
@@ -197,12 +196,12 @@ export async function getRootPath() {
     const res = await fetch("/workspace_paths");
     if (res.ok) {
       const data = await res.json();
-      cachedRootPath = data.config?.workspace_root || "E:\\ADAS";
+      cachedRootPath = data.config?.workspace_root || "E:\\ArcRho";
     } else {
-      cachedRootPath = "E:\\ADAS";
+      cachedRootPath = "E:\\ArcRho";
     }
   } catch {
-    cachedRootPath = "E:\\ADAS";
+    cachedRootPath = "E:\\ArcRho";
   }
   return cachedRootPath;
 }
@@ -294,8 +293,8 @@ export async function getRatioDataDir() {
 }
 
 export function getResultsCsvSuggestedName(options = {}) {
-  // Keep CSV naming aligned with app-server set_data_path_like_vba for ADASTri so
-  // Dataset Viewer can find DFM-produced files via standard /adas/tri refresh.
+  // Keep CSV naming aligned with app-server set_data_path_like_vba for ArcRhoTri so
+  // Dataset Viewer can find DFM-produced files via standard /arcrho/tri refresh.
   const pathRaw = typeof options.path === "string"
     ? options.path
     : (getResolvedReservingClass() || String(document.getElementById("pathInput")?.value || "").trim());
@@ -318,7 +317,7 @@ export function getResultsCsvSuggestedName(options = {}) {
   const devLen = Number.isFinite(devRaw) ? devRaw : 12;
 
   const values = [
-    "ADASTri",
+    "ArcRhoTri",
     String(pathRaw || "").trim(),
     String(datasetNameRaw || "").trim(),
     String(cumulative),

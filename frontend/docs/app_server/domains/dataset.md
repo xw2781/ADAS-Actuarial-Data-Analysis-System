@@ -35,7 +35,7 @@ Also handles dataset Notes persistence files under each project `data` folder.
 ## Data/State/Caches
 <!-- MANUAL:BEGIN -->
 - Uses in-memory dataset map and patch payloads.
-- Persists dataset Notes as JSON files in `projects/<project>/data/ADASTriNotes@<reserving class path with "\" -> "^">@<dataset name>.json` (filesystem-unsafe filename characters are replaced with `^`).
+- Persists dataset Notes as JSON files in `projects/<project>/data/ArcRhoTriNotes@<reserving class path with "\" -> "^">@<dataset name>.json` (filesystem-unsafe filename characters are replaced with `^`).
 <!-- MANUAL:END -->
 
 ## Common Change Tasks

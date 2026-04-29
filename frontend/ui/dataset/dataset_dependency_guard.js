@@ -5,7 +5,7 @@ export function createDatasetDependencyGuard(deps) {
     normalizeProjectText,
     getResolvedProjectValue,
     getTriInputs,
-    precheckAdasTriCsv,
+    precheckArcRhoTriCsv,
     setInputInvalid,
     clearInputInvalid,
     setStatus,
@@ -320,7 +320,7 @@ export function createDatasetDependencyGuard(deps) {
       const triInputsRaw = options?.precheckInputs && typeof options.precheckInputs === "object"
         ? options.precheckInputs
         : getTriInputs();
-      const precheckResult = await precheckAdasTriCsv({
+      const precheckResult = await precheckArcRhoTriCsv({
         ...(triInputsRaw || {}),
         project: triInputsRaw?.project || project,
         tri: triInputsRaw?.tri || datasetName,

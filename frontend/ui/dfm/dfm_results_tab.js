@@ -1,6 +1,6 @@
 /*
 ===============================================================================
-DFM Results Tab - results table rendering, CSV export, results window
+DFM Results Tab - results table rendering and CSV export
 ===============================================================================
 */
 import { getDataset } from "/ui/shared/api.js";
@@ -16,18 +16,11 @@ import {
   getOriginLabelTextForRatio,
   getResolvedProjectName,
   getResolvedReservingClass,
-  getHostApi,
-  getDefaultMethodName,
   escapeCsvCell,
   isResultsTabVisible,
   markDfmDirty,
-  resultsOnlyMode,
-  ratioSyncInst,
-  ratioSyncParams,
 } from "/ui/dfm/dfm_state.js";
 
-let resultsMenuWired = false;
-let resultsAutoResized = false;
 let ratioBasisControlsWired = false;
 let ratioBasisOptionsLoadSeq = 0;
 let ratioBasisColumnLoadSeq = 0;
@@ -370,20 +363,20 @@ async function loadRatioBasisColumnForContext(ctx) {
     timeout_sec: 6.0,
   };
 
-  const adasResp = await fetch("/adas/tri", {
+  const arcrhoResp = await fetch("/arcrho/tri", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  const adasData = await adasResp.json().catch(() => ({}));
-  if (!adasResp.ok) {
-    throw new Error(`Ratio basis request failed (${adasResp.status})`);
+  const arcrhoData = await arcrhoResp.json().catch(() => ({}));
+  if (!arcrhoResp.ok) {
+    throw new Error(`Ratio basis request failed (${arcrhoResp.status})`);
   }
-  if (!adasData?.ok || !toText(adasData?.ds_id)) {
+  if (!arcrhoData?.ok || !toText(arcrhoData?.ds_id)) {
     throw new Error("Ratio basis dataset timed out or CSV was not available.");
   }
 
-  const dsResp = await getDataset(adasData.ds_id);
+  const dsResp = await getDataset(arcrhoData.ds_id);
   if (!dsResp.ok) {
     throw new Error(`Failed to load ratio basis dataset (${dsResp.status})`);
   }
@@ -678,38 +671,6 @@ export function setResultsUltimateRatioDecimalPlacesSelection(value, options = {
   }
 }
 
-function getResultsTabMenuEl() {
-  return document.getElementById("dfmResultsTabMenu");
-}
-
-function hideResultsTabMenu() {
-  const menu = getResultsTabMenuEl();
-  if (menu) menu.style.display = "none";
-}
-
-function showResultsTabMenu(x, y) {
-  const menu = getResultsTabMenuEl();
-  if (!menu) return;
-  menu.style.display = "block";
-  menu.style.left = `${x}px`;
-  menu.style.top = `${y}px`;
-}
-
-export function openResultsInNewWindow() {
-  const name = document.getElementById("dfmMethodName")?.value?.trim() || getDefaultMethodName();
-  const title = `Results - ${name}`;
-  const hostApi = getHostApi();
-  if (!hostApi?.openDfmResultsWindow) {
-    alert("Open in new window requires the desktop app.");
-    return;
-  }
-  hostApi.openDfmResultsWindow({
-    inst: ratioSyncInst,
-    datasetId: ratioSyncParams.get("ds") || "",
-    title,
-  });
-}
-
 export function buildResultsVector() {
   const model = state.model;
   if (!model || !Array.isArray(model.values) || !Array.isArray(model.mask)) return [];
@@ -919,121 +880,4 @@ export function renderResultsTable() {
 
   table.appendChild(tbody);
   wrap.appendChild(table);
-  autoResizeResultsWindowOnce();
-}
-
-export function wireResultsTabContextMenu() {
-  if (resultsMenuWired || resultsOnlyMode) return;
-  resultsMenuWired = true;
-
-  const resultsTab = document.querySelector('.dfmTabBar .dfmTab[data-page="results"]');
-  if (!resultsTab) return;
-
-  resultsTab.addEventListener("contextmenu", (e) => {
-    e.preventDefault();
-    showResultsTabMenu(e.clientX, e.clientY);
-  });
-
-  const menu = getResultsTabMenuEl();
-  menu?.addEventListener("click", (e) => {
-    const btn = e.target?.closest?.("[data-action]");
-    if (!btn) return;
-    if (btn.dataset.action === "open-results-window") {
-      hideResultsTabMenu();
-      openResultsInNewWindow();
-    }
-  });
-
-  document.addEventListener("mousedown", (e) => {
-    const menuEl = getResultsTabMenuEl();
-    if (menuEl && menuEl.style.display === "block" && !menuEl.contains(e.target)) {
-      hideResultsTabMenu();
-    }
-  });
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") hideResultsTabMenu();
-  });
-}
-
-export function wireResultsTitlebar() {
-  if (!resultsOnlyMode) return;
-  const bar = document.getElementById("resultsTitlebar");
-  if (!bar || bar.dataset.wired === "1") return;
-  bar.dataset.wired = "1";
-
-  const hostApi = getHostApi();
-  const minBtn = document.getElementById("resultsMinBtn");
-  const maxBtn = document.getElementById("resultsMaxBtn");
-  const closeBtn = document.getElementById("resultsCloseBtn");
-
-  minBtn?.addEventListener("click", () => {
-    if (hostApi?.minimizeWindow) {
-      hostApi.minimizeWindow();
-    }
-  });
-
-  maxBtn?.addEventListener("click", async () => {
-    if (!hostApi?.isMaximized || !hostApi?.maximizeWindow || !hostApi?.restoreWindow) {
-      return;
-    }
-    try {
-      const isMax = await hostApi.isMaximized();
-      if (isMax) await hostApi.restoreWindow();
-      else await hostApi.maximizeWindow();
-    } catch {}
-  });
-
-  closeBtn?.addEventListener("click", () => {
-    try { window.close(); } catch {}
-  });
-}
-
-export function autoResizeResultsWindowOnce() {
-  if (!resultsOnlyMode || resultsAutoResized) return;
-  const hostApi = getHostApi();
-  const resizeFn = hostApi?.resizeSelfWindow || hostApi?.resizeWindow;
-  if (!resizeFn) return;
-
-  const table = document.querySelector("#resultsWrap table");
-  if (!table) return;
-
-  requestAnimationFrame(() => {
-    if (resultsAutoResized) return;
-    const tableRect = table.getBoundingClientRect();
-    if (!tableRect.width || !tableRect.height) return;
-    const titleBar = document.getElementById("resultsTitlebar");
-    const titleRect = titleBar?.getBoundingClientRect();
-    const titleH = titleRect?.height || 0;
-
-    const paddingX = 24;
-    const paddingY = 32;
-    const scale = 1.2;
-    const width = Math.ceil((tableRect.width + paddingX) * scale);
-    const height = Math.ceil((titleH + tableRect.height + paddingY) * scale);
-
-    const maxW = Math.max(320, Number(window.screen?.availWidth || window.innerWidth || width));
-    const maxH = Math.max(240, Number(window.screen?.availHeight || window.innerHeight || height));
-    const nextW = Math.min(width, maxW);
-    const nextH = Math.min(height, maxH);
-    if (!Number.isFinite(nextW) || !Number.isFinite(nextH)) return;
-
-    resizeFn(nextW, nextH);
-    resultsAutoResized = true;
-  });
-}
-
-export function updateResultsWindowTitle() {
-  if (!resultsOnlyMode) return;
-  let title = "";
-  const passed = ratioSyncParams.get("results_title");
-  if (passed) title = passed;
-  if (!title) {
-    const input = document.getElementById("dfmMethodName");
-    const name = input?.value?.trim() || getDefaultMethodName();
-    title = `Results - ${name}`;
-  }
-  document.title = title;
-  const label = document.getElementById("resultsTitleText");
-  if (label) label.textContent = title;
 }

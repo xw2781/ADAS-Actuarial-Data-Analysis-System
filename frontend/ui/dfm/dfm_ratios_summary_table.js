@@ -34,7 +34,7 @@ const EXCEL_REF_INLINE_RE = /'([^[]*)\[([^\]]+)\]([^'!]+)'!([A-Z]+[0-9]+)/gi;
 function parseExcelRef(text) {
   const m = EXCEL_REF_RE.exec(String(text || ""));
   if (!m) return null;
-  const dir = m[1];            // e.g. "E:\ADAS\Demo\"
+  const dir = m[1];            // e.g. "E:\ArcRho\Demo\"
   const filename = m[2];       // e.g. "Freq w. New Renewal.xlsx"
   const sheet = m[3];          // e.g. "Annual"
   const cell = m[4].toUpperCase();

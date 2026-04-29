@@ -25,7 +25,7 @@ export function createReservingClassTypesFeature(deps = {}) {
 
   const RESERVING_CLASS_TYPES_COLUMNS = ["Name", "Level", "Formula", "EEX Formula"];
   const RESERVING_CLASS_TYPES_SORTABLE_COLS = new Set(["Name", "Formula", "EEX Formula"]);
-  const RESERVING_CLASS_TYPES_SORT_STORAGE_KEY = "adas_ps_rct_sort";
+  const RESERVING_CLASS_TYPES_SORT_STORAGE_KEY = "arcrho_ps_rct_sort";
   const RESERVING_CLASS_TYPES_DEFAULT_SORT = { colLabel: "Formula", dir: "asc", explicit: false };
   const reservingClassTypesByProject = new Map();
   const loadedReservingClassTypesByProject = new Set();

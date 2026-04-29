@@ -28,7 +28,7 @@ if not exist "node_modules" (
   )
 )
 
-for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMddHHmmss"') do set "ADAS_UI_VERSION=%%i"
+for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMddHHmmss"') do set "ARCRHO_UI_VERSION=%%i"
 
 python electron_shell.py
 endlocal

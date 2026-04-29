@@ -6,10 +6,10 @@ Set lightweight frontend behavior guardrails for the current pre-production app.
 Prefer clean coordinated refactors over compatibility shims unless the user explicitly asks for migration support.
 
 ## Scope
-This contract applies when changing shell/tab orchestration, iframe pages, pop-out behavior, keyboard/menu actions, or cross-frame `arcrho:*` messages.
+This contract applies when changing shell/tab orchestration, iframe pages, keyboard/menu actions, or cross-frame `arcrho:*` messages.
 
 ## Core Rules
-1. Preserve shell and iframe state semantics unless intentionally changing them. Keep tab state, iframe lifecycle, dirty-state prompts, and pop-out/dock-back behavior coherent.
+1. Preserve shell and iframe state semantics unless intentionally changing them. Keep tab state, iframe lifecycle, and dirty-state prompts coherent.
 2. Change `arcrho:*` message contracts only as coordinated refactors. Update all known producers, consumers, and docs in the same change.
 3. Keep user-facing save, close, restart, import/export, and error flows explicit. Do not silently swallow failures for actions users can observe or depend on.
 4. Avoid lifecycle and performance regressions such as duplicate listeners, accidental full reloads, infinite refresh loops, lost tab state, or iframe recreation unless the task intentionally changes that behavior.

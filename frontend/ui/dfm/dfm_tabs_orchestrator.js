@@ -8,7 +8,6 @@ import { createTabbedPage } from "/ui/shared/tabbed_page.js";
 import { setStorageInstance, loadNaBorders } from "/ui/dfm/dfm_storage.js";
 import {
   getDfmInst,
-  resultsOnlyMode,
   ALLOWED_DFM_TABS,
   setShowNaBorders,
   setCurrentDfmTab,
@@ -30,8 +29,6 @@ import {
 import {
   renderResultsTable,
   wireResultsRatioBasisControls,
-  wireResultsTabContextMenu,
-  wireResultsTitlebar,
 } from "/ui/dfm/dfm_results_tab.js";
 import { wireNotesInput } from "/ui/dfm/dfm_notes_tab.js";
 import {
@@ -63,11 +60,6 @@ function initDfmTabs() {
   const notesPage = document.getElementById("dfmNotesPage");
   if (!detailsPage || !dataPage || !ratiosPage || !resultsPage || !notesPage) return;
 
-  if (resultsOnlyMode) {
-    document.documentElement.classList.add("results-only");
-    document.body.classList.add("results-only");
-  }
-
   setShowNaBorders(loadNaBorders());
 
   wireDfmSpinnerControls();
@@ -79,14 +71,10 @@ function initDfmTabs() {
   wireRatioChartModal();
   wireRatioContextMenu();
   wireResultsRatioBasisControls();
-  wireResultsTabContextMenu();
-  wireResultsTitlebar();
 
   const params = new URLSearchParams(window.location.search);
   const urlTab = params.get("tab");
-  const initialTab = resultsOnlyMode
-    ? "results"
-    : ALLOWED_DFM_TABS.has(urlTab) ? urlTab : "details";
+  const initialTab = ALLOWED_DFM_TABS.has(urlTab) ? urlTab : "details";
 
   const tabSystem = createTabbedPage(document.body, {
     tabs: [

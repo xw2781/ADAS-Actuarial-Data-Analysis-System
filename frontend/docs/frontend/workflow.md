@@ -10,7 +10,7 @@ Workflow editor page and save/load orchestration.
 - `ui/workflow/workflow.html`: external scripts `/ui/workflow/workflow_main.js?v=20260227`; inline imports _none_.
 
 Detected `fetch(...)` targets in key JS files:
-- `/adas/projects`
+- `/arcrho/projects`
 - `/reserving_class_combinations?project_name=${encodeURIComponent(projectName)}`
 - `/reserving_class_filter_spec`
 - `/reserving_class_filter_spec?project_name=${encodeURIComponent(projectName)}`

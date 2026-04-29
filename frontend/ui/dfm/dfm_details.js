@@ -15,7 +15,6 @@ import {
   saveMethodName,
 } from "/ui/dfm/dfm_storage.js";
 import { resetRatioChartThresholds } from "/ui/dfm/dfm_ratios_tab.js";
-import { updateResultsWindowTitle } from "/ui/dfm/dfm_results_tab.js";
 import {
   scheduleRatioSelectionLoad,
   saveRatioSelectionPattern,
@@ -391,7 +390,6 @@ function syncMethodNameToOutputType(value, options = {}) {
     else clearStoredMethodName(key);
   }
   updateAppTabTitle(next || getDefaultMethodName(), !options?.silent);
-  updateResultsWindowTitle();
   if (changed && !options?.silent) {
     // Name is updated programmatically here, so the normal Name input change/blur
     // pipeline may not fire. Trigger local method lookup explicitly.
@@ -581,7 +579,6 @@ export function syncMethodNameFromInputs() {
   const next = stored || outputVector || "";
   if (input.value !== next) input.value = next;
   updateAppTabTitle(next || getDefaultMethodName());
-  updateResultsWindowTitle();
 }
 
 export function updatePathBar() {
@@ -613,7 +610,6 @@ export function wireMethodName() {
       else clearStoredMethodName(key);
     }
     updateAppTabTitle(raw || getDefaultMethodName(), true);
-    updateResultsWindowTitle();
     if (valueChanged) {
       if (!programmatic) markDfmDirty();
       lastSeenValue = raw;

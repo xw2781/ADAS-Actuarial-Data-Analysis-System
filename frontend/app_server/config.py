@@ -39,12 +39,25 @@ PROJECT_ROOT = _resolve_project_root()
 # Config - load workspace path settings
 # ---------------------------------------------------------------------------
 
-WORKSPACE_PATHS_PATH = str(PROJECT_ROOT / "workspace_paths.json")
-DEFAULT_WORKSPACE_ROOT = r"E:\ADAS"
+DEFAULT_WORKSPACE_ROOT = r"E:\ArcRho Server"
 DEFAULT_WORKSPACE_PATHS = {
     "projects_dir": "projects",
     "requests_dir": "requests",
 }
+
+
+def _get_user_appdata_dir() -> str:
+    appdata = str(os.environ.get("APPDATA") or "").strip()
+    if not appdata:
+        appdata = os.path.join(os.path.expanduser("~"), "AppData", "Roaming")
+    return os.path.join(appdata, "ArcRho")
+
+
+WORKSPACE_PATHS_PATH = os.path.join(_get_user_appdata_dir(), "workspace_paths.json")
+
+
+def workspace_paths_file_exists() -> bool:
+    return os.path.exists(WORKSPACE_PATHS_PATH)
 
 
 def _read_json_file(path: str) -> Dict[str, Any]:
@@ -97,6 +110,7 @@ def load_workspace_paths() -> Dict[str, Any]:
 
 def save_workspace_paths(cfg: Dict[str, Any]) -> None:
     """Persist normalized workspace path configuration."""
+    os.makedirs(os.path.dirname(WORKSPACE_PATHS_PATH), exist_ok=True)
     with open(WORKSPACE_PATHS_PATH, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2, ensure_ascii=False)
 
@@ -252,7 +266,7 @@ def _infer_project_name_from_table_path(table_path: str) -> str:
 
 
 def _find_existing_project_dir(project_name: str) -> Optional[str]:
-    """Find an existing project folder under E:\\ADAS\\projects by name (case-insensitive)."""
+    """Find an existing project folder under E:\\ArcRho Server\\projects by name (case-insensitive)."""
     target = _sanitize_folder_name(project_name or "").strip()
     if not target:
         return None
@@ -324,10 +338,7 @@ def get_reserving_class_path_tree_path(project_name: str) -> str:
 
 
 def _get_user_appdata_cache_dir() -> str:
-    appdata = str(os.environ.get("APPDATA") or "").strip()
-    if not appdata:
-        appdata = os.path.join(os.path.expanduser("~"), "AppData", "Roaming")
-    return os.path.join(appdata, "ArcRho", "WebUI", "cache")
+    return os.path.join(_get_user_appdata_dir(), "cache")
 
 
 def get_reserving_class_hidden_paths_pref_path() -> str:

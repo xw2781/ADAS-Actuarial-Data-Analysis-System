@@ -48,7 +48,7 @@ def terminate_process_tree(proc: subprocess.Popen) -> None:
 def ensure_env_defaults(env: dict[str, str]) -> dict[str, str]:
     env = dict(env)
     env.setdefault("TRI_DATA_DIR", str(BASE_DIR))
-    env.setdefault("ADAS_WORKFLOW_DIR", str(Path.home() / "Documents" / "ArcRho" / "workflows"))
+    env.setdefault("ARCRHO_WORKFLOW_DIR", str(Path.home() / "Documents" / "ArcRho" / "workflows"))
     return env
 
 
@@ -105,7 +105,7 @@ def run_supervisor(host: str, port: int, reload: bool) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="ADAS app supervisor")
+    parser = argparse.ArgumentParser(description="ArcRho app supervisor")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--reload", action="store_true")

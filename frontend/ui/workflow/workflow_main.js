@@ -11,7 +11,7 @@ const importWorkflowTile = document.getElementById("importWorkflowTile");
 const sidebarResizer = document.getElementById("sidebarResizer");
 const datasetEmbedCache = new Map();
 const dfmEmbedCache = new Map();
-const TRI_INPUTS_KEY = "adas_tri_inputs";
+const TRI_INPUTS_KEY = "arcrho_tri_inputs";
 const GLOBAL_VAR_TYPE_PROJECT = "project";
 const GLOBAL_VAR_TYPE_RESERVING_CLASS = "reservingClass";
 const GLOBAL_VAR_TYPE_STRING = "string";
@@ -52,18 +52,18 @@ const state = {
 const qs = new URLSearchParams(window.location.search);
 const instanceId = qs.get("inst") || "default";
 const isFresh = qs.get("fresh") === "1";
-const STORAGE_KEY = `adas_workflow_state_v1::${instanceId}`;
-const WF_TITLE_KEY = `adas_workflow_title_v1::${instanceId}`;
-const WF_SIDEBAR_W_KEY = `adas_workflow_sidebar_w_v1::${instanceId}`;
-const WF_SIDEBAR_COLLAPSED_KEY = `adas_workflow_sidebar_collapsed_v1::${instanceId}`;
-const WF_LAST_PATH_KEY = `adas_workflow_last_path_v1::${instanceId}`;
-const WF_GLOBAL_CTRL_KEY = `adas_workflow_global_ctrl_v1::${instanceId}`;
+const STORAGE_KEY = `arcrho_workflow_state_v1::${instanceId}`;
+const WF_TITLE_KEY = `arcrho_workflow_title_v1::${instanceId}`;
+const WF_SIDEBAR_W_KEY = `arcrho_workflow_sidebar_w_v1::${instanceId}`;
+const WF_SIDEBAR_COLLAPSED_KEY = `arcrho_workflow_sidebar_collapsed_v1::${instanceId}`;
+const WF_LAST_PATH_KEY = `arcrho_workflow_last_path_v1::${instanceId}`;
+const WF_GLOBAL_CTRL_KEY = `arcrho_workflow_global_ctrl_v1::${instanceId}`;
 const WF_AUTOSAVE_MS = 60 * 1000;
-const ZOOM_STORAGE_KEY = "adas_ui_zoom_pct";
-const ZOOM_MODE_KEY = "adas_zoom_mode";
-const STATUSBAR_H_KEY = "adas_statusbar_h";
-const AUTOSAVE_KEY = "adas_autosave_enabled";
-const FONT_STORAGE_KEY = "adas_app_font";
+const ZOOM_STORAGE_KEY = "arcrho_ui_zoom_pct";
+const ZOOM_MODE_KEY = "arcrho_zoom_mode";
+const STATUSBAR_H_KEY = "arcrho_statusbar_h";
+const AUTOSAVE_KEY = "arcrho_autosave_enabled";
+const FONT_STORAGE_KEY = "arcrho_app_font";
 
 let workflowDirty = false;
 let saveInFlight = false;
@@ -429,7 +429,7 @@ function markWorkflowDirty() {
 
 function consumeRefreshAutosaveFlag() {
   try {
-    const key = `adas_wf_autosave_on_load::${instanceId}`;
+    const key = `arcrho_wf_autosave_on_load::${instanceId}`;
     const v = sessionStorage.getItem(key);
     if (v === "1") {
       sessionStorage.removeItem(key);
@@ -1191,7 +1191,7 @@ function renderGlobalControl(step) {
 
   /* ---- fetch project names for dropdown ---- */
   let _projectNames = [];
-  const _projectNamesReady = fetch("/adas/projects")
+  const _projectNamesReady = fetch("/arcrho/projects")
     .then((r) => r.ok ? r.json() : { projects: [] })
     .then((d) => { _projectNames = (d.projects || []).slice().reverse(); })
     .catch(() => { _projectNames = []; });

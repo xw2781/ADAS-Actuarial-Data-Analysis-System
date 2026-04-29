@@ -15,7 +15,6 @@ Frontend module map for page entrypoints, shell orchestration, and feature-speci
 | `ui/workflow/workflow.html` | 1 external script | - |
 | `ui/project_settings/project_settings.html` | 1 external script | - |
 | `ui/scripting_console/scripting_console.html` | 8 external scripts | - |
-| `ui/shell/popout_shell.html` | - | 1 inline import |
 <!-- AUTO-GEN:END -->
 
 ## Key Files
@@ -26,7 +25,6 @@ Frontend module map for page entrypoints, shell orchestration, and feature-speci
 - [`docs/frontend/workflow.md`](workflow.md) - Workflow feature index.
 - [`docs/frontend/project_settings.md`](project_settings.md) - Project settings feature index.
 - [`docs/frontend/scripting_console.md`](scripting_console.md) - Scripting console feature index.
-- [`docs/frontend/popout.md`](popout.md) - Pop-out window feature index.
 <!-- AUTO-GEN:END -->
 
 ## Non-Negotiable Contracts
@@ -43,7 +41,6 @@ High-risk files that must follow contracts:
 - `ui/dfm/dfm.html` and `ui/dfm/dfm_*.js`
 - `ui/project_settings/project_settings.js`
 - `ui/scripting_console/scripting_console*.js` and `ui/scripting_console/scripting_console.html`
-- `ui/shell/popout_shell.html`
 <!-- MANUAL:END -->
 
 ## External Interfaces
@@ -66,7 +63,6 @@ High-risk files that must follow contracts:
 4. Workflow editor change -> [`workflow.md`](workflow.md).
 5. Project settings flow change -> [`project_settings.md`](project_settings.md).
 6. Scripting console change -> [`scripting_console.md`](scripting_console.md).
-7. Pop-out/dock behavior change -> [`popout.md`](popout.md).
 <!-- MANUAL:END -->
 
 ## Known Risks

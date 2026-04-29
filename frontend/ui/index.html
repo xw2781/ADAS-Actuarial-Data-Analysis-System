@@ -350,6 +350,28 @@
       background: #fff;
       width: 100%;
     }
+    .rootPathControl {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+    #rootPathBrowseBtn {
+      height: 30px;
+      min-width: 84px;
+    }
+    #rootPathSetupMessage {
+      margin-top: 10px;
+      min-height: 18px;
+      padding: 0;
+      color: #444;
+      font-size: 12px;
+      line-height: 1.35;
+      box-sizing: border-box;
+    }
+    #rootPathSetupMessage.error {
+      color: #7a1f1f;
+    }
     #rootPathSettingsButtons {
       display: flex;
       justify-content: flex-end;
@@ -1142,14 +1164,13 @@
   </div>
 
   <div id="tabCtxMenu">
-    <div class="tabCtxItem" data-action="open-window">Open in New Window</div>
     <div class="tabCtxItem" data-action="close">Close</div>
     <div class="tabCtxItem" data-action="close-others">Close Others</div>
     <div class="tabCtxItem" data-action="close-all">Close All</div>
   </div>
 
   <div class="topbar">
-    <!-- <div class="brand">ADAS</div> -->
+    <!-- <div class="brand">ArcRho</div> -->
 
     <div class="tabs" id="tabs"></div>
     <div class="autosaveToggle host-nodrag" id="autoSaveToggle">
@@ -1225,8 +1246,12 @@
       <div id="rootPathSettingsTitle">Server Connection</div>
       <div class="fontSettingsRow">
         <label for="rootPathInput">Root Path</label>
-        <input id="rootPathInput" type="text" autocomplete="off" placeholder="E:\ADAS" />
+        <div class="rootPathControl">
+          <input id="rootPathInput" type="text" autocomplete="off" placeholder="E:\ArcRho Server" />
+          <button class="appConfirmBtn" id="rootPathBrowseBtn" type="button">Browse...</button>
+        </div>
       </div>
+      <div id="rootPathSetupMessage" role="status" aria-live="polite"></div>
       <div style="margin-top:10px; font-size:11px; color:#666;">
         This is the base path for all data files. Requires app restart to take effect.
       </div>

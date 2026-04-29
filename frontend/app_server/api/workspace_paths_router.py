@@ -38,18 +38,25 @@ def _persist_workspace_paths(cfg: Dict[str, Any]) -> Dict[str, Any]:
     try:
         config.save_workspace_paths(cfg)
         config.refresh_runtime_paths()
-        return {"ok": True, "config": config.load_workspace_paths()}
+        return {
+            "ok": True,
+            "config": config.load_workspace_paths(),
+            "config_exists": config.workspace_paths_file_exists(),
+        }
     except Exception as e:
         raise HTTPException(500, f"Failed to save workspace paths: {str(e)}")
 
 
 @router.get("/workspace_paths")
 def get_workspace_paths() -> Dict[str, Any]:
-    return {"ok": True, "config": config.load_workspace_paths()}
+    return {
+        "ok": True,
+        "config": config.load_workspace_paths(),
+        "config_exists": config.workspace_paths_file_exists(),
+    }
 
 
 @router.post("/workspace_paths")
 def update_workspace_paths(req: WorkspacePathsUpdateRequest) -> Dict[str, Any]:
     cfg = _with_path_overrides(config.load_workspace_paths(), req)
     return _persist_workspace_paths(cfg)
-

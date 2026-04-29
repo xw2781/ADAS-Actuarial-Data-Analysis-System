@@ -3,7 +3,7 @@
  * Handles all localStorage operations for DFM state persistence.
  */
 
-const NA_BORDER_KEY = "adas_dfm_ratio_na_borders";
+const NA_BORDER_KEY = "arcrho_dfm_ratio_na_borders";
 let _storageInstanceId = "";
 
 function getResolvedProjectNameForStorage() {
@@ -54,27 +54,27 @@ function getMethodNameScopeBase() {
 
 export function getSummaryOrderKey() {
   const base = getSummaryKeyBase();
-  return base ? `adas_dfm_summary_order::${base}` : null;
+  return base ? `arcrho_dfm_summary_order::${base}` : null;
 }
 
 export function getSummaryConfigKey() {
   const base = getSummaryKeyBase();
-  return base ? `adas_dfm_summary_custom::${base}` : null;
+  return base ? `arcrho_dfm_summary_custom::${base}` : null;
 }
 
 export function getSummaryHiddenKey() {
   const base = getSummaryKeyBase();
-  return base ? `adas_dfm_summary_hidden::${base}` : null;
+  return base ? `arcrho_dfm_summary_hidden::${base}` : null;
 }
 
 export function getMethodNameKey() {
   const base = getMethodNameScopeBase();
-  return base ? `adas_dfm_method_name::${base}` : null;
+  return base ? `arcrho_dfm_method_name::${base}` : null;
 }
 
 export function getSavedMethodKey() {
   const base = getSummaryKeyBase();
-  return base ? `adas_dfm_has_saved_method::${base}` : null;
+  return base ? `arcrho_dfm_has_saved_method::${base}` : null;
 }
 
 export function getNaBorderKey() {
@@ -205,7 +205,7 @@ export function clearMethodSavedFlag() {
 
 export function getRatioSelectionKey() {
   const base = getSummaryKeyBase();
-  return base ? `adas_dfm_ratio_selection::${base}` : null;
+  return base ? `arcrho_dfm_ratio_selection::${base}` : null;
 }
 
 export function loadRatioSelection(key) {

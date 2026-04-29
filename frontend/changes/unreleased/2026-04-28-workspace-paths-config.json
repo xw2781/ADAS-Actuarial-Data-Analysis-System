@@ -2,8 +2,11 @@
   "type": "feature",
   "scope": "settings",
   "audience": "user",
-  "summary": "Renamed the runtime path configuration to workspace paths with a simpler workspace root and subpath schema.",
+  "summary": "Moved workspace path settings into the user's AppData profile with a simpler workspace root and subpath schema.",
   "details": [
-    "The app now uses workspace_paths.json and /workspace_paths without carrying legacy ui_config aliases."
+    "The app now uses %APPDATA%\\ArcRho\\workspace_paths.json and /workspace_paths without carrying legacy ui_config aliases.",
+    "Local app prefs and app-server cache now use %APPDATA%\\ArcRho subfolders without a WebUI nesting folder.",
+    "First-run installs use built-in defaults until Server Connection is saved.",
+    "The Server Connection window can browse for the root path and automatically checks drives D: through Z: for an ArcRho Server folder during first-time setup."
   ]
 }

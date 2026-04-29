@@ -5,7 +5,7 @@ export function wireDatasetInputController(deps) {
     loadDataset,
     isRunInFlight,
     setStatus,
-    runAdasTri,
+    runArcRhoTri,
     savePatch,
     toggleBlanks,
     wireLenDropdowns,
@@ -62,7 +62,7 @@ export function wireDatasetInputController(deps) {
   document.getElementById("clearCacheReloadBtn")?.addEventListener("click", () => {
     if (isRunInFlight()) return;
     setStatus("Clearing cache and reloading dataset...");
-    void runAdasTri({ clearCache: true, showValidationMessage: true });
+    void runArcRhoTri({ clearCache: true, showValidationMessage: true });
   });
   $("saveBtn").addEventListener("click", savePatch);
   $("toggleBlankBtn").addEventListener("click", toggleBlanks);
@@ -413,10 +413,10 @@ export function wireDatasetInputController(deps) {
   // Enter -> auto run
   bindAutoRunOnEnter(pathInput);
   // Run button still as fallback
-  const runBtn = document.getElementById("runAdasTriBtn");
+  const runBtn = document.getElementById("runArcRhoTriBtn");
   if (runBtn) {
     runBtn.addEventListener("click", () => {
-      void runAdasTri({ showValidationMessage: true });
+      void runArcRhoTri({ showValidationMessage: true });
     });
   }
 

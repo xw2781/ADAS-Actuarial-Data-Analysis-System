@@ -1,0 +1,11 @@
+{
+  "type": "breaking",
+  "scope": "runtime",
+  "audience": "developer",
+  "summary": "Renamed runtime APIs, schemas, cache IDs, and protocol names to ArcRho.",
+  "details": [
+    "Renamed runtime endpoints to /arcrho paths and renamed request models to ArcRho*.",
+    "Renamed the backend runtime service to arcrho_runtime_service.py.",
+    "Updated external request protocol names, cache prefixes, and generated dataset IDs to ArcRho names."
+  ]
+}

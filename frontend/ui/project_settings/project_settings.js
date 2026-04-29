@@ -8,10 +8,10 @@ import { createDatasetTypesFeature } from "/ui/project_settings/project_settings
 import { createReservingClassTypesFeature } from "/ui/project_settings/project_settings_reserving_class_types.js?v=2026040309";
 
 // ============ Zoom & Hotkey Handling ============
-const ZOOM_STORAGE_KEY = "adas_ui_zoom_pct";
-const ZOOM_MODE_KEY = "adas_zoom_mode";
-const EXPANDED_FOLDERS_SESSION_KEY = "adas_project_settings_expanded_folders_v1";
-const SELECTED_PROJECT_SESSION_KEY = "adas_project_settings_selected_project_v1";
+const ZOOM_STORAGE_KEY = "arcrho_ui_zoom_pct";
+const ZOOM_MODE_KEY = "arcrho_zoom_mode";
+const EXPANDED_FOLDERS_SESSION_KEY = "arcrho_project_settings_expanded_folders_v1";
+const SELECTED_PROJECT_SESSION_KEY = "arcrho_project_settings_selected_project_v1";
 
 function applyZoomValue(v) {
   try {
@@ -612,7 +612,7 @@ function toWinPath(pathValue) {
   return String(pathValue || "").trim().replace(/\//g, "\\");
 }
 
-function inferAdasRootPath(...candidates) {
+function inferArcRhoRootPath(...candidates) {
   for (const candidate of candidates) {
     const value = toWinPath(candidate);
     if (!value) continue;
@@ -624,7 +624,7 @@ function inferAdasRootPath(...candidates) {
     const dataIdx = lower.indexOf("\\data\\");
     if (dataIdx > 1) return value.slice(0, dataIdx);
   }
-  return "E:\\ADAS";
+  return "E:\\ArcRho";
 }
 
 function sanitizeProjectFolderName(projectName) {
@@ -634,7 +634,7 @@ function sanitizeProjectFolderName(projectName) {
 function buildCanonicalProjectSettingsPath(projectName, legacySettingsPath, tablePath) {
   const folderName = sanitizeProjectFolderName(projectName);
   if (!folderName) return toWinPath(legacySettingsPath);
-  const root = inferAdasRootPath(legacySettingsPath, tablePath);
+  const root = inferArcRhoRootPath(legacySettingsPath, tablePath);
   return `${root}\\projects\\${folderName}\\project_settings.json`;
 }
 
@@ -2042,11 +2042,11 @@ function deriveSummaryDateInputs(summaryColumns, mappedDateFields) {
   };
 }
 
-async function clearAdasHeadersCacheForProject(projectName) {
+async function clearArcRhoHeadersCacheForProject(projectName) {
   const name = String(projectName || "").trim();
   if (!name) return { ok: true, cleared_count: 0 };
   try {
-    const res = await fetch("/adas/headers/cache/clear", {
+    const res = await fetch("/arcrho/headers/cache/clear", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ProjectName: name }),
@@ -2064,7 +2064,7 @@ async function clearAdasHeadersCacheForProject(projectName) {
     }
     return res.json();
   } catch (err) {
-    setStatus(`Warning: failed to clear ADASHeaders cache for "${name}": ${err.message}`);
+    setStatus(`Warning: failed to clear ArcRhoHeaders cache for "${name}": ${err.message}`);
     return { ok: false, error: String(err.message || err) };
   }
 }
@@ -2104,7 +2104,7 @@ async function loadTableSummary(tablePath, projectName = "", options = {}) {
 
   try {
     if (forceRefresh && projectName) {
-      await clearAdasHeadersCacheForProject(projectName);
+      await clearArcRhoHeadersCacheForProject(projectName);
       if (requestSeq !== tableSummaryLoadSeq) return true;
     }
 
@@ -3260,7 +3260,7 @@ async function deleteProject(project) {
     return;
   }
 
-  // Delete the project folder on disk (e.g. E:\ADAS\projects\ProjectName)
+  // Delete the project folder on disk (e.g. E:\ArcRho\projects\ProjectName)
   try {
     const res = await fetch(`/project_settings/${DEFAULT_SOURCE}/delete_project_folder`, {
       method: "POST",
@@ -3473,7 +3473,7 @@ async function saveProjectData(sourceKey = DEFAULT_SOURCE) {
     const result = await res.json();
     currentMtime = result.mtime;
 
-    // Save folder structure to E:\ADAS\projects\folder_structure.json
+    // Save folder structure to E:\ArcRho\projects\folder_structure.json
     const folders = Array.isArray(projectData.customFolders) ? projectData.customFolders : [];
     const project_paths = Array.isArray(projectData.projectPaths) ? projectData.projectPaths : [];
     const foldersRes = await fetch(`/project_settings/${sourceKey}/folders`, {

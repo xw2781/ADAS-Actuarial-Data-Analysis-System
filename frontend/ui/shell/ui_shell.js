@@ -16,24 +16,6 @@ import {
 } from "/ui/shell/browsing_history.js";
 
 // ==========================
-// Pop-out window tracking
-// ==========================
-/** @type {Map<string, { tabState: object, channel: object }>} */
-const poppedOutTabs = new Map();
-let _popoutBridge = null;
-
-async function getPopoutBridge() {
-  if (!_popoutBridge) {
-    try {
-      _popoutBridge = await import("/ui/shell/popout_bridge.js");
-    } catch (err) {
-      console.warn("popout_bridge.js not available:", err);
-    }
-  }
-  return _popoutBridge;
-}
-
-// ==========================
 // Hotkey override (F5 / Reload)
 // ==========================
 
@@ -57,14 +39,14 @@ function normalizeKeyCombo(e) {
 let __lastKeyCombo = "";
 let __lastKeyTime = 0;
 const datasetAutoRefreshDone = new Set();
-const ZOOM_STORAGE_KEY = "adas_ui_zoom_pct";
+const ZOOM_STORAGE_KEY = "arcrho_ui_zoom_pct";
 const UI_VERSION_PARAM = new URLSearchParams(window.location.search).get("v") || String(Date.now());
 const ZOOM_MIN = 70;
 const ZOOM_MAX = 160;
 const ZOOM_STEP = 10;
-const AUTOSAVE_KEY = "adas_autosave_enabled";
-const FONT_STORAGE_KEY = "adas_app_font";
-const FORCE_REBUILD_KEY = "adas_force_rebuild_enabled";
+const AUTOSAVE_KEY = "arcrho_autosave_enabled";
+const FONT_STORAGE_KEY = "arcrho_app_font";
+const FORCE_REBUILD_KEY = "arcrho_force_rebuild_enabled";
 let zoomPercent = 100;
 let zoomToastTimer = null;
 let zoomUiWired = false;
@@ -73,7 +55,7 @@ let autoSaveEnabled = true;
 let forceRebuildEnabled = false;
 const hostZoomAvailable = () => typeof window.ADAHost?.setZoomFactor === "function";
 
-window.__adas_should_intercept_close = function () {
+window.__arcrho_should_intercept_close = function () {
   const isClose = __lastKeyCombo === "Ctrl+W";
   if (!isClose) return false;
   return (Date.now() - __lastKeyTime) < 900;
@@ -156,7 +138,6 @@ function broadcastForceRebuildToggle() {
       // ignore
     }
   }
-  relayToPopoutChannels({ type: "arcrho:force-rebuild-toggle", enabled: forceRebuildEnabled });
 }
 
 function setForceRebuildEnabled(enabled, { persist = true, notify = true } = {}) {
@@ -305,26 +286,70 @@ function initFontSettingsModal() {
 
 // ---------- Root Path Settings Modal ----------
 let rootPathModalWired = false;
+const DEFAULT_ROOT_PATH = "E:\\ArcRho Server";
+
+function setRootPathSetupMessage(text, isError = false) {
+  const msg = $("rootPathSetupMessage");
+  if (!msg) return;
+  msg.textContent = text || "";
+  msg.classList.toggle("error", !!isError);
+}
+
+async function scanInitialServerPath(input) {
+  const hostApi = getHostApi();
+  if (!hostApi || typeof hostApi.findArcRhoServerRoot !== "function") {
+    setRootPathSetupMessage("First-time setup: select Browse or enter the server root path manually.", true);
+    return;
+  }
+
+  setRootPathSetupMessage("First-time setup: searching drives D: through Z: for ArcRho Server...");
+  try {
+    const result = await hostApi.findArcRhoServerRoot();
+    const foundPath = String(result?.path || "").trim();
+    if (foundPath) {
+      input.value = foundPath;
+      setRootPathSetupMessage(`The server path ${foundPath} was found and selected automatically. To select a different path, click Browse.`);
+      return;
+    }
+    setRootPathSetupMessage(
+      "First-time setup: ArcRho Server was not found on drives D: through Z:. Select Browse or enter the root path manually.",
+      true,
+    );
+  } catch (err) {
+    setRootPathSetupMessage(
+      `First-time setup: automatic server path search failed. Select Browse or enter the root path manually. ${err?.message || err}`,
+      true,
+    );
+  }
+}
 
 async function openRootPathSettingsModal() {
   const overlay = $("rootPathSettingsOverlay");
   const input = $("rootPathInput");
   if (!overlay || !input) return;
-  
+  setRootPathSetupMessage("");
+
+  let configExists = true;
   // Load current value from the app server.
   try {
     const res = await fetch("/workspace_paths");
     if (res.ok) {
       const data = await res.json();
-      input.value = data.config?.workspace_root || "E:\\ADAS";
+      input.value = data.config?.workspace_root || DEFAULT_ROOT_PATH;
+      configExists = data.config_exists !== false;
     } else {
-      input.value = "E:\\ADAS";
+      input.value = DEFAULT_ROOT_PATH;
     }
   } catch {
-    input.value = "E:\\ADAS";
+    input.value = DEFAULT_ROOT_PATH;
   }
-  
+
   overlay.classList.add("open");
+
+  if (!configExists) {
+    await scanInitialServerPath(input);
+  }
+
   requestAnimationFrame(() => {
     input.focus();
     input.select();
@@ -341,9 +366,28 @@ function initRootPathSettingsModal() {
   rootPathModalWired = true;
   const overlay = $("rootPathSettingsOverlay");
   const input = $("rootPathInput");
+  const browseBtn = $("rootPathBrowseBtn");
   const applyBtn = $("rootPathApplyBtn");
   const cancelBtn = $("rootPathCancelBtn");
-  if (!overlay || !input || !applyBtn || !cancelBtn) return;
+  if (!overlay || !input || !browseBtn || !applyBtn || !cancelBtn) return;
+
+  browseBtn.addEventListener("click", async () => {
+    const hostApi = getHostApi();
+    if (!hostApi || typeof hostApi.pickFolder !== "function") {
+      setRootPathSetupMessage("Folder browsing is unavailable. Enter the server root path manually.", true);
+      return;
+    }
+    try {
+      const picked = await hostApi.pickFolder((input.value || "").trim());
+      const selectedPath = String(picked || "").trim();
+      if (!selectedPath) return;
+      input.value = selectedPath;
+      setRootPathSetupMessage(`Server path selected: ${selectedPath}`);
+      input.focus();
+    } catch (err) {
+      setRootPathSetupMessage(`Folder selection failed: ${err?.message || err}`, true);
+    }
+  });
 
   applyBtn.addEventListener("click", async () => {
     const newPath = (input.value || "").trim();
@@ -439,15 +483,15 @@ function applyZoom() {
   const z = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(zoomPercent)));
   zoomPercent = z;
   if (hostZoomAvailable()) {
-    try { localStorage.setItem("adas_zoom_mode", "host"); } catch {}
+    try { localStorage.setItem("arcrho_zoom_mode", "host"); } catch {}
     window.ADAHost?.setZoomFactor?.(z / 100);
   } else {
-    try { localStorage.setItem("adas_zoom_mode", "css"); } catch {}
+    try { localStorage.setItem("arcrho_zoom_mode", "css"); } catch {}
     if (root) root.style.zoom = String(z / 100);
     if (body) body.style.zoom = String(z / 100);
   }
   const statusH = getStatusBarHeight();
-  try { localStorage.setItem("adas_statusbar_h", String(statusH)); } catch {}
+  try { localStorage.setItem("arcrho_statusbar_h", String(statusH)); } catch {}
   try { localStorage.setItem(ZOOM_STORAGE_KEY, String(z)); } catch {}
   if (!hostZoomAvailable()) broadcastZoomToIframes();
   updateZoomUI();
@@ -555,8 +599,6 @@ function broadcastZoomToIframes() {
       // ignore
     }
   }
-  // Also relay zoom to pop-out windows
-  relayToPopoutChannels({ type: "arcrho:set-zoom", zoom: z, statusBarHeight: statusH });
 }
 
 function broadcastAppFont(font) {
@@ -572,8 +614,6 @@ function broadcastAppFont(font) {
       // ignore
     }
   }
-  // Also relay font to pop-out windows
-  relayToPopoutChannels({ type: "arcrho:set-app-font", font });
 }
 
 function getStatusBarHeight() {
@@ -712,7 +752,7 @@ function refreshActiveTab() {
     if (t.type === "workflow") {
       try {
         const inst = t.wfInst || t.id || "";
-        if (inst) sessionStorage.setItem(`adas_wf_autosave_on_load::${inst}`, "1");
+        if (inst) sessionStorage.setItem(`arcrho_wf_autosave_on_load::${inst}`, "1");
       } catch {
         // ignore
       }
@@ -737,7 +777,7 @@ function customHardRefresh() {
   // Example: clear cache + rebuild UI
   // Adjust to your cache system
   try {
-    localStorage.removeItem("adas_ui_state"); // 
+    localStorage.removeItem("arcrho_ui_state"); // 
   } catch (_) {}
 
   // You can also reset to the initial tabs
@@ -987,8 +1027,8 @@ function formatStatusTimestamp(d = new Date()) {
 }
 
 // bump version because behavior changed
-const STORAGE_KEY = "adas_ui_shell_state_v3";
-const LAST_WF_PATH_KEY = "adas_last_workflow_path_v1";
+const STORAGE_KEY = "arcrho_ui_shell_state_v3";
+const LAST_WF_PATH_KEY = "arcrho_last_workflow_path_v1";
 
 let __isDragging = false;
 
@@ -1366,7 +1406,7 @@ function wireIframeMenuAutoClose(iframe) {
       const frameWin = iframe.contentWindow;
       const frameDoc = frameWin?.document;
       if (!frameWin || !frameDoc) return;
-      if (frameWin.__adasShellMenuBridgeWired) return;
+      if (frameWin.__arcRhoShellMenuBridgeWired) return;
 
       const closeMenus = () => {
         closeAllShellMenus();
@@ -1376,7 +1416,7 @@ function wireIframeMenuAutoClose(iframe) {
       frameWin.addEventListener("keydown", (e) => {
         if (e.key === "Escape") closeMenus();
       }, true);
-      frameWin.__adasShellMenuBridgeWired = true;
+      frameWin.__arcRhoShellMenuBridgeWired = true;
     } catch {
       // ignore cross-frame wiring failures
     }
@@ -1653,7 +1693,7 @@ function toggleNavigationPanel() {
 function getWorkflowTabState(tab) {
   if (!tab || tab.type !== "workflow") return null;
   try {
-    const raw = localStorage.getItem(`adas_workflow_state_v1::${tab.wfInst}`);
+    const raw = localStorage.getItem(`arcrho_workflow_state_v1::${tab.wfInst}`);
     if (!raw) return null;
     const s = JSON.parse(raw);
     return s && typeof s === "object" ? s : null;
@@ -1698,7 +1738,7 @@ const WF_IMPORT_PICKER_ID = "workflow_import_picker";
 
 function openHandleDb() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open("adas_handles", 1);
+    const req = indexedDB.open("arcrho_handles", 1);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains("handles")) {
@@ -2014,7 +2054,7 @@ function shutdownApplication() {
     });
 }
 
-window.__adas_confirm_app_shutdown = function () {
+window.__arcrho_confirm_app_shutdown = function () {
   return showAppConfirm({ title: "Warning", message: "Quit the application?", okText: "Quit" });
 };
 
@@ -3046,14 +3086,8 @@ function openTabCtxMenu(tabId, x, y) {
 function updateTabCtxMenuState(tabId) {
   if (!tabCtxMenu) return;
   const isHome = tabId === "home";
-  const tab = state.tabs.find(t => t.id === tabId);
-  const canOpenWindow = !!tab && tab.type !== "home";
   tabCtxMenu.querySelectorAll(".tabCtxItem").forEach((el) => {
     el.classList.toggle("disabled", isHome);
-    const action = el.getAttribute("data-action") || "";
-    if (action === "open-window") {
-      el.classList.toggle("disabled", !canOpenWindow);
-    }
   });
 }
 
@@ -3095,7 +3129,7 @@ function clearTestData() {
   const ok = window.confirm("Clear test data (import handle cache)?");
   if (!ok) return;
   try {
-    indexedDB.deleteDatabase("adas_handles");
+    indexedDB.deleteDatabase("arcrho_handles");
   } catch {}
 }
 
@@ -3162,125 +3196,6 @@ function renderContent() {
     } catch {
       // ignore
     }
-  }
-}
-
-async function openTabInNewWindow(tabId) {
-  const tab = state.tabs.find(t => t.id === tabId);
-  if (!tab || tab.type === "home") return;
-
-  const hostApi = getHostApi();
-  if (!hostApi?.openTabWindow) {
-    updateStatusBar("Open in new window is not available.");
-    return;
-  }
-
-  // Build instance key and pop-out URL params
-  const inst = tab.dsInst || tab.wfInst || tab.id || `pop_${Date.now()}`;
-  const urlParams = new URLSearchParams();
-  urlParams.set("type", tab.type);
-  urlParams.set("inst", inst);
-  if (tab.datasetId) urlParams.set("ds", tab.datasetId);
-  if (tab.dfmTab) urlParams.set("tab", tab.dfmTab);
-  urlParams.set("title", tab.title || tab.type);
-  urlParams.set("v", UI_VERSION_PARAM);
-
-  // Save tab state for restoration when pop-out closes
-  const savedState = {
-    id: tab.id,
-    title: tab.title,
-    type: tab.type,
-    datasetId: tab.datasetId,
-    datasetInputs: tab.datasetInputs,
-    dsInst: tab.dsInst,
-    wfInst: tab.wfInst,
-    dfmTab: tab.dfmTab,
-    projectSettingsRibbon: tab.projectSettingsRibbon,
-    isDirty: tab.isDirty,
-  };
-
-  // Set up BroadcastChannel to receive messages from pop-out
-  const bridge = await getPopoutBridge();
-  if (bridge) {
-    const channel = bridge.createPopoutChannel(inst);
-    channel.onMessage((data) => {
-      if (data.type === "popout-closed") {
-        restorePopoutTab(inst);
-      } else if (data.type === "relay-to-shell" && data.msg) {
-        // Process relayed message through the existing message handler
-        window.dispatchEvent(new MessageEvent("message", { data: data.msg }));
-      }
-    });
-    poppedOutTabs.set(inst, { tabState: savedState, channel });
-  }
-
-  // Open the pop-out window via host API
-  let opened = false;
-  try {
-    opened = !!(await hostApi.openTabWindow({
-      type: tab.type,
-      url: `/ui/shell/popout_shell.html?${urlParams.toString()}`,
-      datasetId: tab.datasetId || "",
-      dsInst: tab.dsInst || tab.id || "",
-      wfInst: tab.wfInst || "",
-      title: tab.title || tab.type,
-    }));
-  } catch {
-    opened = false;
-  }
-
-  if (!opened) {
-    const entry = poppedOutTabs.get(inst);
-    if (entry) {
-      try { entry.channel.close(); } catch {}
-      poppedOutTabs.delete(inst);
-    }
-    updateStatusBar("Failed to open tab in new window.");
-    return;
-  }
-
-  // Close the tab from the main shell
-  removeTabById(tabId);
-  if (state.activeId === tabId) {
-    state.activeId = "home";
-  }
-  render();
-  saveState();
-}
-
-function restorePopoutTab(inst) {
-  const entry = poppedOutTabs.get(inst);
-  if (!entry) return;
-
-  const { tabState, channel } = entry;
-  channel.close();
-  poppedOutTabs.delete(inst);
-
-  // Re-add the tab to state
-  const newTab = {
-    id: tabState.id || `restored_${Date.now()}`,
-    title: tabState.title || tabState.type,
-    type: tabState.type,
-    datasetId: tabState.datasetId,
-    datasetInputs: normalizeBrowsingHistoryEntry(tabState.datasetInputs || null) || undefined,
-    dsInst: tabState.dsInst,
-    wfInst: tabState.wfInst,
-    dfmTab: tabState.dfmTab,
-    projectSettingsRibbon: tabState.type === "project_settings"
-      ? String(tabState.projectSettingsRibbon || "").trim().toLowerCase() || "summary"
-      : undefined,
-    isDirty: tabState.isDirty,
-  };
-
-  state.tabs.push(newTab);
-  state.activeId = newTab.id;
-  render();
-  saveState();
-}
-
-function relayToPopoutChannels(msg) {
-  for (const [, entry] of poppedOutTabs) {
-    entry.channel.send({ type: "relay-to-iframe", msg });
   }
 }
 
@@ -3605,10 +3520,6 @@ function wire() {
     closeTabCtxMenu();
     if (!id) return;
 
-    if (action === "open-window") {
-      openTabInNewWindow(id);
-      return;
-    }
     if (action === "close") {
       closeTab(id);
       return;

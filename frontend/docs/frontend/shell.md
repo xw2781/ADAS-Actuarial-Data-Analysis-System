@@ -48,7 +48,6 @@ Detected `arcrho:*` message types in key JS files:
 - [`ui/shell/ui_shell.js`](../../ui/shell/ui_shell.js) - Tab orchestration, iframe lifecycle, menus, and hotkeys.
 - [`electron/preload.js`](../../electron/preload.js) - Renderer-safe host bridge APIs.
 - [`electron/main.js`](../../electron/main.js) - Window lifecycle and shell-to-host wiring.
-- [`ui/shell/popout_bridge.js`](../../ui/shell/popout_bridge.js) - BroadcastChannel helper for pop-out tabs.
 <!-- AUTO-GEN:END -->
 
 ## External Interfaces
@@ -56,14 +55,15 @@ Detected `arcrho:*` message types in key JS files:
 - Communicates with child iframes via `arcrho:*` postMessage events.
 - Invokes app-server endpoints for workflow import helpers and configuration endpoints.
 - Uses Electron host bridge for shutdown/clear-cache actions; app-server startup is host-managed with retry on transient launch failures.
+- Uses Electron host bridge for Server Connection folder browsing and first-time `ArcRho Server` drive detection.
 - Consumes dataset-page browsing updates (`arcrho:dataset-settings-changed`, `arcrho:browsing-history-updated`) and forwards updates to any open Browsing History tab.
 - Receives `arcrho:open-dataset-from-history` from Browsing History tab to open dataset tabs with selected inputs.
+- Detached tab pop-out windows are not supported; tabs stay inside the main shell iframe host.
 <!-- MANUAL:END -->
 
 ## Data/State/Caches
 <!-- MANUAL:BEGIN -->
 - Persists tab state, zoom, and toggles in `localStorage`.
-- Tracks popped-out tabs via `BroadcastChannel`.
 - Persists dataset browsing history entries (latest 15) via `browsing_history.js`.
 <!-- MANUAL:END -->
 

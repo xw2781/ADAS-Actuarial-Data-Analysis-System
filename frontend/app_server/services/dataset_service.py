@@ -129,7 +129,7 @@ def _build_notes_dataset_id(project_name: str, reserving_class: str, dataset_nam
     rc = str(reserving_class if reserving_class is not None else "").replace("\\", "^")
     rc_component = _sanitize_notes_filename_component(rc)
     ds_component = _sanitize_notes_filename_component(dataset_name)
-    return f"ADASTriNotes@{rc_component}@{ds_component}"
+    return f"ArcRhoTriNotes@{rc_component}@{ds_component}"
 
 
 def _require_notes_fields(project_name: str, reserving_class: str, dataset_name: str) -> Tuple[str, str, str]:

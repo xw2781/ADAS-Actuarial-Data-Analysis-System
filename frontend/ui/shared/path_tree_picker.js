@@ -1,4 +1,4 @@
-const STYLE_ID = "adas-path-tree-picker-style";
+const STYLE_ID = "arcrho-path-tree-picker-style";
 const TREE_INDENT_PX = 10;
 const TREE_CHILDREN_INDENT_PX = 6;
 const TREE_LEAF_EXTRA_INDENT_PX = 12;

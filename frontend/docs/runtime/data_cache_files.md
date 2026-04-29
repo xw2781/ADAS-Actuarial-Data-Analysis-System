@@ -9,8 +9,8 @@ Index cache/data files and refresh points used by app-server services.
 <!-- AUTO-GEN:BEGIN runtime.data_cache_files.entry_points -->
 | Method | Path | Domain | Handler |
 | --- | --- | --- | --- |
-| `POST` | `/adas/headers/cache/clear` | `adas` | `clear_adas_headers_cache` |
-| `POST` | `/adas/tri/refresh` | `adas` | `adas_tri_refresh` |
+| `POST` | `/arcrho/headers/cache/clear` | `arcrho` | `clear_arcrho_headers_cache` |
+| `POST` | `/arcrho/tri/refresh` | `arcrho` | `arcrho_tri_refresh` |
 | `POST` | `/reserving_class_values/refresh` | `reserving_class` | `refresh_reserving_class_values` |
 | `GET` | `/table_summary` | `table_summary` | `get_table_summary` |
 | `POST` | `/table_summary/refresh` | `table_summary` | `refresh_table_summary` |

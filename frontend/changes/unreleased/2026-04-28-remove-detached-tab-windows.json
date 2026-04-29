@@ -1,0 +1,9 @@
+{
+  "type": "change",
+  "scope": "shell",
+  "audience": "user",
+  "summary": "Removed detached window actions for shell tabs and DFM Results.",
+  "details": [
+    "Tabs now remain inside the main ArcRho shell; the previous standalone detached-window entry points and menu actions were removed."
+  ]
+}

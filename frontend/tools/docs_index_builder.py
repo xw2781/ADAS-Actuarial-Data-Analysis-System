@@ -59,7 +59,6 @@ FRONTEND_ENTRY_HTMLS = [
     "ui/workflow/workflow.html",
     "ui/project_settings/project_settings.html",
     "ui/scripting_console/scripting_console.html",
-    "ui/shell/popout_shell.html",
 ]
 
 
@@ -444,7 +443,6 @@ FRONTEND_DOC_META: Mapping[str, Dict[str, object]] = {
             ("ui/shell/ui_shell.js", "Tab orchestration, iframe lifecycle, menus, and hotkeys."),
             ("electron/preload.js", "Renderer-safe host bridge APIs."),
             ("electron/main.js", "Window lifecycle and shell-to-host wiring."),
-            ("ui/shell/popout_bridge.js", "BroadcastChannel helper for pop-out tabs."),
         ],
     },
     "dataset": {
@@ -467,7 +465,7 @@ FRONTEND_DOC_META: Mapping[str, Dict[str, object]] = {
             ("ui/dfm/dfm_tabs_orchestrator.js", "DFM tabs orchestration and message handling."),
             ("ui/dfm/dfm_details.js", "Details tab logic and title syncing."),
             ("ui/dfm/dfm_ratios_tab.js", "Ratios tab calculations and controls."),
-            ("ui/dfm/dfm_results_tab.js", "Results table rendering and pop-out actions."),
+            ("ui/dfm/dfm_results_tab.js", "Results table rendering and CSV export."),
             ("ui/dfm/dfm_persistence.js", "DFM template/pattern persistence."),
         ],
     },
@@ -507,15 +505,6 @@ FRONTEND_DOC_META: Mapping[str, Dict[str, object]] = {
             ("ui/scripting_console/scripting_console_notebook_io.js", "Notebook save/open and `.ipynb` import/export helpers."),
         ],
     },
-    "popout": {
-        "doc": "docs/frontend/popout.md",
-        "html": ["ui/shell/popout_shell.html"],
-        "files": [
-            ("ui/shell/popout_shell.html", "Secondary window shell hosting one iframe tab."),
-            ("ui/shell/popout_bridge.js", "BroadcastChannel connection between windows."),
-            ("ui/shell/ui_shell.js", "Main-window pop-out/dock-back orchestration."),
-        ],
-    },
 }
 
 BACKEND_DOMAIN_META: Mapping[str, Dict[str, object]] = {
@@ -533,7 +522,6 @@ BACKEND_DOMAIN_META: Mapping[str, Dict[str, object]] = {
             ("app_server/api/workspace_paths_router.py", "Read/update workspace path config."),
             ("app_server/config.py", "Config loader and runtime path refresh."),
             ("app_server/schemas/workspace_paths.py", "Workspace path request models."),
-            ("workspace_paths.json", "Persistent workspace path configuration."),
         ],
     },
     "app_control": {
@@ -579,12 +567,12 @@ BACKEND_DOMAIN_META: Mapping[str, Dict[str, object]] = {
             ("app_server/schemas/excel.py", "Excel request payload schemas."),
         ],
     },
-    "adas": {
-        "doc": "docs/app_server/domains/adas.md",
+    "arcrho": {
+        "doc": "docs/app_server/domains/arcrho.md",
         "files": [
-            ("app_server/api/adas_router.py", "ADAS tri/precheck/header endpoints."),
-            ("app_server/services/adas_service.py", "ADAS processing and project listing."),
-            ("app_server/schemas/adas.py", "ADAS request schemas."),
+            ("app_server/api/arcrho_router.py", "ArcRho tri/precheck/header endpoints."),
+            ("app_server/services/arcrho_runtime_service.py", "ArcRho processing and project listing."),
+            ("app_server/schemas/arcrho.py", "ArcRho request schemas."),
         ],
     },
     "project_settings": {
@@ -655,7 +643,7 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
 
                 System map:
                 - Electron host/runtime: `electron/main.js`, `electron/preload.js`, `app_shell.py`.
-                - Frontend pages/features: shell + dataset + DFM + workflow + project settings + pop-out.
+                - Frontend pages/features: shell + dataset + DFM + workflow + project settings + scripting console.
                 - App-server API: FastAPI app in `app_server/main.py` with domain routers in `app_server/api`.
                 - Runtime/config state: path resolution and cache constants in `app_server/config.py`.
                 """
@@ -737,7 +725,6 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
                 4. Workflow editor change -> [`workflow.md`](workflow.md).
                 5. Project settings flow change -> [`project_settings.md`](project_settings.md).
                 6. Scripting console change -> [`scripting_console.md`](scripting_console.md).
-                7. Pop-out/dock behavior change -> [`popout.md`](popout.md).
                 """
             ),
             "Known Risks": dedent(
@@ -797,14 +784,14 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
     frontend_manual = {
         "shell": {
             "purpose": "Shell-level tab/iframe host for all feature pages.",
-            "external": "- Communicates with child iframes via `arcrho:*` postMessage events.\n- Invokes app-server endpoints for workflow import helpers and configuration endpoints.",
+            "external": "- Communicates with child iframes via `arcrho:*` postMessage events.\n- Invokes app-server endpoints for workflow import helpers and configuration endpoints.\n- Uses Electron host bridge for Server Connection folder browsing and first-time `ArcRho Server` drive detection.",
             "data": "- Persists tab state, zoom, and toggles in `localStorage`.\n- Tracks popped-out tabs via `BroadcastChannel`.",
             "tasks": "1. Add a new tab type: update tab creation + iframe source logic in `ui_shell.js`.\n2. Add shell menu action: wire menu item + action handler + hotkey map.",
             "risks": "- DOM replacement in shell can invalidate iframe references.\n- Unsaved-state handling must stay consistent for close/close-all flows.",
         },
         "dataset": {
             "purpose": "Dataset editing/analysis page used inside shell tabs.",
-            "external": "- Calls app-server dataset/book/adas endpoints.\n- Sends status/hotkey/close signals to parent shell.",
+            "external": "- Calls app-server dataset/book/arcrho endpoints.\n- Sends status/hotkey/close signals to parent shell.",
             "data": "- Uses in-page mutable state for active dataset and selection.\n- Reads project metadata from app_server endpoints.",
             "tasks": "1. Add a new app-server call: update fetch call and API wrappers.\n2. Change table behavior: update `dataset_main.js` render + patch flow together.",
             "risks": "- Formula or patch changes can cause silent data drift.\n- Endpoint mismatches break runtime flows without compile-time safety.",
@@ -837,13 +824,6 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
             "tasks": "1. Change notebook model or persistence: update core state, notebook I/O, app-server scripting routes if needed, and docs together.\n2. Change cell behavior or shortcuts: update cells/core/shortcuts modules and verify command/edit mode interactions.\n3. Change sidebar or visual layout: update panels/cells/html together and keep INDEX.md as a short pointer only.",
             "risks": "- Keyboard handling is sensitive to edit mode, command mode, IME/composition, and Monaco focus.\n- Multi-cell selection, queueing, markdown folding, and drag/drop share state and can regress each other.\n- Long feature notes should stay in this module doc or release fragments, not in `docs/frontend/INDEX.md`.",
         },
-        "popout": {
-            "purpose": "Standalone pop-out window to host one tab outside main shell.",
-            "external": "- Uses `BroadcastChannel` for shell <-> popout message relays.\n- Forwards `arcrho:*` iframe messages back to shell.",
-            "data": "- Carries tab identity/state via URL params and channel payloads.",
-            "tasks": "1. Add popout tab type support: update src construction + dock-back state mapping.\n2. Change popout controls: adjust `popout_shell.html` and bridge handling.",
-            "risks": "- Channel lifecycle race conditions during window close/dock-back.\n- Mismatched tab instance IDs can orphan popout state.",
-        },
     }
 
     for name in FRONTEND_DOC_META:
@@ -874,9 +854,9 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
         ),
         "workspace_paths": (
             "Runtime workspace path read/update domain.",
-            "- Used by shell root-path settings modal.\n- Triggers `config.refresh_runtime_paths()` on updates.",
-            "- Persists config in `workspace_paths.json`.",
-            "1. Add config field: update schema + router serialization + config readers.\n2. Rename config fields by updating producers, consumers, docs, and packaging together.",
+            "- Used by shell root-path settings modal.\n- Triggers `config.refresh_runtime_paths()` on updates.\n- `GET /workspace_paths` reports whether the AppData config file already exists so the shell can detect first-time setup.",
+            "- Persists config in `%APPDATA%\\ArcRho\\workspace_paths.json`.\n- Uses built-in defaults until Server Connection is saved.",
+            "1. Add config field: update schema + router serialization + config readers.\n2. Rename config fields by updating producers, consumers, and docs together.",
             "- Invalid path config writes can impact all path-dependent domains.",
         ),
         "app_control": (
@@ -914,11 +894,11 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
             "1. Add automation method: schema + router + service must stay aligned.",
             "- Excel COM timing and environment dependencies are fragile.",
         ),
-        "adas": (
-            "ADAS calculations/precheck domain.",
-            "- Called by dataset/workflow actions requiring ADAS processing.",
+        "arcrho": (
+            "ArcRho calculations/precheck domain.",
+            "- Called by dataset/workflow actions requiring ArcRho processing.",
             "- Integrates headers/project listing and tri execution endpoints.",
-            "1. Add new ADAS operation: keep precheck/execute contracts explicit.",
+            "1. Add new ArcRho operation: keep precheck/execute contracts explicit.",
             "- Long-running computations need robust error messaging.",
         ),
         "project_settings": (
@@ -987,10 +967,10 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
         path="docs/runtime/config_paths.md",
         title="Runtime: Config and Path Resolution",
         manual_sections={
-            "Purpose": "Document path/config setup and runtime path refresh behavior.",
-            "External Interfaces": "- Frontend shell settings modal calls `/workspace_paths` routes.\n- App-server modules import `app_server.config` for runtime path resolution.",
-            "Data/State/Caches": "- `workspace_paths.json` is persistent source-of-truth for workspace root/path mapping.\n- Runtime globals in `app_server/config.py` are refreshed from config.",
-            "Common Change Tasks": "1. Add a new configurable path: update `workspace_paths.json` contract + `app_server/config.py` getters.\n2. Change path refresh behavior: validate all services that depend on runtime globals.",
+            "Purpose": "Document path/config setup, AppData-backed workspace path persistence, and runtime path refresh behavior.",
+            "External Interfaces": "- Frontend shell settings modal calls `/workspace_paths` routes.\n- App-server modules import `app_server.config` for runtime path resolution.\n- On first-time setup, the Electron shell searches `D:\\ArcRho Server` through `Z:\\ArcRho Server` and fills the Server Connection root path when found.",
+            "Data/State/Caches": "- `%APPDATA%\\ArcRho\\workspace_paths.json` is the persistent user-local source-of-truth for workspace root/path mapping.\n- If the AppData workspace path file does not exist yet, the app uses built-in defaults until the Server Connection setting is saved.\n- Runtime globals in `app_server/config.py` are refreshed from config.\n- User-local fixed paths are also refreshed in `app_server/config.py`, including workflow export path (`~/Documents/ArcRho/workflows`) and scripting notebook path (`~/Documents/ArcRho/scripts`).",
+            "Common Change Tasks": "1. Add a new configurable path: update the AppData `workspace_paths.json` contract + `app_server/config.py` getters.\n2. Change path refresh behavior: validate all services that depend on runtime globals.",
             "Known Risks": "- Path changes affect every filesystem-backed domain.\n- Environment-specific path assumptions can break packaged deployments.",
         },
         auto_sections={
@@ -1237,7 +1217,6 @@ def render_frontend_index_key_files(doc_path: str) -> str:
         ("docs/frontend/workflow.md", "Workflow feature index."),
         ("docs/frontend/project_settings.md", "Project settings feature index."),
         ("docs/frontend/scripting_console.md", "Scripting console feature index."),
-        ("docs/frontend/popout.md", "Pop-out window feature index."),
     ]
     return render_key_files_block(doc_path, files)
 
@@ -1278,9 +1257,8 @@ def render_runtime_data_key_files(doc_path: str, constants: Sequence[str]) -> st
 
 def render_runtime_config_key_files(doc_path: str) -> str:
     files = [
-        ("app_server/config.py", "Primary runtime path + config module."),
+        ("app_server/config.py", "Primary runtime path + config module, including AppData workspace path persistence."),
         ("app_server/api/workspace_paths_router.py", "HTTP interface for workspace path updates."),
-        ("workspace_paths.json", "Persisted workspace root and subpath config."),
         ("app_server/main.py", "App bootstrap and static path mounting."),
     ]
     return render_key_files_block(doc_path, files)

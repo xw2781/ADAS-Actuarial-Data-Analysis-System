@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 
-class AdaTriRequest(BaseModel):
+class ArcRhoTriRequest(BaseModel):
     Path: str
     TriangleName: str
     ProjectName: str
@@ -11,7 +11,7 @@ class AdaTriRequest(BaseModel):
     timeout_sec: float = 6.0
 
 
-class AdaHeadersRequest(BaseModel):
+class ArcRhoHeadersRequest(BaseModel):
     periodType: int = 0
     Transposed: bool = False
     PeriodLength: int = 12
@@ -20,5 +20,5 @@ class AdaHeadersRequest(BaseModel):
     timeout_sec: float = 6.0
 
 
-class AdaHeadersCacheClearRequest(BaseModel):
+class ArcRhoHeadersCacheClearRequest(BaseModel):
     ProjectName: str
