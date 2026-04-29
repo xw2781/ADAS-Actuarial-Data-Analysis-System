@@ -11,12 +11,12 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `.claude` | 1 |
 | `app_server` | 47 |
 | `build` | 7 |
-| `changes` | 11 |
+| `changes` | 12 |
 | `docs` | 36 |
 | `electron` | 2 |
 | `icons` | 17 |
 | `tools` | 2 |
-| `ui` | 166 |
+| `ui` | 167 |
 
 ## Full File List
 | Path | Size (bytes) |
@@ -91,6 +91,7 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `changes/unreleased/2026-04-28-remove-detached-tab-windows.json` | 301 |
 | `changes/unreleased/2026-04-28-workspace-paths-config.json` | 703 |
 | `changes/unreleased/2026-04-29-arcrho-runtime-rename.json` | 450 |
+| `changes/unreleased/2026-04-29-home-sidebar-grid.json` | 363 |
 | `changes/unreleased/_template.json` | 193 |
 | `docs/CONVENTIONS.md` | 1515 |
 | `docs/GENERATED_README.md` | 400 |
@@ -183,7 +184,8 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `ui/dfm/dfm_storage.js` | 6085 |
 | `ui/dfm/dfm_sync.js` | 3204 |
 | `ui/dfm/dfm_tabs_orchestrator.js` | 8536 |
-| `ui/index.html` | 40410 |
+| `ui/home_style_previews.html` | 14574 |
+| `ui/index.html` | 44422 |
 | `ui/libs/monaco-editor/min/vs/base/browser/ui/codicons/codicon/codicon.ttf` | 80340 |
 | `ui/libs/monaco-editor/min/vs/base/worker/workerMain.js` | 376545 |
 | `ui/libs/monaco-editor/min/vs/basic-languages/abap/abap.js` | 14996 |
@@ -315,7 +317,7 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `ui/shell/browsing_history.html` | 2693 |
 | `ui/shell/browsing_history.js` | 4115 |
 | `ui/shell/browsing_history_main.js` | 3278 |
-| `ui/shell/ui_shell.js` | 110030 |
+| `ui/shell/ui_shell.js` | 115590 |
 | `ui/splash.html` | 7831 |
 | `ui/workflow/workflow.html` | 16655 |
 | `ui/workflow/workflow_main.js` | 66810 |
