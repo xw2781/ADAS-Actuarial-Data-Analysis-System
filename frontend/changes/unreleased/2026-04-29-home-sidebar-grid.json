@@ -1,0 +1,10 @@
+{
+  "type": "feature",
+  "scope": "shell",
+  "audience": "user",
+  "summary": "Redesign the Home page with a sidebar and icon-based launch cards.",
+  "details": [
+    "Adds SVG icons and a responsive grid layout for the main ArcRho components.",
+    "Adds a Settings menu refresh command for reloading the active page with a cache-busted document request."
+  ]
+}

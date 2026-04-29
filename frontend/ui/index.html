@@ -605,33 +605,148 @@
       background: #fff;
       margin-top: -1px;
     }
-    .home { padding: 14px; }
-    .homeGroup { margin-top: 12px; }
-    .homeGroup:first-of-type { margin-top: 8px; }
-    .groupTitle {
-      font-size: 13px;
+    .home {
+      height: 100%;
+      padding: 0;
+      background: #f5f7f9;
+      overflow: hidden;
+    }
+    .homeLayout {
+      height: 100%;
+      display: grid;
+      grid-template-columns: 210px minmax(0, 1fr);
+      overflow: hidden;
+    }
+    .homeSidebar {
+      border-right: 1px solid #d8dde3;
+      background: #edf1f5;
+      padding: 16px 12px;
+      overflow: hidden;
+    }
+    .homeBrand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 36px;
+      margin-bottom: 16px;
+    }
+    .homeBrandMark {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, #0f766e 0%, #2563eb 62%, #7c3aed 100%);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
+      flex: 0 0 auto;
+    }
+    .homeBrandTitle {
+      font-size: 15px;
       font-weight: 700;
-      color: #333;
+      color: #1f2933;
+    }
+    .homeBrandSub {
+      margin-top: 2px;
+      font-size: 11px;
+      color: #65717d;
+      line-height: 1.25;
+    }
+    .homeNavGroup { margin-top: 14px; }
+    .homeNavLabel {
+      margin: 0 8px 7px;
+      color: #697480;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+    .homeNavItem {
+      min-height: 32px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 0 9px;
+      border-radius: 6px;
+      color: #47515c;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .homeNavItem.active {
+      background: #ffffff;
+      border: 1px solid #d7dde4;
+      color: #1f2933;
+      box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+    }
+    .homeNavDot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #2563eb;
+      flex: 0 0 auto;
+    }
+    .homeNavDot.data { background: #2563eb; }
+    .homeNavDot.automation { background: #15803d; }
+    .homeNavDot.general { background: #475569; }
+    .homeMain {
+      min-width: 0;
+      padding: 18px;
+      overflow: auto;
+    }
+    .homeHeader {
+      margin-bottom: 16px;
+    }
+    .homeTitle {
+      margin: 0;
+      color: #202327;
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .homeSubtitle {
+      margin-top: 4px;
+      color: #626b75;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .homeGroup { margin-top: 16px; }
+    .homeGroup:first-of-type { margin-top: 0; }
+    .groupTitle {
+      font-size: 11px;
+      font-weight: 700;
+      color: #515b66;
+      letter-spacing: 0;
+      text-transform: uppercase;
       margin-bottom: 8px;
     }
-    .cards { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(238px, 340px));
+      gap: 10px;
+      justify-content: start;
+      margin-top: 12px;
+    }
     .homeGroup .cards { margin-top: 0; }
     .card {
-      width: 260px;
-      border:1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px;
-      background:#fff;
+      min-height: 94px;
+      max-width: 340px;
+      border: 1px solid #d8dde3;
+      border-radius: 7px;
+      padding: 13px;
+      background: #fff;
+      display: grid;
+      grid-template-columns: 46px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      box-shadow: 0 1px 2px rgba(15,23,42,0.04);
     }
 
     .card.clickable {
       cursor: pointer;
-      transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+      transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease, background-color 120ms ease;
     }
 
     .card.clickable:hover {
-      border-color: #bbb;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+      border-color: #b8c2cc;
+      background: #fbfcfd;
+      box-shadow: 0 8px 20px rgba(15,23,42,0.08);
       transform: translateY(-1px);
     }
 
@@ -640,8 +755,66 @@
       box-shadow: 0 3px 10px rgba(0,0,0,0.06);
     }
 
-    .card h3 { margin: 0 0 8px 0; font-size: 16px; }
-    .muted { color: var(--muted); font-size: 12px; }
+    .homeIconBox {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      color: #475569;
+    }
+    .homeIcon {
+      width: 34px;
+      height: 34px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .homeIconBox.dataset { color: #2563eb; }
+    .homeIconBox.dfm { color: #0f766e; }
+    .homeIconBox.workflow { color: #15803d; }
+    .homeIconBox.scripting { color: #b45309; }
+    .homeIconBox.project { color: #475569; }
+    .homeIconBox.history { color: #be123c; }
+    .card h3 {
+      margin: 1px 0 6px 0;
+      color: #202327;
+      font-size: 14px;
+      line-height: 1.2;
+    }
+    .muted {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    @media (max-width: 760px) {
+      .homeLayout {
+        grid-template-columns: 1fr;
+      }
+      .homeSidebar {
+        border-right: 0;
+        border-bottom: 1px solid #d8dde3;
+        padding: 12px;
+      }
+      .homeNavGroup {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+      .homeNavLabel {
+        width: 100%;
+        margin-bottom: 2px;
+      }
+      .homeNavItem {
+        border: 1px solid #d7dde4;
+        background: #fff;
+      }
+      .homeMain {
+        padding: 14px;
+      }
+    }
     iframe { width:100%; height:100%; border:0; display:block; }
     select { padding: 6px 10px; }
 
@@ -1160,6 +1333,7 @@
     <div class="menuItem" data-action="root-path-settings"><span>Server Connection</span></div>
     <div class="menuItem" data-action="force-rebuild-settings"><span>Force Rebuild...</span></div>
     <div class="menuSep"></div>
+    <div class="menuItem" data-action="refresh-page"><span>Refresh Page</span><span class="menuShortcut">Ctrl+F5</span></div>
     <div class="menuItem" data-action="clear-cache-reload"><span>Clear Cache & Reload</span></div>
   </div>
 
