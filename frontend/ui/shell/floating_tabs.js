@@ -8,6 +8,10 @@ export const FLOAT_VERTICAL_RETURN_THRESHOLD_PX = 15;
 export const FLOAT_HORIZONTAL_OFFSCREEN_RATIO = 0.8;
 export const FLOAT_SNAP_EDGE_THRESHOLD_PX = 18;
 export const FLOAT_RESTORE_DRAG_THRESHOLD_PX = 8;
+export const FLOAT_DEFAULT_ASPECT_W = 16;
+export const FLOAT_DEFAULT_ASPECT_H = 10;
+export const FLOAT_DOCK_TARGET_EXIT_PAD_PX = 8;
+export const FLOAT_DOCK_TARGET_TRIGGER_OFFSET_PX = Math.round(FLOAT_TITLEBAR_H / 2);
 
 export function isFloatingTab(tab) {
   return !!tab && tab.layout === "floating" && tab.id !== "home";
@@ -42,6 +46,9 @@ export function createFloatingTabsController(deps) {
 
   let floatPreviewEl = null;
   let snapPreviewEl = null;
+  let dockPlaceholderEl = null;
+  let dockPreviewBeforeId = null;
+  let lastUserFloatSize = null;
   const dockingTabIds = new Set();
 
   function getContentRect() {
@@ -66,11 +73,42 @@ export function createFloatingTabsController(deps) {
 
   function defaultFloatRectFromPointer(clientX, clientY) {
     const hostRect = getContentRect();
-    const width = Math.max(FLOAT_MIN_W, Math.round((hostRect.width || window.innerWidth) * FLOAT_DEFAULT_RATIO));
-    const height = Math.max(FLOAT_MIN_H, Math.round((hostRect.height || window.innerHeight) * FLOAT_DEFAULT_RATIO));
+    const hostW = Math.max(FLOAT_MIN_W, hostRect.width || window.innerWidth || FLOAT_MIN_W);
+    const hostH = Math.max(FLOAT_MIN_H, hostRect.height || window.innerHeight || FLOAT_MIN_H);
+    const maxW = Math.max(FLOAT_MIN_W, Math.round(hostW * FLOAT_DEFAULT_RATIO));
+    const maxH = Math.max(FLOAT_MIN_H, Math.round(hostH * FLOAT_DEFAULT_RATIO));
+    let width;
+    let height;
+    if (lastUserFloatSize) {
+      width = Math.max(FLOAT_MIN_W, Math.min(Number(lastUserFloatSize.width) || maxW, hostW));
+      height = Math.max(FLOAT_MIN_H, Math.min(Number(lastUserFloatSize.height) || maxH, hostH));
+    } else {
+      width = maxW;
+      height = Math.round(width * FLOAT_DEFAULT_ASPECT_H / FLOAT_DEFAULT_ASPECT_W);
+      if (height > maxH) {
+        height = maxH;
+        width = Math.round(height * FLOAT_DEFAULT_ASPECT_W / FLOAT_DEFAULT_ASPECT_H);
+      }
+      width = Math.max(FLOAT_MIN_W, width);
+      height = Math.max(FLOAT_MIN_H, Math.round(width * FLOAT_DEFAULT_ASPECT_H / FLOAT_DEFAULT_ASPECT_W));
+      if (height > hostH) {
+        height = Math.max(FLOAT_MIN_H, hostH);
+        width = Math.max(FLOAT_MIN_W, Math.round(height * FLOAT_DEFAULT_ASPECT_W / FLOAT_DEFAULT_ASPECT_H));
+      }
+    }
     const x = (clientX - hostRect.left) - width / 2;
     const y = (clientY - hostRect.top) - 18;
     return clampFloatRect({ x, y, width, height });
+  }
+
+  function rememberUserFloatSize(rect) {
+    const normalized = normalizeFloatRect(rect);
+    if (!normalized) return;
+    const clamped = clampFloatRect({ x: 0, y: 0, width: normalized.width, height: normalized.height });
+    lastUserFloatSize = {
+      width: clamped.width,
+      height: clamped.height,
+    };
   }
 
   function ensureFloatPreview() {
@@ -170,6 +208,85 @@ export function createFloatingTabsController(deps) {
       if (snapPreviewEl.parentNode) snapPreviewEl.parentNode.removeChild(snapPreviewEl);
     }
     snapPreviewEl = null;
+  }
+
+  function getDockTargetElement() {
+    return document.getElementById("tabs");
+  }
+
+  function isDockTargetPointer(clientX, clientY) {
+    const target = getDockTargetElement();
+    if (!target) return false;
+    const stripRect = target.closest(".topbar")?.getBoundingClientRect?.() || target.getBoundingClientRect();
+    return (
+      clientX >= stripRect.left &&
+      clientX <= stripRect.right &&
+      clientY <= stripRect.top + FLOAT_DOCK_TARGET_TRIGGER_OFFSET_PX &&
+      clientY >= stripRect.top - Math.max(stripRect.height, FLOAT_TITLEBAR_H) - FLOAT_DOCK_TARGET_EXIT_PAD_PX
+    );
+  }
+
+  function setDockTargetActive(active) {
+    getDockTargetElement()?.classList.toggle("floatingDockTarget", !!active);
+  }
+
+  function removeDockOrderPreview() {
+    if (dockPlaceholderEl?.parentNode) dockPlaceholderEl.parentNode.removeChild(dockPlaceholderEl);
+    dockPlaceholderEl = null;
+    dockPreviewBeforeId = null;
+  }
+
+  function ensureDockOrderPreview(tab) {
+    if (dockPlaceholderEl?.isConnected) return dockPlaceholderEl;
+    const el = document.createElement("div");
+    el.className = "tab placeholder floatingDockPlaceholder";
+    el.textContent = tab?.title || "Tab";
+    dockPlaceholderEl = el;
+    return el;
+  }
+
+  function updateDockOrderPreview(tab, clientX) {
+    const host = getDockTargetElement();
+    if (!host || !tab) return null;
+    const placeholder = ensureDockOrderPreview(tab);
+    const dockedTabEls = [...host.querySelectorAll('.tab[data-tab-id]')]
+      .filter((el) => {
+        const id = el.getAttribute("data-tab-id");
+        return id && id !== "home" && id !== tab.id;
+      });
+    let beforeNode = null;
+    for (const node of dockedTabEls) {
+      const rect = node.getBoundingClientRect();
+      if (clientX < rect.left + rect.width / 2) {
+        beforeNode = node;
+        break;
+      }
+    }
+    if (beforeNode) host.insertBefore(placeholder, beforeNode);
+    else {
+      const plus = host.querySelector("#plusTabBtn");
+      if (plus) host.insertBefore(placeholder, plus);
+      else host.appendChild(placeholder);
+    }
+    dockPreviewBeforeId = beforeNode?.getAttribute("data-tab-id") || null;
+    return dockPreviewBeforeId;
+  }
+
+  function applyDockOrderPreview(tabId) {
+    const state = getState();
+    const index = state.tabs.findIndex(t => t.id === tabId);
+    if (index < 0) return;
+    const [tab] = state.tabs.splice(index, 1);
+    const beforeIndex = dockPreviewBeforeId ? state.tabs.findIndex(t => t.id === dockPreviewBeforeId) : -1;
+    if (beforeIndex >= 0) {
+      state.tabs.splice(beforeIndex, 0, tab);
+      return;
+    }
+    let insertIndex = state.tabs.length;
+    for (let i = 0; i < state.tabs.length; i++) {
+      if (!isFloatingTab(state.tabs[i])) insertIndex = i + 1;
+    }
+    state.tabs.splice(insertIndex, 0, tab);
   }
 
   function runFloatIntroAnimation(tab, frame) {
@@ -272,6 +389,7 @@ export function createFloatingTabsController(deps) {
     let startRect = clampFloatRect(tab.floatRect || defaultFloatRectFromPointer(e.clientX, e.clientY));
     let didRestorePreSnapRect = false;
     let snapSide = null;
+    let dockTargetActive = false;
     beginFloatingPointerInteraction(pointerTarget, pointerId);
 
     const onMove = (ev) => {
@@ -280,7 +398,8 @@ export function createFloatingTabsController(deps) {
         startRect = restorePreSnapRectForDrag(tab, startRect, ev.clientX, ev.clientY);
         didRestorePreSnapRect = true;
       }
-      snapSide = getHorizontalSnapSide(ev.clientX);
+      dockTargetActive = isDockTargetPointer(ev.clientX, ev.clientY);
+      snapSide = dockTargetActive ? null : getHorizontalSnapSide(ev.clientX);
       const next = clampFloatRect({
         ...startRect,
         x: startRect.x + (ev.clientX - startX),
@@ -288,8 +407,16 @@ export function createFloatingTabsController(deps) {
       });
       tab.floatRect = next;
       applyFloatingFrameRect(tab, next);
-      if (snapSide) updateSnapPreview(snapSide);
-      else removeSnapPreview();
+      setDockTargetActive(dockTargetActive);
+      if (dockTargetActive) {
+        removeSnapPreview();
+        updateDockOrderPreview(tab, ev.clientX);
+      }
+      else if (snapSide) updateSnapPreview(snapSide);
+      else {
+        removeSnapPreview();
+        removeDockOrderPreview();
+      }
     };
 
     const finish = (ev) => {
@@ -297,6 +424,15 @@ export function createFloatingTabsController(deps) {
       document.removeEventListener("pointerup", finish, true);
       document.removeEventListener("pointercancel", finish, true);
       endFloatingPointerInteraction(pointerTarget, pointerId);
+      setDockTargetActive(false);
+      if (dockTargetActive && ev?.type !== "pointercancel") {
+        removeSnapPreview();
+        applyDockOrderPreview(tabId);
+        removeDockOrderPreview();
+        animateDockTab(tabId);
+        return;
+      }
+      removeDockOrderPreview();
       if (snapSide && ev?.type !== "pointercancel") {
         tab.floatRestoreRect = normalizeFloatRect(tab.floatRestoreRect) || startRect;
         tab.floatRect = getHorizontalSnapRect(snapSide);
@@ -354,12 +490,13 @@ export function createFloatingTabsController(deps) {
       applyFloatingFrameRect(tab, next);
     };
 
-    const finish = () => {
+    const finish = (ev) => {
       document.removeEventListener("pointermove", onMove, true);
       document.removeEventListener("pointerup", finish, true);
       document.removeEventListener("pointercancel", finish, true);
       endFloatingPointerInteraction(pointerTarget, pointerId);
       tab.floatRect = clampFloatRect(tab.floatRect || startRect);
+      if (ev?.type !== "pointercancel") rememberUserFloatSize(tab.floatRect);
       saveState();
     };
 

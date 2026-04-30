@@ -1,4 +1,4 @@
-import { $, shell } from "./shell_context.js?v=20260430k";
+import { $, shell } from "./shell_context.js?v=20260430r";
 
 let titlebarControlsWired = false;
 let resizeHandleWired = false;

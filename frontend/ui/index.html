@@ -473,6 +473,10 @@
     .topbar { display:flex; align-items:center; gap: var(--gap); border-top:none; border-bottom:none; padding-top:0px; padding-bottom:0px; }
     .brand { font-weight:700; }
     .tabs { display:flex; gap:0; flex-wrap:wrap; position: relative; align-items: flex-end; }
+    .tabs.floatingDockTarget {
+      box-shadow: inset 0 -2px 0 #2b6df6, inset 0 0 0 1px rgba(43,109,246,0.28);
+      background: rgba(43,109,246,0.08);
+    }
 
     .tab {
       display: flex;
@@ -571,6 +575,13 @@
       background: rgba(0,0,0,0.04);
       border: 1px dashed #bbb;
       box-shadow: none;
+    }
+    .tab.floatingDockPlaceholder {
+      border-color: #2b6df6;
+      background: rgba(43,109,246,0.10);
+      color: #1f4fbf;
+      min-width: 120px;
+      opacity: 0.9;
     }
 
     .tab {
@@ -1770,7 +1781,7 @@
       }
     })();
   </script>
-  <script type="module" src="/ui/shell/ui_shell.js?v=20260430k"></script>
+  <script type="module" src="/ui/shell/ui_shell.js?v=20260430r"></script>
 </body>
 </html>
 

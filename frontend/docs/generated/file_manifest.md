@@ -92,7 +92,7 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `changes/unreleased/2026-04-28-workspace-paths-config.json` | 703 |
 | `changes/unreleased/2026-04-29-arcrho-runtime-rename.json` | 450 |
 | `changes/unreleased/2026-04-29-dfm-method-filenames.json` | 503 |
-| `changes/unreleased/2026-04-29-floating-tab-drag-preview-threshold.json` | 1141 |
+| `changes/unreleased/2026-04-29-floating-tab-drag-preview-threshold.json` | 1684 |
 | `changes/unreleased/2026-04-29-home-sidebar-grid.json` | 373 |
 | `changes/unreleased/2026-04-29-main-tab-floating-windows.json` | 1315 |
 | `changes/unreleased/2026-04-29-shell-module-split.json` | 398 |
@@ -124,7 +124,7 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `docs/frontend/dfm.md` | 17115 |
 | `docs/frontend/project_settings.md` | 11933 |
 | `docs/frontend/scripting_console.md` | 3867 |
-| `docs/frontend/shell.md` | 10583 |
+| `docs/frontend/shell.md` | 11115 |
 | `docs/frontend/workflow.md` | 3145 |
 | `docs/landing - cn.html` | 194369 |
 | `docs/landing.html` | 194621 |
@@ -189,7 +189,7 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `ui/dfm/dfm_storage.js` | 6085 |
 | `ui/dfm/dfm_sync.js` | 3204 |
 | `ui/dfm/dfm_tabs_orchestrator.js` | 8536 |
-| `ui/index.html` | 51816 |
+| `ui/index.html` | 52317 |
 | `ui/libs/monaco-editor/min/vs/base/browser/ui/codicons/codicon/codicon.ttf` | 80340 |
 | `ui/libs/monaco-editor/min/vs/base/worker/workerMain.js` | 376545 |
 | `ui/libs/monaco-editor/min/vs/basic-languages/abap/abap.js` | 14996 |
@@ -322,20 +322,20 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `ui/shell/browsing_history.html` | 2693 |
 | `ui/shell/browsing_history.js` | 4115 |
 | `ui/shell/browsing_history_main.js` | 3278 |
-| `ui/shell/floating_tabs.js` | 20893 |
+| `ui/shell/floating_tabs.js` | 26368 |
 | `ui/shell/home_view.js` | 5500 |
 | `ui/shell/iframe_host.js` | 5573 |
 | `ui/shell/root_path_settings.js` | 4815 |
 | `ui/shell/shell_content.js` | 6421 |
-| `ui/shell/shell_context.js` | 255 |
+| `ui/shell/shell_context.js` | 252 |
 | `ui/shell/shell_hotkeys.js` | 5607 |
 | `ui/shell/shell_menus.js` | 16162 |
 | `ui/shell/shell_messages.js` | 7779 |
 | `ui/shell/shell_preferences.js` | 12274 |
 | `ui/shell/shell_state.js` | 4786 |
 | `ui/shell/status_bar.js` | 2106 |
-| `ui/shell/tab_actions.js` | 6647 |
-| `ui/shell/tab_strip.js` | 18892 |
+| `ui/shell/tab_actions.js` | 6657 |
+| `ui/shell/tab_strip.js` | 19598 |
 | `ui/shell/titlebar_controls.js` | 3857 |
 | `ui/shell/ui_shell.js` | 5863 |
 | `ui/shell/workflow_host_actions.js` | 7212 |

@@ -1,4 +1,4 @@
-import { $, shell } from "./shell_context.js?v=20260430k";
+import { $, shell } from "./shell_context.js?v=20260430r";
 
 let rootPathModalWired = false;
 const DEFAULT_ROOT_PATH = "E:\\ArcRho Server";

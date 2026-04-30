@@ -1,5 +1,5 @@
-import { $, shell } from "./shell_context.js?v=20260430k";
-import { FLOAT_VERTICAL_RETURN_THRESHOLD_PX, FLOAT_VERTICAL_THRESHOLD_PX, isFloatingTab } from "./floating_tabs.js?v=20260430k";
+import { $, shell } from "./shell_context.js?v=20260430r";
+import { FLOAT_VERTICAL_RETURN_THRESHOLD_PX, FLOAT_VERTICAL_THRESHOLD_PX, isFloatingTab } from "./floating_tabs.js?v=20260430r";
 
 let draggedTabId = null;
 let dragEl = null;
@@ -9,6 +9,7 @@ let tabsHostPrevStyle = null;
 let dragElPrevStyle = null;
 let dragElBaseLeft = 0;
 let dragElBaseTop = 0;
+let dragElPrevVisibility = null;
 let ptrActive = false;
 let ptrId = null;
 let ptrStartX = 0;
@@ -110,8 +111,12 @@ function cleanupDragUI() {
     dragEl.style.zIndex = dragElPrevStyle.zIndex;
     dragEl.style.pointerEvents = dragElPrevStyle.pointerEvents;
     dragEl.style.transform = dragElPrevStyle.transform;
+    dragEl.style.visibility = dragElPrevStyle.visibility;
+  } else if (dragEl && dragElPrevVisibility != null) {
+    dragEl.style.visibility = dragElPrevVisibility;
   }
   dragElPrevStyle = null;
+  dragElPrevVisibility = null;
   dragElBaseLeft = 0;
   dragElBaseTop = 0;
   dragEl = null;
@@ -166,7 +171,9 @@ function startDragIfNeeded(host, el, pointerId) {
     zIndex: el.style.zIndex,
     pointerEvents: el.style.pointerEvents,
     transform: el.style.transform,
+    visibility: el.style.visibility,
   };
+  dragElPrevVisibility = el.style.visibility;
   dragElBaseLeft = (r.left - hostRect.left) + host.scrollLeft;
   dragElBaseTop = (r.top - hostRect.top);
   el.style.width = `${Math.ceil(r.width)}px`;
@@ -181,6 +188,12 @@ function startDragIfNeeded(host, el, pointerId) {
   try { el.setPointerCapture(pointerId); } catch {}
 }
 
+function setDraggedTabHidden(hidden) {
+  if (!dragEl) return;
+  if (dragElPrevVisibility == null) dragElPrevVisibility = dragEl.style.visibility;
+  dragEl.style.visibility = hidden ? "hidden" : dragElPrevVisibility;
+}
+
 function enterFloatDragMode(clientX, clientY) {
   if (tabDragMode === "float") return;
   tabDragMode = "float";
@@ -188,6 +201,7 @@ function enterFloatDragMode(clientX, clientY) {
   isDragging = true;
   hideIndicator();
   removePlaceholder();
+  setDraggedTabHidden(true);
   try { document.body.style.cursor = "grabbing"; } catch {}
   shell.updateFloatPreview?.(clientX, clientY);
 }
@@ -198,6 +212,7 @@ function enterReorderDragMode(host, pointerId) {
     tabDragMode = "reorder";
     ptrMoved = true;
     shell.removeFloatPreview?.();
+    setDraggedTabHidden(false);
     startDragIfNeeded(host, dragEl, pointerId);
     lockTabsOverflowDuringDrag();
   }

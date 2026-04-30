@@ -1,4 +1,4 @@
-import { shell } from "./shell_context.js?v=20260430k";
+import { shell } from "./shell_context.js?v=20260430r";
 
 const fileMenuBtn = document.querySelector('.menu[data-menu="file"]');
 const fileMenuDropdown = document.getElementById("fileMenuDropdown");

@@ -1,4 +1,4 @@
-﻿export const shell = {};
+export const shell = {};
 
 export function registerShellApi(api = {}) {
   Object.assign(shell, api);

@@ -1,4 +1,4 @@
-import { $, shell } from "./shell_context.js?v=20260430k";
+import { $, shell } from "./shell_context.js?v=20260430r";
 
 const ZOOM_STORAGE_KEY = "arcrho_ui_zoom_pct";
 const AUTOSAVE_KEY = "arcrho_autosave_enabled";

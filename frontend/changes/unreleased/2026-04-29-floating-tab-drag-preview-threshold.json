@@ -10,6 +10,10 @@
     "Floating windows can be moved partially beyond the left or right app-shell edge while keeping a reachable portion inside the app.",
     "Floating and docking now use a short scale/fade animation while preserving the existing iframe session.",
     "Dragging a floating window to the left or right shell edge now shows a half-frame snap preview and releasing there snaps the window into that half.",
-    "After a half-frame snap, dragging the snapped title bar beyond a small threshold restores the previous floating size before moving."
+    "After a half-frame snap, dragging the snapped title bar beyond a small threshold restores the previous floating size before moving.",
+    "New floating windows created by tab pop-out use a 16:10 default size.",
+    "After the user manually resizes any floating window, new floating windows in the same app session reuse that last adjusted size.",
+    "The dragged tab now disappears from the tab strip while pop-out preview mode is active, avoiding clipped tab remnants during the drag.",
+    "Dragging a floating window title bar near the top tab strip now highlights a dock target, shows a tab-order placeholder, and releasing there docks it back into the previewed order."
   ]
 }
