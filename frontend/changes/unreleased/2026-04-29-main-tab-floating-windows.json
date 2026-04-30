@@ -1,0 +1,16 @@
+{
+  "type": "feature",
+  "scope": "shell",
+  "audience": "user",
+  "summary": "Added in-shell floating windows for main tabs dragged down from the tab strip.",
+  "details": [
+    "Floating tabs keep their live iframe session, are removed from the main tab strip while floated, and can be moved, resized, minimized, closed, or docked back with the title-bar square/max icon or a title-bar double-click.",
+    "Floating window drag and resize now keep pointer control when the cursor crosses iframe content.",
+    "Floating and docking now preserve iframe DOM ownership so pages do not refresh or lose in-progress input values during layout changes.",
+    "Floating windows use rounded corners on Windows 11 to match the main app frame styling.",
+    "Overlapped floating windows now layer iframe bodies with their shell chrome so background windows do not show through foreground window content.",
+    "Clicking inside a floating or docked iframe page activates that tab, so overlapped background windows can be brought forward from their visible content.",
+    "The first click inside an inactive iframe only activates the tab/window and is suppressed before page controls receive it.",
+    "The iframe host now passes through empty areas so Home remains interactive behind floating windows."
+  ]
+}

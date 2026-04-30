@@ -604,6 +604,169 @@
       overflow:hidden; 
       background: #fff;
       margin-top: -1px;
+      position: relative;
+    }
+    #floatingHost {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: auto;
+    }
+    #floatingTabPreview {
+      position: absolute;
+      border: 2px solid #2b6df6;
+      background: rgba(43,109,246,0.08);
+      box-shadow: 0 16px 34px rgba(15,23,42,0.16);
+      pointer-events: none;
+      z-index: 40;
+    }
+    .floatingTabWindow {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      min-width: 360px;
+      min-height: 240px;
+      background: transparent;
+      border: 1px solid #b8c0ca;
+      box-sizing: border-box;
+      box-shadow: 0 18px 42px rgba(15,23,42,0.22);
+      pointer-events: none;
+      overflow: visible;
+    }
+    .floatingTabWindow.active {
+      border-color: #2b6df6;
+      box-shadow: 0 20px 46px rgba(15,23,42,0.26), inset 0 2px 0 #2b6df6;
+    }
+    .floatingTabWindow.minimized {
+      min-height: 33px;
+    }
+    body.win11-frame .floatingTabWindow {
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .floatingTabTitlebar {
+      height: 31px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 7px 0 10px;
+      background: #edf1f5;
+      border-bottom: 1px solid #c9d1dc;
+      box-sizing: border-box;
+      cursor: move;
+      user-select: none;
+      flex: 0 0 auto;
+      pointer-events: auto;
+    }
+    body.win11-frame .floatingTabTitlebar {
+      border-top-left-radius: 8px;
+      border-top-right-radius: 8px;
+    }
+    .floatingTabWindow.active .floatingTabTitlebar {
+      background: #e9f0ff;
+    }
+    .floatingTabTitle {
+      min-width: 0;
+      flex: 1 1 auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #202327;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .floatingTabDirty {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #555;
+      display: none;
+      flex: 0 0 auto;
+    }
+    .floatingTabDirty.show { display: block; }
+    .floatingTabControls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 0 0 auto;
+    }
+    .floatingTabWindow .floatingTabButton.titlebarBtn {
+      width: 28px;
+      height: 20px;
+      min-width: 0;
+      padding: 0;
+      background: #fff;
+      border-color: #c6ced8;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .floatingTabWindow .floatingTabButton.titlebarBtn:hover {
+      background: #dbeafe;
+      border-color: #93c5fd;
+    }
+    .floatingTabWindow .floatingTabButton.titlebarBtn[data-action="close"]:hover {
+      background: #fee2e2;
+      border-color: #fca5a5;
+    }
+    .floatingTabBody {
+      flex: 1 1 auto;
+      min-height: 0;
+      background: transparent;
+      pointer-events: none;
+    }
+    .floatingTabWindow.minimized .floatingTabBody,
+    .floatingTabWindow.minimized .floatingTabResizeHandle {
+      display: none;
+    }
+    body.floatingTabDragActive iframe {
+      pointer-events: none !important;
+    }
+    body.win11-frame iframe.floatingTabIframe {
+      border-bottom-left-radius: 8px;
+      border-bottom-right-radius: 8px;
+    }
+    iframe.floatingTabIframe {
+      background: #fff;
+      box-shadow: 0 18px 42px rgba(15,23,42,0.22);
+    }
+    .floatingTabResizeHandle {
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      pointer-events: auto;
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-end;
+      padding: 0 4px 4px 0;
+      box-sizing: border-box;
+      background: transparent;
+    }
+    .floatingTabResizeNw {
+      left: 0;
+      top: 0;
+      cursor: nwse-resize;
+    }
+    .floatingTabResizeNe {
+      right: 0;
+      top: 0;
+      cursor: nesw-resize;
+    }
+    .floatingTabResizeSw {
+      left: 0;
+      bottom: 0;
+      cursor: nesw-resize;
+    }
+    .floatingTabResizeSe {
+      right: 0;
+      bottom: 0;
+      cursor: nwse-resize;
+    }
+    .floatingTabResizeHandle .resizeIcon {
+      width: 16px;
+      height: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .home {
       height: 100%;
@@ -1059,7 +1222,8 @@
     }
 
     /* === Option A: Dot grid (6 dots in triangle) === */
-    #resizeHandle .resizeIcon::after {
+    #resizeHandle .resizeIcon::after,
+    .floatingTabResizeHandle .resizeIcon::after {
       content: "";
       width: 10px;
       height: 10px;
@@ -1491,15 +1655,16 @@
   <div id="globalTooltip"></div>
 
   <script>
-    // Apply Win10 borders unless running on Windows 11
+    // Apply app-frame styling from the host Windows version check.
     (async () => {
       if (window.ADAHost?.isWindows11) {
         const isWin11 = await window.ADAHost.isWindows11();
-        if (!isWin11) document.body.classList.add('win10-borders');
+        document.body.classList.toggle('win11-frame', !!isWin11);
+        document.body.classList.toggle('win10-borders', !isWin11);
       }
     })();
   </script>
-  <script type="module" src="/ui/shell/ui_shell.js?v=20260302"></script>
+  <script type="module" src="/ui/shell/ui_shell.js?v=20260430d"></script>
 </body>
 </html>
 

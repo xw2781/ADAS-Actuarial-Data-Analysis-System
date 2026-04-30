@@ -1,0 +1,10 @@
+{
+  "type": "refactor",
+  "scope": "shell",
+  "audience": "developer",
+  "summary": "Split the shell entrypoint into focused shell modules.",
+  "details": [
+    "Reduced ui_shell.js to bootstrap and controller composition.",
+    "Moved shell state, tab actions, tab strip rendering, content hosting, menus, hotkeys, preferences, lifecycle, and host controls into separate modules."
+  ]
+}

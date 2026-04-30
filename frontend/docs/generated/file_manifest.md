@@ -11,12 +11,12 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `.claude` | 1 |
 | `app_server` | 47 |
 | `build` | 7 |
-| `changes` | 12 |
-| `docs` | 36 |
+| `changes` | 14 |
+| `docs` | 37 |
 | `electron` | 2 |
 | `icons` | 17 |
 | `tools` | 2 |
-| `ui` | 167 |
+| `ui` | 184 |
 
 ## Full File List
 | Path | Size (bytes) |
@@ -91,7 +91,9 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `changes/unreleased/2026-04-28-remove-detached-tab-windows.json` | 301 |
 | `changes/unreleased/2026-04-28-workspace-paths-config.json` | 703 |
 | `changes/unreleased/2026-04-29-arcrho-runtime-rename.json` | 450 |
-| `changes/unreleased/2026-04-29-home-sidebar-grid.json` | 363 |
+| `changes/unreleased/2026-04-29-home-sidebar-grid.json` | 373 |
+| `changes/unreleased/2026-04-29-main-tab-floating-windows.json` | 1299 |
+| `changes/unreleased/2026-04-29-shell-module-split.json` | 388 |
 | `changes/unreleased/_template.json` | 193 |
 | `docs/CONVENTIONS.md` | 1515 |
 | `docs/GENERATED_README.md` | 400 |
@@ -120,11 +122,12 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `docs/frontend/dfm.md` | 16885 |
 | `docs/frontend/project_settings.md` | 11933 |
 | `docs/frontend/scripting_console.md` | 3867 |
-| `docs/frontend/shell.md` | 5322 |
+| `docs/frontend/shell.md` | 9603 |
 | `docs/frontend/workflow.md` | 3145 |
 | `docs/landing - cn.html` | 194369 |
 | `docs/landing.html` | 194621 |
-| `docs/plans/arcrho_api_module_plan.md` | 8209 |
+| `docs/plans/arcrho_api_module_plan.md` | 8213 |
+| `docs/plans/main_tab_floating_window_plan.md` | 16865 |
 | `docs/releases/0.2.1.md` | 2088 |
 | `docs/releases/INDEX.md` | 149 |
 | `docs/runtime/config_paths.md` | 3392 |
@@ -153,7 +156,7 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `package.json` | 1903 |
 | `start_electron.bat` | 739 |
 | `tools/agent_commit_push.ps1` | 215 |
-| `tools/docs_index_builder.py` | 74702 |
+| `tools/docs_index_builder.py` | 76252 |
 | `ui/dataset/dataset_chart.js` | 24027 |
 | `ui/dataset/dataset_dependency_guard.js` | 13647 |
 | `ui/dataset/dataset_grid_interactions.js` | 17782 |
@@ -180,12 +183,12 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `ui/dfm/dfm_ratios_summary_table.js` | 91918 |
 | `ui/dfm/dfm_ratios_tab.js` | 25409 |
 | `ui/dfm/dfm_results_tab.js` | 31539 |
-| `ui/dfm/dfm_state.js` | 20838 |
+| `ui/dfm/dfm_state.js` | 20848 |
 | `ui/dfm/dfm_storage.js` | 6085 |
 | `ui/dfm/dfm_sync.js` | 3204 |
 | `ui/dfm/dfm_tabs_orchestrator.js` | 8536 |
-| `ui/home_style_previews.html` | 14574 |
-| `ui/index.html` | 44422 |
+| `ui/home_style_previews.html` | 15003 |
+| `ui/index.html` | 48861 |
 | `ui/libs/monaco-editor/min/vs/base/browser/ui/codicons/codicon/codicon.ttf` | 80340 |
 | `ui/libs/monaco-editor/min/vs/base/worker/workerMain.js` | 376545 |
 | `ui/libs/monaco-editor/min/vs/basic-languages/abap/abap.js` | 14996 |
@@ -314,10 +317,27 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `ui/shared/state.js` | 360 |
 | `ui/shared/tabbed_page.js` | 4776 |
 | `ui/shared/valid_value_list_provider.js` | 12105 |
+| `ui/shell/app_lifecycle.js` | 6215 |
 | `ui/shell/browsing_history.html` | 2693 |
 | `ui/shell/browsing_history.js` | 4115 |
 | `ui/shell/browsing_history_main.js` | 3278 |
-| `ui/shell/ui_shell.js` | 115590 |
+| `ui/shell/floating_tabs.js` | 14978 |
+| `ui/shell/home_view.js` | 5435 |
+| `ui/shell/iframe_host.js` | 5419 |
+| `ui/shell/root_path_settings.js` | 4679 |
+| `ui/shell/shell_content.js` | 6255 |
+| `ui/shell/shell_context.js` | 244 |
+| `ui/shell/shell_hotkeys.js` | 5495 |
+| `ui/shell/shell_menus.js` | 15957 |
+| `ui/shell/shell_messages.js` | 7630 |
+| `ui/shell/shell_preferences.js` | 11888 |
+| `ui/shell/shell_state.js` | 4648 |
+| `ui/shell/status_bar.js` | 2043 |
+| `ui/shell/tab_actions.js` | 6399 |
+| `ui/shell/tab_strip.js` | 17248 |
+| `ui/shell/titlebar_controls.js` | 3761 |
+| `ui/shell/ui_shell.js` | 5720 |
+| `ui/shell/workflow_host_actions.js` | 6987 |
 | `ui/splash.html` | 7831 |
 | `ui/workflow/workflow.html` | 16655 |
 | `ui/workflow/workflow_main.js` | 66810 |

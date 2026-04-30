@@ -1,0 +1,153 @@
+﻿import { shell } from "./shell_context.js?v=20260430d";
+import { normalizeBrowsingHistoryEntry } from "/ui/shell/browsing_history.js";
+
+let shellMessagesWired = false;
+
+export function initShellMessages() {
+  if (shellMessagesWired) return;
+  shellMessagesWired = true;
+  window.addEventListener("message", (e) => {
+    const msg = e.data;
+    if (!msg) return;
+    if (msg.type === "arcrho:close-shell-menus") return shell.closeAllShellMenus?.();
+    if (msg.type === "arcrho:dfm-edit-state") return shell.setDfmEditEnabled?.(!!msg.enabled);
+    if (msg.type === "arcrho:project-settings-ribbon-changed") {
+      const ribbon = String(msg.ribbon || "").trim().toLowerCase();
+      let updated = false;
+      for (const tab of shell.state.tabs || []) {
+        if (tab.type !== "project_settings" || !tab.iframe) continue;
+        if (tab.iframe.contentWindow !== e.source) continue;
+        tab.projectSettingsRibbon = ribbon;
+        updated = true;
+        break;
+      }
+      if (!updated) {
+        const activeTab = shell.state.tabs.find((t) => t.id === shell.state.activeId && t.type === "project_settings");
+        if (activeTab) { activeTab.projectSettingsRibbon = ribbon; updated = true; }
+      }
+      if (updated) { shell.updateFileMenuState?.(); shell.saveState?.(); }
+      return;
+    }
+    if (msg.type === "arcrho:update-workflow-tab-title") {
+      const title = String(msg.title || "").trim();
+      const inst = String(msg.inst || "");
+      if (!title || !inst) return;
+      const tab = shell.state.tabs.find(t => t.type === "workflow" && t.wfInst === inst);
+      if (!tab) return;
+      tab.title = title;
+      shell.render?.();
+      shell.saveState?.();
+      return;
+    }
+    if (msg.type === "arcrho:workflow-saved") {
+      const path = String(msg.path || "").trim();
+      if (!path) return;
+      const inst = String(msg.inst || "");
+      if (inst) {
+        const tab = shell.state.tabs.find(t => t.type === "workflow" && t.wfInst === inst);
+        if (!tab) return;
+        tab.isDirty = false;
+        shell.renderTabs?.();
+      }
+      const label = msg.source === "auto" ? "Auto-saved" : "Saved";
+      shell.updateStatusBar?.(`${label}: ${path} (${shell.formatStatusTimestamp?.()})`);
+      shell.setLastWorkflowPath?.(path);
+      return;
+    }
+    if (msg.type === "arcrho:workflow-dirty") {
+      const inst = String(msg.inst || "");
+      if (!inst) return;
+      const tab = shell.state.tabs.find(t => t.type === "workflow" && t.wfInst === inst);
+      if (!tab) return;
+      const dirty = !!msg.dirty;
+      if (tab.isDirty === dirty) return;
+      tab.isDirty = dirty;
+      if (dirty) shell.clearSavedStatusOnDirty?.();
+      shell.renderTabs?.();
+      shell.saveState?.();
+      return;
+    }
+    if (msg.type === "arcrho:dfm-tab-changed") {
+      const inst = String(msg.inst || "");
+      const dfmTab = msg.tab;
+      if (!inst || !dfmTab) return;
+      const tab = shell.state.tabs.find(t => t.type === "dfm" && t.dsInst === inst);
+      if (tab && tab.dfmTab !== dfmTab) {
+        tab.dfmTab = dfmTab;
+        if (tab.id === shell.state.activeId) shell.updateFileMenuState?.();
+        shell.saveState?.();
+      }
+      return;
+    }
+    if (msg.type === "arcrho:dfm-dirty") {
+      const inst = String(msg.inst || "");
+      if (!inst) return;
+      const tab = shell.state.tabs.find(t => t.type === "dfm" && t.dsInst === inst);
+      if (!tab) return;
+      const dirty = !!msg.dirty;
+      if (tab.isDirty === dirty) return;
+      tab.isDirty = dirty;
+      if (dirty) shell.clearSavedStatusOnDirty?.();
+      shell.renderTabs?.();
+      shell.saveState?.();
+      return;
+    }
+    if (msg.type === "arcrho:zoom") return shell.adjustZoomByDelta?.(Number(msg.deltaY || 0));
+    if (msg.type === "arcrho:zoom-step") {
+      const delta = Number(msg.delta || 0);
+      if (Number.isFinite(delta) && delta) shell.setZoomPercent?.((shell.getZoomPercent?.() || 100) + delta * shell.ZOOM_STEP, true);
+      return;
+    }
+    if (msg.type === "arcrho:zoom-reset") return shell.setZoomPercent?.(100, true);
+    if (msg.type === "arcrho:open-path") {
+      const requestId = String(msg.requestId || "").trim();
+      const targetPath = String(msg.path || "").trim();
+      const source = e?.source;
+      const reply = (payload) => { if (requestId && source?.postMessage) { try { source.postMessage({ type: "arcrho:open-path-result", requestId, ...payload }, "*"); } catch {} } };
+      if (!requestId) return;
+      if (!targetPath) { reply({ ok: false, error: "Empty path." }); return; }
+      const hostApi = shell.getHostApi?.();
+      if (!hostApi || typeof hostApi.openPath !== "function") { reply({ ok: false, error: "Open path requires desktop app." }); return; }
+      Promise.resolve(hostApi.openPath({ path: targetPath })).then((result) => reply(result?.ok ? { ok: true } : { ok: false, error: String(result?.error || `Path not found: ${targetPath}`) })).catch((err) => reply({ ok: false, error: String(err?.message || err) }));
+      return;
+    }
+    if (msg.type === "arcrho:status") { const text = String(msg.text || "").trim(); if (text) shell.updateStatusBar?.(text, { tone: msg.tone || msg.level || "" }); return; }
+    if (msg.type === "arcrho:dataset-settings-changed") {
+      const active = shell.state.tabs.find(t => t.id === shell.state.activeId);
+      const resolved = normalizeBrowsingHistoryEntry(msg?.resolved || null);
+      if (active && active.type === "dataset" && resolved) { active.datasetInputs = resolved; shell.saveState?.(); }
+      shell.notifyBrowsingHistoryTabs?.({ resolved });
+      return;
+    }
+    if (msg.type === "arcrho:browsing-history-updated") {
+      const active = shell.state.tabs.find(t => t.id === shell.state.activeId);
+      const entry = normalizeBrowsingHistoryEntry(msg?.entry || null);
+      if (active && active.type === "dataset" && entry) { active.datasetInputs = entry; shell.saveState?.(); }
+      shell.notifyBrowsingHistoryTabs?.({ entry });
+      return;
+    }
+    if (msg.type === "arcrho:open-dataset-from-history") { const entry = normalizeBrowsingHistoryEntry(msg?.entry || null); if (entry) shell.openDatasetTab?.({ datasetInputs: entry }); return; }
+    if (msg.type === "arcrho:tooltip") {
+      if (msg.show) {
+        let x = Number(msg.x) || 0;
+        let y = Number(msg.y) || 0;
+        if (msg.coord === "client") { try { const iframe = shell.state.tabs.find(t => t.id === shell.state.activeId)?.iframe; if (iframe?.getBoundingClientRect) { const rect = iframe.getBoundingClientRect(); x += rect.left; y += rect.top; } } catch {} }
+        if (msg.coord === "screen") { try { x -= window.screenX || 0; y -= window.screenY || 0; } catch {} }
+        shell.showGlobalTooltip?.(msg.text || "", x, y);
+      } else shell.hideGlobalTooltip?.();
+      return;
+    }
+    if (msg.type === "arcrho:workflow-import") return shell.importWorkflow?.();
+    if (msg.type === "arcrho:close-active-tab") return shell.closeTab?.(shell.state.activeId);
+    if (msg.type === "arcrho:app-shutdown") return shell.shutdownApplication?.();
+    if (msg.type === "arcrho:hotkey") { const action = String(msg.action || ""); if (action) shell.runHotkeyAction?.(action); return; }
+    if (msg.type !== "arcrho:update-active-tab-title") return;
+    const title = String(msg.title || "").trim();
+    if (!title) return;
+    const tab = shell.state.tabs.find(t => t.id === shell.state.activeId);
+    if (!tab || tab.type === "home" || tab.type === "workflow" || tab.type === "project_settings" || tab.type === "browsing_history") return;
+    tab.title = title;
+    shell.render?.();
+    shell.saveState?.();
+  });
+}

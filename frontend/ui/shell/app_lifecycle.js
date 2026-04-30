@@ -1,0 +1,194 @@
+﻿import { $, shell } from "./shell_context.js?v=20260430d";
+
+let appShutdownRequested = false;
+let appConfirmPromise = null;
+
+function appendRefreshParam(rawUrl) {
+  try {
+    const url = new URL(rawUrl || window.location.href, window.location.href);
+    url.searchParams.set("_arcrho_refresh", String(Date.now()));
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    const sep = String(rawUrl || "").includes("?") ? "&" : "?";
+    return `${rawUrl || window.location.pathname}${sep}_arcrho_refresh=${Date.now()}`;
+  }
+}
+
+function reloadShellDocument() {
+  const next = appendRefreshParam(window.location.href);
+  window.__appRefreshing = true;
+  try {
+    window.location.replace(next);
+  } catch {
+    window.location.href = next;
+  }
+}
+
+export function refreshActiveTab() {
+  const t = shell.state?.tabs.find(x => x.id === shell.state.activeId);
+  if (!t) return;
+  if (t.type === "home") {
+    reloadShellDocument();
+    return;
+  }
+  if (t.iframe && t.iframe.tagName === "IFRAME") {
+    if (t.type === "workflow") {
+      try {
+        const inst = t.wfInst || t.id || "";
+        if (inst) sessionStorage.setItem(`arcrho_wf_autosave_on_load::${inst}`, "1");
+      } catch {}
+    }
+    try {
+      const src = t.iframe.getAttribute("src");
+      if (src) {
+        t.iframe.setAttribute("src", appendRefreshParam(src));
+        return;
+      }
+      t.iframe.contentWindow?.location?.reload();
+    } catch (_) {
+      const src = t.iframe.getAttribute("src");
+      if (src) t.iframe.setAttribute("src", appendRefreshParam(src));
+    }
+    return;
+  }
+  reloadShellDocument();
+}
+
+export function customHardRefresh() {
+  try { localStorage.removeItem("arcrho_ui_state"); } catch (_) {}
+  shell.render?.();
+  shell.saveState?.();
+}
+
+export async function clearCacheAndReload() {
+  const confirmed = await showAppConfirm({
+    title: "Warning",
+    message: "Clear cache and reload the app?",
+    okText: "Reload",
+    cancelText: "Cancel",
+  });
+  if (!confirmed) return;
+  const hostApi = shell.getHostApi?.();
+  if (hostApi?.clearCacheAndReload) {
+    try {
+      await hostApi.clearCacheAndReload();
+      return;
+    } catch {}
+  }
+  try {
+    if (window.caches?.keys) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+  } catch {}
+  try { window.location.reload(); } catch {}
+}
+
+function waitForServerThenReload(timeoutMs = 15000) {
+  const start = Date.now();
+  const attempt = async () => {
+    try {
+      await fetch("/", { cache: "no-store" });
+      window.location.reload();
+      return;
+    } catch {}
+    if (Date.now() - start >= timeoutMs) {
+      window.location.reload();
+      return;
+    }
+    setTimeout(attempt, 800);
+  };
+  setTimeout(attempt, 800);
+}
+
+export async function restartApplication() {
+  window.__appRestarting = true;
+  shell.updateStatusBar?.("Restarting application...");
+  try { await fetch("/app/restart", { method: "POST" }); } catch {}
+  try { await fetch("/app/restart_electron", { method: "POST" }); } catch {}
+  waitForServerThenReload();
+}
+
+export function sendShutdownSignal() {
+  const hostApi = shell.getHostApi?.();
+  if (hostApi?.shutdownApp) {
+    try { hostApi.shutdownApp(); } catch {}
+    return;
+  }
+  try {
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon("/app/shutdown");
+      return;
+    }
+  } catch {}
+  try { fetch("/app/shutdown", { method: "POST", keepalive: true }); } catch {}
+}
+
+export function showAppConfirm({ title, message, okText, cancelText } = {}) {
+  if (appConfirmPromise) return appConfirmPromise;
+  const overlay = $("appConfirmOverlay");
+  const titleEl = $("appConfirmTitle");
+  const messageEl = $("appConfirmMessage");
+  const okBtn = $("appConfirmOk");
+  const cancelBtn = $("appConfirmCancel");
+  if (!overlay || !titleEl || !messageEl || !okBtn || !cancelBtn) {
+    return Promise.resolve(window.confirm(message || "Quit the application?"));
+  }
+  titleEl.textContent = title || "Warning";
+  messageEl.textContent = message || "Quit the application?";
+  okBtn.textContent = okText || "Quit";
+  cancelBtn.textContent = cancelText || "Cancel";
+  overlay.classList.add("open");
+  appConfirmPromise = new Promise((resolve) => {
+    const cleanup = () => {
+      overlay.classList.remove("open");
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+      overlay.removeEventListener("click", onOverlay);
+      window.removeEventListener("keydown", onKey, true);
+      appConfirmPromise = null;
+    };
+    const finish = (result) => { cleanup(); resolve(result); };
+    const onOk = (e) => { e.preventDefault(); finish(true); };
+    const onCancel = (e) => { e.preventDefault(); finish(false); };
+    const onOverlay = (e) => { if (e.target === overlay) finish(false); };
+    const onKey = (e) => {
+      if (e.key === "Escape") { e.preventDefault(); finish(false); return; }
+      if (e.key === "Enter") { e.preventDefault(); finish(true); }
+    };
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+    overlay.addEventListener("click", onOverlay);
+    window.addEventListener("keydown", onKey, true);
+    setTimeout(() => { try { cancelBtn.focus(); } catch {} }, 0);
+  });
+  return appConfirmPromise;
+}
+
+export function shutdownApplication() {
+  if (appShutdownRequested) return;
+  showAppConfirm({ title: "Warning", message: "Quit the application?", okText: "Quit" })
+    .then((ok) => {
+      if (!ok) {
+        shell.updateStatusBar?.("Shutdown canceled.");
+        return;
+      }
+      appShutdownRequested = true;
+      shell.updateStatusBar?.("Shutting down...");
+      sendShutdownSignal();
+      setTimeout(() => { try { window.close(); } catch {} }, 200);
+    })
+    .catch(() => { shell.updateStatusBar?.("Shutdown canceled."); });
+}
+
+export function initAppLifecycle() {
+  window.__arcrho_confirm_app_shutdown = function () {
+    return showAppConfirm({ title: "Warning", message: "Quit the application?", okText: "Quit" });
+  };
+  window.addEventListener("beforeunload", () => {
+    if (window.__appRestarting) return;
+    if (window.__appRefreshing) return;
+    if (appShutdownRequested) return;
+    sendShutdownSignal();
+  });
+}
