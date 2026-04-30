@@ -1,43 +1,45 @@
-ArcRho 自定义 Python 模块（`arcrho`）子项目计划
-版本：v0.2
-更新时间：2026-02-17
+ArcRho Custom Python Module (`arcrho`) Subproject Plan
+Version: v0.2
+Last updated: 2026-02-17
 
 ---
 
-1. 子项目目标
+1. Subproject Goals
 
-在 Scripting Console 中提供可直接导入的业务模块：
+Provide a business module that can be imported directly from the Scripting Console:
 
-`import arcrho`
+```python
+import arcrho
+```
 
-目标是给业务用户提供稳定、易用、面向对象的 API，减少对底层文件结构、HTTP 路由和内部数据格式的直接依赖。
+The goal is to give business users a stable, easy-to-use, object-oriented API and reduce direct dependency on lower-level file structures, HTTP routes, and internal data formats.
 
-核心目标：
-1. 提供统一入口：`arcrho.application`。
-2. 提供项目 -> ReservingClass -> Dataset/Dfm 的对象化访问链路。
-3. 支持常见读写操作（先读后写，分阶段落地）。
-4. 保持对现有 scripting 能力兼容，不破坏已有 `/scripting/*` 行为。
-
----
-
-2. 约束与设计原则
-
-必须遵守：
-1. 根目录来源必须是 `workspace_paths.json` / `app_server.config`，禁止硬编码 `E:\\ArcRho`。
-2. 代码分层保持 `router -> service -> config/schema`，不要把业务逻辑塞进 router。
-3. 对外接口默认向后兼容；新增能力优先增量，不直接重构旧行为。
-4. Scripting 会话隔离语义保持不变（不同会话变量互不污染）。
-5. 错误返回要可读（参数错误/资源不存在/权限限制/运行时错误需可区分）。
-
-建议策略：
-1. `arcrho` 优先封装现有 service 层能力，不直接耦合前端页面逻辑。
-2. 写操作先做最小闭环，逐步扩展，避免一次性大范围改动。
+Core goals:
+1. Provide a unified entry point: `arcrho.application`.
+2. Provide an object-oriented access path from Project -> ReservingClass -> Dataset/Dfm.
+3. Support common read and write operations, starting with read support and landing write support in phases.
+4. Preserve compatibility with existing scripting capabilities and avoid breaking existing `/scripting/*` behavior.
 
 ---
 
-3. 目标 API 草案（MVP）
+2. Constraints and Design Principles
 
-3.1 顶层入口
+Required constraints:
+1. The root directory must come from `workspace_paths.json` / `app_server.config`; do not hard-code `E:\\ArcRho`.
+2. Preserve the `router -> service -> config/schema` layering; do not put business logic into routers.
+3. External interfaces are backward-compatible by default. Add new capabilities incrementally instead of directly refactoring old behavior.
+4. Preserve scripting session isolation semantics. Variables from different sessions must not leak into each other.
+5. Errors must be readable and distinguish parameter errors, missing resources, permission restrictions, and runtime errors.
+
+Recommended strategy:
+1. `arcrho` should primarily wrap existing service-layer capabilities and should not directly couple to frontend page logic.
+2. Start write operations with the smallest complete workflow, then expand gradually to avoid a large one-shot change.
+
+---
+
+3. Target API Draft (MVP)
+
+3.1 Top-Level Entry Point
 
 ```python
 import arcrho
@@ -48,7 +50,7 @@ arcrho.projects()
 arcrho.project("my_project")
 ```
 
-3.2 对象层级
+3.2 Object Hierarchy
 
 ```text
 Application
@@ -58,7 +60,7 @@ Application
           └─ Dfm
 ```
 
-3.3 对象与方法（第一版建议）
+3.3 Objects and Methods (Initial Recommendation)
 
 `Application`
 1. `version: str`
@@ -70,14 +72,14 @@ Application
 1. `name: str`
 2. `folder: str`
 3. `reserving_class(path: str) -> ReservingClass`
-4. `reserving_classes() -> list[ReservingClass]`（可选）
+4. `reserving_classes() -> list[ReservingClass]` (optional)
 
 `ReservingClass`
 1. `path: str`
 2. `dataset(name_or_id: str) -> Dataset`
-3. `datasets() -> list[Dataset]`（可选）
+3. `datasets() -> list[Dataset]` (optional)
 4. `dfm(name: str) -> Dfm`
-5. `DFM(name: str) -> Dfm`（兼容别名，不建议在新代码中使用）
+5. `DFM(name: str) -> Dfm` (compatibility alias; not recommended for new code)
 
 `Dfm`
 1. `name: str`
@@ -89,7 +91,7 @@ Application
 
 ---
 
-4. 示例（文档对外展示口径）
+4. Example (Public Documentation Wording)
 
 ```python
 import arcrho
@@ -113,127 +115,127 @@ dfm.ratios.set_user_entry(col=1, value=1.2345)
 
 ---
 
-5. 实施范围与非范围
+5. Implementation Scope and Non-Scope
 
-5.1 本期范围（In Scope）
-1. 在 scripting 执行环境可用 `import arcrho`。
-2. 完成 `Application/Project/ReservingClass/Dfm` 最小对象模型。
-3. 支持核心读能力（root、projects、对象获取、基础 values/selected）。
-4. 支持最小写能力（`set_selected`、`set_user_entry`）。
-5. 提供 API 帮助文档入口（可接入 `/scripting/api-help`）。
+5.1 In Scope
+1. Make `import arcrho` available in the scripting execution environment.
+2. Complete the minimal `Application/Project/ReservingClass/Dfm` object model.
+3. Support core read capabilities: root, projects, object lookup, and basic `values` / `selected` access.
+4. Support minimal write capabilities: `set_selected` and `set_user_entry`.
+5. Provide an API help documentation entry point, which may connect to `/scripting/api-help`.
 
-5.2 非本期范围（Out of Scope）
-1. 一次性覆盖全部 Dfm 高级编辑能力。
-2. 在本期内提供复杂富输出渲染（图像、HTML、交互控件）。
-3. 重构现有 scripting 路由协议或会话机制。
-
----
-
-6. 分阶段计划与里程碑
-
-Phase 0：需求冻结与技术设计（0.5-1 天）
-1. 确认对象命名、方法签名、错误语义。
-2. 确认首期只做哪些写操作。
-3. 产出：接口清单 + 验收清单。
-
-Phase 1：模块骨架与只读能力（1-2 天）
-1. 建立 `arcrho` 包结构与入口。
-2. 实现 `application.root/version/projects/project(...)`。
-3. 接入 scripting 会话命名空间，保证多窗口会话隔离不变。
-4. 产出：可运行只读 demo。
-
-Phase 2：Dfm 读写最小闭环（2-3 天）
-1. 实现 `Dfm.data.values`、`ratios.values/selected`。
-2. 实现 `ratios.set_selected`、`ratios.set_user_entry`。
-3. 完成异常分类（参数/不存在/权限/运行错误）。
-4. 产出：读写端到端可验证。
-
-Phase 3：文档、测试与发布（1-2 天）
-1. 单元测试 + 集成测试 + 手工回归脚本。
-2. 补充 API 帮助文档与示例 notebook。
-3. 发布说明（新增 API、已知限制、回滚方式）。
+5.2 Out of Scope
+1. Covering all advanced Dfm editing capabilities in one pass.
+2. Providing complex rich-output rendering in this phase, such as images, HTML, or interactive controls.
+3. Refactoring existing scripting route protocols or session mechanisms.
 
 ---
 
-7. 任务分解（执行清单）
+6. Phased Plan and Milestones
+
+Phase 0: Requirement Freeze and Technical Design (0.5-1 day)
+1. Confirm object names, method signatures, and error semantics.
+2. Confirm which write operations are included in the first phase.
+3. Deliverable: interface checklist and acceptance checklist.
+
+Phase 1: Module Skeleton and Read-Only Capabilities (1-2 days)
+1. Create the `arcrho` package structure and entry point.
+2. Implement `application.root/version/projects/project(...)`.
+3. Connect to the scripting session namespace while preserving multi-window session isolation.
+4. Deliverable: runnable read-only demo.
+
+Phase 2: Minimal Dfm Read/Write Workflow (2-3 days)
+1. Implement `Dfm.data.values` and `ratios.values/selected`.
+2. Implement `ratios.set_selected` and `ratios.set_user_entry`.
+3. Complete exception classification for parameter errors, missing resources, permission errors, and runtime errors.
+4. Deliverable: end-to-end verifiable read/write workflow.
+
+Phase 3: Documentation, Tests, and Release (1-2 days)
+1. Add unit tests, integration tests, and a manual regression script.
+2. Add API help documentation and an example notebook.
+3. Add release notes covering the new API, known limitations, and rollback path.
+
+---
+
+7. Task Breakdown (Execution Checklist)
 
 App Server
-1. 新增 `arcrho` 模块实现（建议放在 `app_server/services` 邻近或独立 package）。
-2. 通过 service 层封装数据读写，不绕开 config 规则。
-3. 补充必要 schema（如新增专用接口时）。
+1. Add the `arcrho` module implementation, preferably near `app_server/services` or as an independent package.
+2. Wrap data reads and writes through the service layer without bypassing config rules.
+3. Add any necessary schemas if dedicated new interfaces are introduced.
 
 Scripting
-1. 在会话初始化中注入 `arcrho` 可导入能力。
-2. 保持现有 `/scripting/run`、`/scripting/run-stream`、`/scripting/interrupt` 兼容。
-3. 在 `/scripting/api-help` 暴露新模块常用方法说明。
+1. Inject `arcrho` import support during session initialization.
+2. Keep existing `/scripting/run`, `/scripting/run-stream`, and `/scripting/interrupt` behavior compatible.
+3. Expose common method documentation for the new module through `/scripting/api-help`.
 
 Docs
-1. 更新后端/前端相关 MANUAL 文档（若行为或契约受影响）。
-2. 追加 `arcrho_api_module` 示例与错误说明。
-3. 运行文档索引构建检查。
+1. Update related backend/frontend MANUAL documentation if behavior or contracts are affected.
+2. Add `arcrho_api_module` examples and error documentation.
+3. Run the documentation index build and check.
 
 QA
-1. 新建最小回归脚本（导入、读取、写入、异常、并发会话）。
-2. 覆盖路径变更场景（修改 `workspace_paths.workspace_root` 后是否生效）。
-3. 覆盖权限场景（禁止写目录的错误提示）。
+1. Add a minimal regression script covering import, read, write, exceptions, and concurrent sessions.
+2. Cover path-change scenarios, including whether changes to `workspace_paths.workspace_root` take effect.
+3. Cover permission scenarios, including error messages for disallowed write directories.
 
 ---
 
-8. 验收标准（Definition of Done）
+8. Acceptance Criteria (Definition of Done)
 
-功能验收：
-1. `import arcrho` 在 scripting console 成功。
-2. `arcrho.application.root` 与 `workspace_paths` 配置一致。
-3. `arcrho.projects()` 可返回项目对象列表，且不依赖硬编码路径。
-4. `Dfm` 读方法与写方法在目标样例项目上可用。
+Functional acceptance:
+1. `import arcrho` succeeds in the scripting console.
+2. `arcrho.application.root` is consistent with the `workspace_paths` configuration.
+3. `arcrho.projects()` returns a list of project objects and does not depend on hard-coded paths.
+4. `Dfm` read and write methods work on the target sample project.
 
-兼容性验收：
-1. 现有 scripting notebook 执行、保存、加载行为无回归。
-2. 现有 `/scripting/*` 路由契约不破坏。
-3. 现有 session 隔离语义不变。
+Compatibility acceptance:
+1. Existing scripting notebook execution, save, and load behavior has no regression.
+2. Existing `/scripting/*` route contracts are not broken.
+3. Existing session isolation semantics remain unchanged.
 
-质量验收：
-1. 关键 API 有单元测试与失败场景测试。
-2. 错误信息可读，可定位到对象/字段/参数。
-3. 文档示例可直接运行。
-
----
-
-9. 风险与应对
-
-风险 1：路径逻辑被写死，导致环境迁移失败。
-应对：统一通过 `app_server.config` 取根路径，增加路径变更回归用例。
-
-风险 2：对象 API 与现有 service 语义不一致。
-应对：先定义 service 适配层，避免在对象层直接拼接文件读写。
-
-风险 3：写操作破坏数据一致性。
-应对：写操作先做最小范围，必要时使用临时文件 + 原子替换策略。
-
-风险 4：跨会话污染（变量/状态串台）。
-应对：严格复用现有 session_id 隔离机制，不使用全局可变单例缓存业务对象。
+Quality acceptance:
+1. Key APIs have unit tests and failure-scenario tests.
+2. Error messages are readable and identify the relevant object, field, or parameter.
+3. Documentation examples can run directly.
 
 ---
 
-10. 回滚策略
+9. Risks and Mitigations
 
-1. 保留原有 scripting helper API，不移除旧入口。
-2. `arcrho` 新功能可通过配置开关禁用（建议增加开关）。
-3. 若上线后异常，优先回退 `arcrho` 注入步骤，不影响基础 scripting 执行路径。
+Risk 1: Path logic is hard-coded, causing environment migration failures.
+Mitigation: Resolve root paths uniformly through `app_server.config` and add regression coverage for path changes.
+
+Risk 2: The object API does not match existing service semantics.
+Mitigation: Define a service adapter layer first and avoid direct file read/write assembly in the object layer.
+
+Risk 3: Write operations break data consistency.
+Mitigation: Start with the smallest write scope and use temporary files plus atomic replacement where needed.
+
+Risk 4: Cross-session contamination through shared variables or state.
+Mitigation: Reuse the existing `session_id` isolation mechanism strictly and avoid global mutable singleton caches for business objects.
 
 ---
 
-11. 待确认问题（实施前需要拍板）
+10. Rollback Strategy
 
-1. `Dfm` 的权威数据源
-- 决议：以持久化数据文件为权威来源，缓存仅用于加速读取。
-- 行为：读取时若不存在目标 `Dfm`，返回明确“未找到”错误，不返回 `None`。
-- 创建：支持 `add_dfm()` 创建内存对象，调用 `save()` 后持久化落盘。
+1. Keep the original scripting helper API and do not remove legacy entry points.
+2. Allow the new `arcrho` functionality to be disabled through configuration, preferably via a new feature flag.
+3. If issues appear after release, roll back the `arcrho` injection step first without affecting the base scripting execution path.
 
-2. `set_selected`、`set_user_entry` 的持久化语义
-- 决议：两者仅修改内存对象并标记 dirty，不立即落盘。
-- 持久化：通过显式 `save()` 原子写入本地 JSON（含锁与并发保护）。
+---
 
-3. 首期 `Dataset` API 范围
-- 决议：首期包含最小只读 `Dataset` API（列表、基础元信息、按坐标取值）。
-- 说明：`Dataset` 写接口不纳入首期，优先保证 `Dfm` 闭环可用。
+11. Open Questions to Confirm Before Implementation
+
+1. Authoritative data source for `Dfm`
+- Decision: Use persisted data files as the authoritative source. Caches are only for faster reads.
+- Behavior: If the target `Dfm` does not exist during read, return a clear "not found" error instead of `None`.
+- Creation: Support `add_dfm()` to create an in-memory object and persist it after `save()` is called.
+
+2. Persistence semantics for `set_selected` and `set_user_entry`
+- Decision: Both methods only modify the in-memory object and mark it dirty; they do not immediately write to disk.
+- Persistence: Use explicit `save()` to atomically write local JSON, including locking and concurrency protection.
+
+3. First-phase `Dataset` API scope
+- Decision: Include a minimal read-only `Dataset` API in the first phase: listing, basic metadata, and coordinate-based value lookup.
+- Note: `Dataset` write APIs are not included in the first phase. Prioritize completing the `Dfm` workflow first.

@@ -262,7 +262,6 @@ export function getRatioSaveSuggestedName() {
     document.getElementById("dfmMethodName")?.value?.trim(),
     "Name",
   );
-  const projectName = sanitizeFileNamePart(getRatioSaveProjectName(), "Project");
   const devLen = sanitizeFileNamePart(
     document.getElementById("devLenSelect")?.value?.trim(),
     "Dev",
@@ -271,7 +270,7 @@ export function getRatioSaveSuggestedName() {
     document.getElementById("originLenSelect")?.value?.trim(),
     "Origin",
   );
-  return `DFM@${reservingClass}@${methodName}@${projectName}@${devLen}@${originLen}.json`;
+  return `DFM@${reservingClass}@${methodName}@${devLen}@${originLen}.json`;
 }
 
 export async function getRatioSaveBaseDir() {

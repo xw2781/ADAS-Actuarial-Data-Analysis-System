@@ -1,0 +1,10 @@
+{
+  "type": "fix",
+  "scope": "dfm",
+  "audience": "user",
+  "summary": "DFM method JSON saves no longer repeat the project name in filenames because the project folder already identifies the project.",
+  "details": [
+    "DFM UI loading now checks the new standard method JSON path only, while the name index is used for saved-name metadata such as origin and development lengths.",
+    "DFM CSV export remains project-folder scoped and keeps its ArcRhoTri-compatible filename format."
+  ]
+}

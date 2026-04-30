@@ -684,36 +684,23 @@ export async function loadRatioSelectionIfExists(reason) {
   const methodName = getTrimmedInputValue("dfmMethodName");
   const standardPath = await buildRatioSavePath();
   let path = standardPath;
-  let indexedEntry = null;
   if (projectName && reservingClass && methodName) {
     try {
       const indexEntries = await loadDfmMethodNameIndexEntries(projectName, { forceReload: false });
-      indexedEntry = findDfmMethodNameIndexEntryForContext(indexEntries, {
+      const indexedEntry = findDfmMethodNameIndexEntryForContext(indexEntries, {
         name: methodName,
         reservingClass,
       });
-      const indexedPath = normalizeIndexText(indexedEntry?.path);
-      if (indexedPath) {
-        path = indexedPath;
-        if (path.toLowerCase() !== standardPath.toLowerCase()) {
-          postDfmLookupDebugStatus(`resolved via name index ${path}`, { reason });
-        }
-        if (applyIndexedLengthSelectionIfNeeded(indexedEntry)) {
-          postDfmLookupDebugStatus("applied indexed lengths; deferring load", { reason });
-          return;
-        }
+      if (applyIndexedLengthSelectionIfNeeded(indexedEntry)) {
+        postDfmLookupDebugStatus("applied indexed lengths; deferring load", { reason });
+        return;
       }
     } catch (err) {
       console.warn("Failed to resolve DFM method via name index:", err);
     }
   }
   postDfmLookupDebugStatus(`checking ${path}`, { reason });
-  let result = await hostApi.readJsonFile({ path });
-  if ((!result || !result.exists) && path.toLowerCase() !== standardPath.toLowerCase()) {
-    postDfmLookupDebugStatus(`indexed path missing; fallback ${standardPath}`, { reason });
-    path = standardPath;
-    result = await hostApi.readJsonFile({ path });
-  }
+  const result = await hostApi.readJsonFile({ path });
   if (!result || !result.exists) {
     emitDfmInstancePresence("missing");
     postDfmStatus("This method object has not been created yet, changes will be saved to a new container.", { tone: "warn" });
