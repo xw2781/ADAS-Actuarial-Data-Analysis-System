@@ -1,0 +1,142 @@
+﻿import { isFloatingTab, normalizeFloatRect } from "./floating_tabs.js?v=20260430d";
+import { normalizeBrowsingHistoryEntry } from "/ui/shell/browsing_history.js";
+
+const STORAGE_KEY = "arcrho_ui_shell_state_v4";
+const LEGACY_STORAGE_KEYS = ["arcrho_ui_shell_state_v3"];
+
+export const state = {
+  tabs: [{ id: "home", title: "Home", type: "home" }],
+  activeId: "home",
+  nextId: 1,
+  lastDockedActiveId: "home",
+  nextFloatZ: 1,
+};
+
+function getSavedShellStateRaw() {
+  try {
+    const current = localStorage.getItem(STORAGE_KEY);
+    if (current) return current;
+    for (const key of LEGACY_STORAGE_KEYS) {
+      const raw = localStorage.getItem(key);
+      if (raw) return raw;
+    }
+  } catch {
+    // ignore
+  }
+  return "";
+}
+
+export function getFirstDockedTabId() {
+  const docked = state.tabs.find(t => t.id !== "home" && !isFloatingTab(t));
+  return docked?.id || "home";
+}
+
+export function ensureActiveTabInvariant() {
+  if (!state.tabs.some(t => t.id === state.activeId)) {
+    state.activeId = "home";
+  }
+  const lastDocked = state.tabs.find(t => t.id === state.lastDockedActiveId && !isFloatingTab(t));
+  if (!lastDocked) state.lastDockedActiveId = getFirstDockedTabId();
+  const active = state.tabs.find(t => t.id === state.activeId);
+  if (active && !isFloatingTab(active)) state.lastDockedActiveId = active.id;
+}
+
+export function loadState() {
+  try {
+    const raw = getSavedShellStateRaw();
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (!s || !Array.isArray(s.tabs) || !s.activeId) return;
+
+    if (!s.tabs.some(t => t.id === "home")) {
+      s.tabs.unshift({ id: "home", title: "Home", type: "home" });
+    }
+
+    state.tabs = s.tabs.map(t => ({
+      id: t.id,
+      title: t.title,
+      type: t.type,
+      datasetId: t.datasetId,
+      datasetInputs: normalizeBrowsingHistoryEntry(t.datasetInputs || null) || undefined,
+      dsInst: t.dsInst || (t.type === "dataset" ? `ds_${t.id}` : undefined),
+      wfInst: t.wfInst,
+      wfFresh: t.wfFresh,
+      scInst: t.scInst || (t.type === "scripting" ? `sc_${t.id}` : undefined),
+      scFresh: !!t.scFresh,
+      projectSettingsRibbon: t.type === "project_settings"
+        ? (String(t.projectSettingsRibbon || "").trim().toLowerCase() || "summary")
+        : undefined,
+      layout: t.id === "home" ? "docked" : (t.layout === "floating" ? "floating" : "docked"),
+      floatRect: normalizeFloatRect(t.floatRect),
+      floatZ: Number.isFinite(Number(t.floatZ)) ? Number(t.floatZ) : 0,
+      floatMinimized: t.layout === "floating" ? !!t.floatMinimized : false,
+      isDirty: false,
+      iframe: null,
+    }));
+    state.activeId = s.activeId;
+    state.nextId = s.nextId || 1;
+    state.lastDockedActiveId = String(s.lastDockedActiveId || "home");
+    state.nextFloatZ = Number.isFinite(Number(s.nextFloatZ)) ? Number(s.nextFloatZ) : 1;
+
+    for (const t of state.tabs) {
+      if (t.id === "home") {
+        t.type = "home";
+        t.title = "Home";
+        t.datasetId = undefined;
+        t.layout = "docked";
+        t.floatRect = null;
+        t.floatZ = 0;
+        t.floatMinimized = false;
+      }
+    }
+
+    const maxId = Math.max(
+      0,
+      ...state.tabs.map(t => {
+        const m = String(t.id).match(/_(\d+)$/);
+        return m ? parseInt(m[1], 10) : 0;
+      })
+    );
+    state.nextId = Math.max(state.nextId, maxId + 1);
+    const maxZ = Math.max(0, ...state.tabs.map(t => Number(t.floatZ) || 0));
+    state.nextFloatZ = Math.max(state.nextFloatZ, maxZ + 1);
+    ensureActiveTabInvariant();
+  } catch {
+    // ignore
+  }
+}
+
+export function saveState() {
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        tabs: state.tabs.map(t => ({
+          id: t.id,
+          title: t.title,
+          type: t.type,
+          datasetId: t.datasetId,
+          datasetInputs: t.datasetInputs || undefined,
+          dsInst: t.dsInst,
+          wfInst: t.wfInst,
+          wfFresh: t.wfFresh,
+          scInst: t.scInst,
+          scFresh: t.scFresh,
+          projectSettingsRibbon: t.type === "project_settings"
+            ? String(t.projectSettingsRibbon || "").trim().toLowerCase()
+            : undefined,
+          layout: isFloatingTab(t) ? "floating" : "docked",
+          floatRect: isFloatingTab(t) ? t.floatRect : undefined,
+          floatZ: isFloatingTab(t) ? t.floatZ : undefined,
+          floatMinimized: isFloatingTab(t) ? !!t.floatMinimized : undefined,
+        })),
+        activeId: state.activeId,
+        nextId: state.nextId,
+        lastDockedActiveId: state.lastDockedActiveId,
+        nextFloatZ: state.nextFloatZ,
+      })
+    );
+  } catch {
+    // ignore quota / privacy errors
+  }
+}

@@ -1,0 +1,423 @@
+﻿import { $, shell } from "./shell_context.js?v=20260430d";
+import { FLOAT_VERTICAL_THRESHOLD_PX, isFloatingTab } from "./floating_tabs.js?v=20260430d";
+
+let draggedTabId = null;
+let dragEl = null;
+let placeholderEl = null;
+let dropIndicatorEl = null;
+let tabsHostPrevStyle = null;
+let dragElPrevStyle = null;
+let dragElBaseLeft = 0;
+let dragElBaseTop = 0;
+let ptrActive = false;
+let ptrId = null;
+let ptrStartX = 0;
+let ptrStartY = 0;
+let ptrMoved = false;
+let tabDragMode = null;
+let isDragging = false;
+let lastPlaceholderIndex = -1;
+let plusBtnEl = null;
+let plusMenuEl = null;
+let tabCtxId = null;
+let tabStripWired = false;
+const DRAG_THRESHOLD_PX = 6;
+
+export function isTabStripDragging() { return isDragging; }
+
+function lockTabsOverflowDuringDrag() {
+  const host = $("tabs");
+  if (!host) return;
+  if (host.dataset.prevOverflowX == null) host.dataset.prevOverflowX = host.style.overflowX || "";
+  host.style.overflowX = "hidden";
+}
+
+function restoreTabsOverflowAfterDrag() {
+  const host = $("tabs");
+  if (!host) return;
+  if (host.dataset.prevOverflowX != null) {
+    host.style.overflowX = host.dataset.prevOverflowX;
+    delete host.dataset.prevOverflowX;
+  } else host.style.overflowX = "";
+}
+
+function ensureDropIndicator(host) {
+  if (dropIndicatorEl && dropIndicatorEl.isConnected) return dropIndicatorEl;
+  let el = document.getElementById("dropIndicator");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "dropIndicator";
+    host.appendChild(el);
+  }
+  dropIndicatorEl = el;
+  return el;
+}
+
+function showIndicatorAt(host, x) {
+  const ind = ensureDropIndicator(host);
+  const r = host.getBoundingClientRect();
+  const left = Math.max(0, Math.min(r.width, x - r.left));
+  ind.style.left = `${left}px`;
+  ind.style.display = "block";
+}
+
+function hideIndicator() { if (dropIndicatorEl) dropIndicatorEl.style.display = "none"; }
+
+function lockTabsHostLayout(host) {
+  if (!host || tabsHostPrevStyle) return;
+  const r = host.getBoundingClientRect();
+  tabsHostPrevStyle = {
+    height: host.style.height,
+    minHeight: host.style.minHeight,
+    flexWrap: host.style.flexWrap,
+    overflowX: host.style.overflowX,
+    overflowY: host.style.overflowY,
+    alignItems: host.style.alignItems,
+  };
+  host.style.height = `${Math.ceil(r.height)}px`;
+  host.style.minHeight = host.style.height;
+  host.style.flexWrap = "nowrap";
+  host.style.overflowX = "auto";
+  host.style.overflowY = "hidden";
+  host.style.alignItems = "stretch";
+}
+
+function unlockTabsHostLayout() {
+  const host = $("tabs");
+  if (!host || !tabsHostPrevStyle) return;
+  host.style.height = tabsHostPrevStyle.height;
+  host.style.minHeight = tabsHostPrevStyle.minHeight;
+  host.style.flexWrap = tabsHostPrevStyle.flexWrap;
+  host.style.overflowX = tabsHostPrevStyle.overflowX;
+  host.style.overflowY = tabsHostPrevStyle.overflowY;
+  host.style.alignItems = tabsHostPrevStyle.alignItems;
+  tabsHostPrevStyle = null;
+}
+
+function cleanupDragUI() {
+  restoreTabsOverflowAfterDrag();
+  hideIndicator();
+  shell.removeFloatPreview?.();
+  if (dragEl) dragEl.classList.remove("dragging");
+  if (placeholderEl && placeholderEl.parentNode) placeholderEl.parentNode.removeChild(placeholderEl);
+  placeholderEl = null;
+  if (dragEl && dragElPrevStyle) {
+    dragEl.style.position = dragElPrevStyle.position;
+    dragEl.style.left = dragElPrevStyle.left;
+    dragEl.style.top = dragElPrevStyle.top;
+    dragEl.style.width = dragElPrevStyle.width;
+    dragEl.style.height = dragElPrevStyle.height;
+    dragEl.style.zIndex = dragElPrevStyle.zIndex;
+    dragEl.style.pointerEvents = dragElPrevStyle.pointerEvents;
+    dragEl.style.transform = dragElPrevStyle.transform;
+  }
+  dragElPrevStyle = null;
+  dragElBaseLeft = 0;
+  dragElBaseTop = 0;
+  dragEl = null;
+  draggedTabId = null;
+  ptrActive = false;
+  ptrId = null;
+  ptrMoved = false;
+  tabDragMode = null;
+  isDragging = false;
+  lastPlaceholderIndex = -1;
+  unlockTabsHostLayout();
+  try { document.body.style.cursor = ""; } catch {}
+}
+
+function ensurePlaceholderFrom(el) {
+  if (placeholderEl && placeholderEl.isConnected) return placeholderEl;
+  const r = el.getBoundingClientRect();
+  const ph = document.createElement("div");
+  ph.className = "tab placeholder";
+  ph.innerHTML = "&nbsp;";
+  ph.style.width = `${Math.ceil(r.width)}px`;
+  ph.style.height = `${Math.ceil(r.height)}px`;
+  placeholderEl = ph;
+  return ph;
+}
+
+function startDragIfNeeded(host, el, pointerId) {
+  if (!host || !el || isDragging) return;
+  isDragging = true;
+  lockTabsHostLayout(host);
+  try { document.body.style.cursor = "grabbing"; } catch {}
+  el.classList.add("dragging");
+  const hostRect = host.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  dragElPrevStyle = {
+    position: el.style.position,
+    left: el.style.left,
+    top: el.style.top,
+    width: el.style.width,
+    height: el.style.height,
+    zIndex: el.style.zIndex,
+    pointerEvents: el.style.pointerEvents,
+    transform: el.style.transform,
+  };
+  dragElBaseLeft = (r.left - hostRect.left) + host.scrollLeft;
+  dragElBaseTop = (r.top - hostRect.top);
+  el.style.width = `${Math.ceil(r.width)}px`;
+  el.style.height = `${Math.ceil(r.height)}px`;
+  el.style.position = "absolute";
+  el.style.left = `${Math.round(dragElBaseLeft)}px`;
+  el.style.top = `${Math.round(dragElBaseTop)}px`;
+  el.style.zIndex = "1000";
+  el.style.pointerEvents = "none";
+  el.style.transform = "translate3d(0px, 0px, 0px)";
+  host.insertBefore(ensurePlaceholderFrom(el), el);
+  try { el.setPointerCapture(pointerId); } catch {}
+}
+
+function commitOrderFromDom() {
+  const host = $("tabs");
+  if (!host || !draggedTabId || !placeholderEl) return;
+  const seq = [];
+  for (const child of host.children) {
+    if (child === placeholderEl) { seq.push("__PLACEHOLDER__"); continue; }
+    if (child.classList && child.classList.contains("tab")) {
+      const id = child.getAttribute("data-tab-id");
+      if (!id || id === draggedTabId) continue;
+      seq.push(id);
+    }
+  }
+  const phIndex = seq.indexOf("__PLACEHOLDER__");
+  if (phIndex < 0) return;
+  const ids = seq.filter(x => x !== "__PLACEHOLDER__");
+  ids.splice(Math.max(0, Math.min(ids.length, phIndex)), 0, draggedTabId);
+  const home = shell.state.tabs.find(t => t.id === "home");
+  const map = new Map(shell.state.tabs.map(t => [t.id, t]));
+  const nextDocked = [];
+  if (home) nextDocked.push(home);
+  for (const id of ids) {
+    if (id === "home") continue;
+    const t = map.get(id);
+    if (t && !isFloatingTab(t)) nextDocked.push(t);
+  }
+  for (const t of shell.state.tabs) {
+    if (t.id === "home" || isFloatingTab(t)) continue;
+    if (!nextDocked.some(x => x.id === t.id)) nextDocked.push(t);
+  }
+  const dockedQueue = [...nextDocked];
+  shell.state.tabs = shell.state.tabs.map((t) => isFloatingTab(t) ? t : (dockedQueue.shift() || t));
+}
+
+function wireTabDnDHostOnce() {
+  const host = $("tabs");
+  if (!host || host.dataset.dndWired === "1") return;
+  host.dataset.dndWired = "1";
+  ensureDropIndicator(host);
+}
+
+function flipAnimateTabs(host, beforeRects) {
+  const after = new Map();
+  host.querySelectorAll('.tab[data-tab-id]').forEach(el => {
+    const id = el.getAttribute("data-tab-id");
+    if (!id || id === draggedTabId || el.classList.contains("placeholder")) return;
+    after.set(id, el.getBoundingClientRect());
+  });
+  host.querySelectorAll('.tab[data-tab-id]').forEach(el => {
+    const id = el.getAttribute("data-tab-id");
+    if (!id || id === draggedTabId || el.classList.contains("placeholder")) return;
+    const b = beforeRects.get(id);
+    const a = after.get(id);
+    if (!b || !a) return;
+    const dx = b.left - a.left;
+    if (Math.abs(dx) < 0.5) return;
+    if (el.__flipAnim) { try { el.__flipAnim.cancel(); } catch {} el.__flipAnim = null; }
+    el.__flipAnim = el.animate([{ transform: `translateX(${dx}px)` }, { transform: "translateX(0px)" }], { duration: 140, easing: "ease-out" });
+  });
+}
+
+function positionPlusMenu() {
+  if (!plusMenuEl || !plusBtnEl) return;
+  const wasOpen = plusMenuEl.classList.contains("open");
+  if (!wasOpen) { plusMenuEl.style.visibility = "hidden"; plusMenuEl.classList.add("open"); }
+  const btnRect = plusBtnEl.getBoundingClientRect();
+  const menuRect = plusMenuEl.getBoundingClientRect();
+  let left = Math.max(8, Math.min(btnRect.left, Math.max(8, window.innerWidth - menuRect.width - 8)));
+  plusMenuEl.style.left = `${Math.round(left)}px`;
+  plusMenuEl.style.top = `${Math.round(btnRect.bottom + 6)}px`;
+  plusMenuEl.style.right = "auto";
+  if (!wasOpen) { plusMenuEl.classList.remove("open"); plusMenuEl.style.visibility = ""; }
+}
+
+function ensurePlusMenu(host) {
+  if (!host) return;
+  if (!plusBtnEl) {
+    plusBtnEl = document.createElement("div");
+    plusBtnEl.className = "plusTab";
+    plusBtnEl.id = "plusTabBtn";
+    plusBtnEl.textContent = "+";
+    plusBtnEl.title = "Add...";
+    plusBtnEl.addEventListener("click", (e) => { e.stopPropagation(); togglePlusMenu(true); });
+  }
+  if (!plusMenuEl) {
+    plusMenuEl = document.createElement("div");
+    plusMenuEl.className = "tabMenu";
+    plusMenuEl.id = "plusTabMenu";
+    plusMenuEl.style.position = "fixed";
+    plusMenuEl.innerHTML = `<div class="tabMenuItem" data-action="add-dataset">Dataset</div><div class="tabMenuItem" data-action="add-dfm">DFM</div><div class="tabMenuItem" data-action="add-workflow">Workflow</div><div class="tabMenuItem" data-action="add-scripting">Scripting Console</div><div class="tabMenuSep"></div><div class="tabMenuItem" data-action="close-menu">Cancel</div>`;
+    plusMenuEl.addEventListener("click", (e) => {
+      const action = e.target?.closest?.(".tabMenuItem")?.getAttribute("data-action");
+      if (!action) return;
+      togglePlusMenu(false);
+      if (action === "add-dataset") shell.openDatasetTab?.();
+      else if (action === "add-dfm") shell.openDFMTab?.();
+      else if (action === "add-workflow") shell.openWorkflowTab?.();
+      else if (action === "add-scripting") shell.openScriptingTab?.();
+      else if (action === "import-workflow") shell.importWorkflow?.();
+    });
+    window.addEventListener("click", () => togglePlusMenu(false));
+    window.addEventListener("keydown", (ev) => { if (ev.key === "Escape") togglePlusMenu(false); });
+  }
+  if (plusMenuEl.parentNode !== document.body) document.body.appendChild(plusMenuEl);
+  if (plusBtnEl.parentNode !== host) host.appendChild(plusBtnEl);
+  host.appendChild(plusBtnEl);
+  if (document.body.dataset.plusMenuScrollWired !== "1") {
+    document.body.dataset.plusMenuScrollWired = "1";
+    window.addEventListener("scroll", () => { if (plusMenuEl?.classList.contains("open")) positionPlusMenu(); }, { passive: true });
+    window.addEventListener("resize", () => { if (plusMenuEl?.classList.contains("open")) positionPlusMenu(); });
+  }
+}
+
+export function togglePlusMenu(forceOpen) {
+  if (!plusMenuEl) return;
+  const shouldOpen = typeof forceOpen === "boolean" ? forceOpen : !plusMenuEl.classList.contains("open");
+  plusMenuEl.classList.toggle("open", shouldOpen);
+  if (shouldOpen) positionPlusMenu();
+}
+
+export function renderTabs() {
+  const host = $("tabs");
+  if (!host) return;
+  host.querySelectorAll(".tab").forEach(n => n.remove());
+  wireTabDnDHostOnce();
+  ensureDropIndicator(host);
+  for (const t of shell.state.tabs) {
+    if (isFloatingTab(t)) continue;
+    const el = document.createElement("div");
+    el.className = "tab" + (t.id === shell.state.activeId ? " active" : "");
+    el.setAttribute("data-tab-id", t.id);
+    el.addEventListener("click", () => { if (!isDragging) shell.setActive?.(t.id); });
+    el.addEventListener("contextmenu", (e) => { e.preventDefault(); openTabCtxMenu(t.id, e.clientX, e.clientY); });
+    if (t.id !== "home") {
+      el.draggable = false;
+      el.addEventListener("pointerdown", (e) => {
+        if (e.target?.closest?.("button.x")) return;
+        if (e.button !== 0) return;
+        ptrActive = true; ptrId = e.pointerId; ptrStartX = e.clientX; ptrStartY = e.clientY; ptrMoved = false; draggedTabId = t.id; dragEl = el;
+        try { el.setPointerCapture(e.pointerId); } catch {}
+      });
+      el.addEventListener("pointermove", (e) => {
+        if (!ptrActive || ptrId !== e.pointerId || !draggedTabId || !dragEl) return;
+        const dx = e.clientX - ptrStartX;
+        const dy = e.clientY - ptrStartY;
+        if (!ptrMoved) {
+          if (dy >= FLOAT_VERTICAL_THRESHOLD_PX && dy > Math.abs(dx) * 0.75) {
+            ptrMoved = true; tabDragMode = "float"; isDragging = true;
+            try { document.body.style.cursor = "grabbing"; } catch {}
+            shell.updateFloatPreview?.(e.clientX, e.clientY); e.preventDefault(); return;
+          }
+          if (Math.abs(dx) < DRAG_THRESHOLD_PX) return;
+          ptrMoved = true; tabDragMode = "reorder"; startDragIfNeeded($("tabs"), dragEl, e.pointerId); lockTabsOverflowDuringDrag();
+        }
+        if (tabDragMode === "float") { shell.updateFloatPreview?.(e.clientX, e.clientY); e.preventDefault(); return; }
+        if (tabDragMode !== "reorder" || !placeholderEl) return;
+        if (dragEl) dragEl.style.transform = `translate3d(${dx}px, 0px, 0px)`;
+        e.preventDefault();
+        const host = $("tabs");
+        if (!host) return;
+        const tabs = [...host.querySelectorAll('.tab[data-tab-id]')].filter(n => n.getAttribute("data-tab-id") !== draggedTabId);
+        let targetNode = null;
+        let indicatorX = null;
+        for (const node of tabs) {
+          const rect = node.getBoundingClientRect();
+          if (e.clientX < rect.left + rect.width / 2) { targetNode = node; indicatorX = rect.left; break; }
+        }
+        const beforeRects = new Map();
+        host.querySelectorAll('.tab[data-tab-id]').forEach(el => {
+          const id = el.getAttribute("data-tab-id");
+          if (!id || id === draggedTabId || el.classList.contains("placeholder")) return;
+          beforeRects.set(id, el.getBoundingClientRect());
+        });
+        if (targetNode) { if (placeholderEl.nextSibling !== targetNode) host.insertBefore(placeholderEl, targetNode); showIndicatorAt(host, indicatorX); }
+        else { if (placeholderEl.parentNode !== host || placeholderEl !== host.lastChild) host.appendChild(placeholderEl); showIndicatorAt(host, host.getBoundingClientRect().right - 2); }
+        const newIndex = Array.from(host.children).indexOf(placeholderEl);
+        if (newIndex !== lastPlaceholderIndex) { lastPlaceholderIndex = newIndex; flipAnimateTabs(host, beforeRects); }
+      });
+      el.addEventListener("pointerup", (e) => {
+        if (!ptrActive || ptrId !== e.pointerId) return;
+        if (!ptrMoved) { cleanupDragUI(); return; }
+        if (tabDragMode === "float") {
+          const rect = shell.defaultFloatRectFromPointer?.(e.clientX, e.clientY);
+          const id = draggedTabId;
+          cleanupDragUI();
+          shell.floatTab?.(id, rect);
+          return;
+        }
+        if (tabDragMode === "reorder") commitOrderFromDom();
+        cleanupDragUI(); shell.render?.(); shell.saveState?.();
+      });
+      el.addEventListener("pointercancel", (e) => { if (ptrActive && ptrId === e.pointerId) cleanupDragUI(); });
+    }
+    const label = document.createElement("span");
+    label.textContent = t.title;
+    el.appendChild(label);
+    if (t.id !== "home") {
+      const x = document.createElement("button");
+      x.className = "x" + (t.isDirty ? " dirty" : "");
+      x.textContent = "x";
+      if (t.isDirty) { const dot = document.createElement("span"); dot.className = "dirtyDot"; x.appendChild(dot); x.title = "Unsaved changes (close tab)"; }
+      else x.title = "Close";
+      x.addEventListener("click", (e) => { e.stopPropagation(); shell.closeTab?.(t.id); });
+      el.appendChild(x);
+    }
+    host.appendChild(el);
+  }
+  ensurePlusMenu(host);
+}
+
+const tabCtxMenu = document.getElementById("tabCtxMenu");
+
+export function closeTabCtxMenu() {
+  if (!tabCtxMenu) return;
+  tabCtxMenu.classList.remove("open");
+  tabCtxId = null;
+}
+
+function positionTabCtxMenu(x, y) {
+  if (!tabCtxMenu) return;
+  const pad = 8;
+  const maxX = window.innerWidth - tabCtxMenu.offsetWidth - pad;
+  const maxY = window.innerHeight - tabCtxMenu.offsetHeight - pad;
+  tabCtxMenu.style.left = `${Math.max(pad, Math.min(x, maxX))}px`;
+  tabCtxMenu.style.top = `${Math.max(pad, Math.min(y, maxY))}px`;
+}
+
+function openTabCtxMenu(tabId, x, y) {
+  if (!tabCtxMenu) return;
+  tabCtxId = tabId;
+  tabCtxMenu.querySelectorAll(".tabCtxItem").forEach((el) => el.classList.toggle("disabled", tabId === "home"));
+  tabCtxMenu.classList.add("open");
+  positionTabCtxMenu(x, y);
+}
+
+export function initTabStrip() {
+  if (tabStripWired) return;
+  tabStripWired = true;
+  tabCtxMenu?.addEventListener("click", (e) => {
+    const item = e.target?.closest?.(".tabCtxItem");
+    const action = item?.getAttribute("data-action");
+    if (!action || item.classList.contains("disabled")) return;
+    const id = tabCtxId;
+    closeTabCtxMenu();
+    if (!id) return;
+    if (action === "close") shell.closeTab?.(id);
+    else if (action === "close-others") shell.closeTabsExcept?.([id]);
+    else if (action === "close-all") shell.closeTabsExcept?.([]);
+  });
+  window.addEventListener("click", () => closeTabCtxMenu());
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeTabCtxMenu(); });
+}

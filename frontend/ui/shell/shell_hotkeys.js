@@ -1,0 +1,116 @@
+﻿import { shell } from "./shell_context.js?v=20260430d";
+
+let lastKeyCombo = "";
+let lastKeyTime = 0;
+let hotkeysWired = false;
+
+function normalizeKeyCombo(e) {
+  const parts = [];
+  if (e.ctrlKey) parts.push("Ctrl");
+  if (e.altKey) parts.push("Alt");
+  if (e.shiftKey) parts.push("Shift");
+  let k = e.key;
+  if (k === "r" || k === "R") k = "R";
+  if (k === "F5") k = "F5";
+  if (k && k.length === 1 && k >= "a" && k <= "z") k = k.toUpperCase();
+  parts.push(k);
+  return parts.join("+");
+}
+
+function shouldIgnoreHotkey(e) {
+  const el = e.target;
+  if (!el) return false;
+  const tag = el.tagName?.toLowerCase();
+  if (tag === "input" || tag === "textarea" || tag === "select") return true;
+  if (el.isContentEditable) return true;
+  return false;
+}
+
+const hotkeys = {
+  "Ctrl+F5": "custom_refresh",
+  "Ctrl+R": "custom_refresh",
+  "Ctrl+Shift+R": "custom_hard_refresh",
+  "Ctrl+Shift+K": "clear_test_data",
+  "Alt+W": "tab_close",
+  "Ctrl+H": "dfm_exclude_high",
+  "Ctrl+L": "dfm_exclude_low",
+  "Ctrl+I": "dfm_include_all",
+  "Ctrl+S": "file_save",
+  "Ctrl+Shift+S": "file_save_as",
+  "Ctrl+O": "file_import",
+  "Ctrl+P": "file_print",
+  "Ctrl+Shift+F": "view_toggle_nav",
+  "Ctrl+Shift+L": "view_toggle_line_numbers",
+  "Ctrl+Shift+E": "view_toggle_exec_time",
+  "Ctrl+Q": "app_shutdown",
+  "Ctrl+Alt+R": "file_restart",
+};
+
+export function runHotkeyAction(action) {
+  if (action === "custom_refresh") return shell.refreshActiveTab?.();
+  if (action === "custom_hard_refresh") return shell.customHardRefresh?.();
+  if (action === "clear_test_data") return shell.clearTestData?.();
+  if (action === "tab_close") return shell.closeTab?.(shell.state.activeId);
+  if (action === "dfm_exclude_high") { if (shell.isActiveDFMTab?.()) shell.sendDFMCommand?.("arcrho:dfm-exclude-high"); return; }
+  if (action === "dfm_exclude_low") { if (shell.isActiveDFMTab?.()) shell.sendDFMCommand?.("arcrho:dfm-exclude-low"); return; }
+  if (action === "dfm_include_all") { if (shell.isActiveDFMTab?.()) shell.sendDFMCommand?.("arcrho:dfm-include-all"); return; }
+  if (action === "file_save") {
+    if (shell.isActiveWorkflowTab?.()) shell.sendWorkflowCommand?.("arcrho:workflow-save");
+    else if (shell.isActiveDFMTab?.()) shell.sendDFMCommand?.("arcrho:dfm-save");
+    else if (shell.isActiveScriptingTab?.()) shell.sendScriptingCommand?.("arcrho:scripting-save");
+    else if (shell.isActiveProjectSettingsReservingClassTypesTab?.()) shell.sendProjectSettingsCommand?.("arcrho:project-settings-reserving-class-types-save-local");
+    else if (shell.isActiveProjectSettingsDatasetTypesTab?.()) shell.sendProjectSettingsCommand?.("arcrho:project-settings-dataset-types-save-local");
+    return;
+  }
+  if (action === "file_save_as") {
+    if (shell.isActiveWorkflowTab?.()) shell.sendWorkflowCommand?.("arcrho:workflow-save-as");
+    else if (shell.isActiveDFMTab?.()) shell.sendDFMCommand?.(shell.isActiveDFMDetailsTab?.() ? "arcrho:dfm-save-template" : "arcrho:dfm-save-as");
+    else if (shell.isActiveScriptingTab?.()) shell.sendScriptingCommand?.("arcrho:scripting-save-as");
+    else if (shell.isActiveProjectSettingsReservingClassTypesTab?.()) shell.sendProjectSettingsCommand?.("arcrho:project-settings-reserving-class-types-load-local");
+    else if (shell.isActiveProjectSettingsDatasetTypesTab?.()) shell.sendProjectSettingsCommand?.("arcrho:project-settings-dataset-types-load-local");
+    return;
+  }
+  if (action === "file_import") return shell.importWorkflow?.();
+  if (action === "file_print") return shell.printActiveTab?.();
+  if (action === "view_toggle_nav") return shell.toggleNavigationPanel?.();
+  if (action === "view_toggle_line_numbers") { if (shell.isActiveScriptingTab?.()) shell.sendScriptingCommand?.("arcrho:scripting-toggle-line-numbers"); return; }
+  if (action === "view_toggle_exec_time") { if (shell.isActiveScriptingTab?.()) shell.sendScriptingCommand?.("arcrho:scripting-toggle-exec-time"); return; }
+  if (action === "file_restart") return shell.restartApplication?.();
+  if (action === "app_shutdown") return shell.shutdownApplication?.();
+}
+
+export function initHotkeys() {
+  if (hotkeysWired) return;
+  hotkeysWired = true;
+  window.__arcrho_should_intercept_close = function () {
+    return lastKeyCombo === "Ctrl+W" && (Date.now() - lastKeyTime) < 900;
+  };
+  window.addEventListener("keydown", (e) => {
+    if (!shell.hostZoomAvailable?.() && e.ctrlKey && !e.altKey) {
+      if (e.key === "-" || e.key === "_") { e.preventDefault(); shell.setZoomPercent?.((shell.getZoomPercent?.() || 100) - shell.ZOOM_STEP, true); return; }
+      if (e.key === "=" || e.key === "+") { e.preventDefault(); shell.setZoomPercent?.((shell.getZoomPercent?.() || 100) + shell.ZOOM_STEP, true); return; }
+      if (e.key === "0") { e.preventDefault(); shell.setZoomPercent?.(100, true); return; }
+    }
+    if (shouldIgnoreHotkey(e)) return;
+    const combo = normalizeKeyCombo(e);
+    lastKeyCombo = combo;
+    lastKeyTime = Date.now();
+    if (combo === "Ctrl+W") {
+      e.preventDefault();
+      e.stopPropagation();
+      shell.closeTab?.(shell.state.activeId);
+      return;
+    }
+    const action = hotkeys[combo];
+    if (!action) return;
+    e.preventDefault();
+    e.stopPropagation();
+    runHotkeyAction(action);
+  }, { capture: true });
+  window.addEventListener("wheel", (e) => {
+    if (!e.ctrlKey) return;
+    if (shell.hostZoomAvailable?.()) return;
+    e.preventDefault();
+    shell.adjustZoomByDelta?.(e.deltaY || 0);
+  }, { capture: true, passive: false });
+}
