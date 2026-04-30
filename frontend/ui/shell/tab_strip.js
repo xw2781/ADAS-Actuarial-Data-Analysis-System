@@ -1,5 +1,5 @@
-﻿import { $, shell } from "./shell_context.js?v=20260430d";
-import { FLOAT_VERTICAL_THRESHOLD_PX, isFloatingTab } from "./floating_tabs.js?v=20260430d";
+import { $, shell } from "./shell_context.js?v=20260430k";
+import { FLOAT_VERTICAL_RETURN_THRESHOLD_PX, FLOAT_VERTICAL_THRESHOLD_PX, isFloatingTab } from "./floating_tabs.js?v=20260430k";
 
 let draggedTabId = null;
 let dragEl = null;
@@ -138,8 +138,19 @@ function ensurePlaceholderFrom(el) {
   return ph;
 }
 
+function removePlaceholder() {
+  if (placeholderEl && placeholderEl.parentNode) placeholderEl.parentNode.removeChild(placeholderEl);
+  placeholderEl = null;
+  lastPlaceholderIndex = -1;
+}
+
+function tabStripFloatDistance(host, clientY) {
+  const r = host?.getBoundingClientRect?.();
+  return r ? clientY - r.bottom : 0;
+}
+
 function startDragIfNeeded(host, el, pointerId) {
-  if (!host || !el || isDragging) return;
+  if (!host || !el || dragElPrevStyle) return;
   isDragging = true;
   lockTabsHostLayout(host);
   try { document.body.style.cursor = "grabbing"; } catch {}
@@ -168,6 +179,54 @@ function startDragIfNeeded(host, el, pointerId) {
   el.style.transform = "translate3d(0px, 0px, 0px)";
   host.insertBefore(ensurePlaceholderFrom(el), el);
   try { el.setPointerCapture(pointerId); } catch {}
+}
+
+function enterFloatDragMode(clientX, clientY) {
+  if (tabDragMode === "float") return;
+  tabDragMode = "float";
+  ptrMoved = true;
+  isDragging = true;
+  hideIndicator();
+  removePlaceholder();
+  try { document.body.style.cursor = "grabbing"; } catch {}
+  shell.updateFloatPreview?.(clientX, clientY);
+}
+
+function enterReorderDragMode(host, pointerId) {
+  if (!host || !dragEl) return;
+  if (tabDragMode !== "reorder") {
+    tabDragMode = "reorder";
+    ptrMoved = true;
+    shell.removeFloatPreview?.();
+    startDragIfNeeded(host, dragEl, pointerId);
+    lockTabsOverflowDuringDrag();
+  }
+  if (!placeholderEl) {
+    host.insertBefore(ensurePlaceholderFrom(dragEl), dragEl);
+  }
+}
+
+function updateReorderDrag(clientX, pointerId) {
+  const host = $("tabs");
+  enterReorderDragMode(host, pointerId);
+  if (!host || !placeholderEl) return;
+  const tabs = [...host.querySelectorAll('.tab[data-tab-id]')].filter(n => n.getAttribute("data-tab-id") !== draggedTabId);
+  let targetNode = null;
+  let indicatorX = null;
+  for (const node of tabs) {
+    const rect = node.getBoundingClientRect();
+    if (clientX < rect.left + rect.width / 2) { targetNode = node; indicatorX = rect.left; break; }
+  }
+  const beforeRects = new Map();
+  host.querySelectorAll('.tab[data-tab-id]').forEach(el => {
+    const id = el.getAttribute("data-tab-id");
+    if (!id || id === draggedTabId || el.classList.contains("placeholder")) return;
+    beforeRects.set(id, el.getBoundingClientRect());
+  });
+  if (targetNode) { if (placeholderEl.nextSibling !== targetNode) host.insertBefore(placeholderEl, targetNode); showIndicatorAt(host, indicatorX); }
+  else { if (placeholderEl.parentNode !== host || placeholderEl !== host.lastChild) host.appendChild(placeholderEl); showIndicatorAt(host, host.getBoundingClientRect().right - 2); }
+  const newIndex = Array.from(host.children).indexOf(placeholderEl);
+  if (newIndex !== lastPlaceholderIndex) { lastPlaceholderIndex = newIndex; flipAnimateTabs(host, beforeRects); }
 }
 
 function commitOrderFromDom() {
@@ -314,38 +373,22 @@ export function renderTabs() {
         if (!ptrActive || ptrId !== e.pointerId || !draggedTabId || !dragEl) return;
         const dx = e.clientX - ptrStartX;
         const dy = e.clientY - ptrStartY;
+        const host = $("tabs");
+        const floatDistance = tabStripFloatDistance(host, e.clientY);
+        const shouldFloat = floatDistance >= FLOAT_VERTICAL_THRESHOLD_PX;
+        const shouldReturnToReorder = floatDistance <= FLOAT_VERTICAL_RETURN_THRESHOLD_PX;
         if (!ptrMoved) {
-          if (dy >= FLOAT_VERTICAL_THRESHOLD_PX && dy > Math.abs(dx) * 0.75) {
-            ptrMoved = true; tabDragMode = "float"; isDragging = true;
-            try { document.body.style.cursor = "grabbing"; } catch {}
-            shell.updateFloatPreview?.(e.clientX, e.clientY); e.preventDefault(); return;
-          }
+          if (shouldFloat && dy > 0) { enterFloatDragMode(e.clientX, e.clientY); e.preventDefault(); return; }
           if (Math.abs(dx) < DRAG_THRESHOLD_PX) return;
-          ptrMoved = true; tabDragMode = "reorder"; startDragIfNeeded($("tabs"), dragEl, e.pointerId); lockTabsOverflowDuringDrag();
+          enterReorderDragMode(host, e.pointerId);
         }
+        if (tabDragMode === "reorder" && shouldFloat && dy > 0) enterFloatDragMode(e.clientX, e.clientY);
+        else if (tabDragMode === "float" && shouldReturnToReorder) enterReorderDragMode(host, e.pointerId);
         if (tabDragMode === "float") { shell.updateFloatPreview?.(e.clientX, e.clientY); e.preventDefault(); return; }
         if (tabDragMode !== "reorder" || !placeholderEl) return;
         if (dragEl) dragEl.style.transform = `translate3d(${dx}px, 0px, 0px)`;
         e.preventDefault();
-        const host = $("tabs");
-        if (!host) return;
-        const tabs = [...host.querySelectorAll('.tab[data-tab-id]')].filter(n => n.getAttribute("data-tab-id") !== draggedTabId);
-        let targetNode = null;
-        let indicatorX = null;
-        for (const node of tabs) {
-          const rect = node.getBoundingClientRect();
-          if (e.clientX < rect.left + rect.width / 2) { targetNode = node; indicatorX = rect.left; break; }
-        }
-        const beforeRects = new Map();
-        host.querySelectorAll('.tab[data-tab-id]').forEach(el => {
-          const id = el.getAttribute("data-tab-id");
-          if (!id || id === draggedTabId || el.classList.contains("placeholder")) return;
-          beforeRects.set(id, el.getBoundingClientRect());
-        });
-        if (targetNode) { if (placeholderEl.nextSibling !== targetNode) host.insertBefore(placeholderEl, targetNode); showIndicatorAt(host, indicatorX); }
-        else { if (placeholderEl.parentNode !== host || placeholderEl !== host.lastChild) host.appendChild(placeholderEl); showIndicatorAt(host, host.getBoundingClientRect().right - 2); }
-        const newIndex = Array.from(host.children).indexOf(placeholderEl);
-        if (newIndex !== lastPlaceholderIndex) { lastPlaceholderIndex = newIndex; flipAnimateTabs(host, beforeRects); }
+        updateReorderDrag(e.clientX, e.pointerId);
       });
       el.addEventListener("pointerup", (e) => {
         if (!ptrActive || ptrId !== e.pointerId) return;

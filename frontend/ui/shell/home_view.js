@@ -1,4 +1,4 @@
-﻿import { shell } from "./shell_context.js?v=20260430d";
+import { shell } from "./shell_context.js?v=20260430k";
 
 let homeWired = false;
 

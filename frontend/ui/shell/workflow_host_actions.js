@@ -1,4 +1,4 @@
-﻿import { shell } from "./shell_context.js?v=20260430d";
+import { shell } from "./shell_context.js?v=20260430k";
 
 const LAST_WF_PATH_KEY = "arcrho_last_workflow_path_v1";
 const WF_IMPORT_HANDLE_KEY = "workflow_import_handle";

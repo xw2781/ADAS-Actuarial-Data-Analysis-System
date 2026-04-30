@@ -1,17 +1,17 @@
-﻿import { getHostApi, registerShellApi } from "./shell_context.js?v=20260430d";
-import { ensureActiveTabInvariant, getFirstDockedTabId, loadState, saveState, state } from "./shell_state.js?v=20260430d";
-import { applyAppFont, applyZoom, adjustZoomByDelta, broadcastAppFont, broadcastZoomToIframes, closeFontSettingsModal, closeForceRebuildSettingsModal, getAutoSaveEnabled, getForceRebuildEnabled, getZoomPercent, hideGlobalTooltip, hostZoomAvailable, initAutoSaveToggle, initFontSettingsModal, initForceRebuildSettingsModal, initShellPreferences, initZoomControls, loadAppFont, openFontSettingsModal, openForceRebuildSettingsModal, setAutoSaveEnabled, setForceRebuildEnabled, setZoomPercent, showGlobalTooltip, ZOOM_STEP } from "./shell_preferences.js?v=20260430d";
-import { clearSavedStatusOnDirty, formatStatusTimestamp, getStatusBarHeight, initClock, updateStatusBar } from "./status_bar.js?v=20260430d";
-import { closeRootPathSettingsModal, initRootPathSettingsModal, openRootPathSettingsModal } from "./root_path_settings.js?v=20260430d";
-import { clearCacheAndReload, customHardRefresh, initAppLifecycle, refreshActiveTab, restartApplication, sendShutdownSignal, showAppConfirm, shutdownApplication } from "./app_lifecycle.js?v=20260430d";
-import { clearTestData, getLastWorkflowDir, getLastWorkflowPath, getWorkflowTabState, importWorkflow, postToWorkflowTab, setLastWorkflowPath } from "./workflow_host_actions.js?v=20260430d";
-import { closeTab, closeTabsExcept, dockTab, floatTab, openBrowsingHistoryTab, openDatasetTab, openDFMTab, openProjectSettingsTab, openScriptingTab, openWorkflowTab, setActive, setDockedActive } from "./tab_actions.js?v=20260430d";
-import { applyDockedIframeLayout, clampFloatingTabsToContent, clampFloatRect, defaultFloatRectFromPointer, ensureContentContainers, ensureIframe, notifyBrowsingHistoryTabs, notifyTabActivated, printActiveTab, removeFloatPreview, renderContent, renderFloatingWindows, updateFloatPreview } from "./shell_content.js?v=20260430d";
-import { closeTabCtxMenu, initTabStrip, isTabStripDragging, renderTabs, togglePlusMenu } from "./tab_strip.js?v=20260430d";
-import { closeAllShellMenus, initShellMenus, isActiveDFMDetailsTab, isActiveDFMTab, isActiveProjectSettingsDatasetTypesTab, isActiveProjectSettingsReservingClassTypesTab, isActiveScriptingTab, isActiveWorkflowTab, sendDFMCommand, sendProjectSettingsCommand, sendScriptingCommand, sendWorkflowCommand, setDfmEditEnabled, toggleNavigationPanel, updateEditMenuState, updateFileMenuState, updateViewMenuState } from "./shell_menus.js?v=20260430d";
-import { initHotkeys, runHotkeyAction } from "./shell_hotkeys.js?v=20260430d";
-import { initShellMessages } from "./shell_messages.js?v=20260430d";
-import { initResizeHandle, initTitlebarControls } from "./titlebar_controls.js?v=20260430d";
+import { getHostApi, registerShellApi } from "./shell_context.js?v=20260430k";
+import { ensureActiveTabInvariant, getFirstDockedTabId, loadState, saveState, state } from "./shell_state.js?v=20260430k";
+import { applyAppFont, applyZoom, adjustZoomByDelta, broadcastAppFont, broadcastZoomToIframes, closeFontSettingsModal, closeForceRebuildSettingsModal, getAutoSaveEnabled, getForceRebuildEnabled, getZoomPercent, hideGlobalTooltip, hostZoomAvailable, initAutoSaveToggle, initFontSettingsModal, initForceRebuildSettingsModal, initShellPreferences, initZoomControls, loadAppFont, openFontSettingsModal, openForceRebuildSettingsModal, setAutoSaveEnabled, setForceRebuildEnabled, setZoomPercent, showGlobalTooltip, ZOOM_STEP } from "./shell_preferences.js?v=20260430k";
+import { clearSavedStatusOnDirty, formatStatusTimestamp, getStatusBarHeight, initClock, updateStatusBar } from "./status_bar.js?v=20260430k";
+import { closeRootPathSettingsModal, initRootPathSettingsModal, openRootPathSettingsModal } from "./root_path_settings.js?v=20260430k";
+import { clearCacheAndReload, customHardRefresh, initAppLifecycle, refreshActiveTab, restartApplication, sendShutdownSignal, showAppConfirm, shutdownApplication } from "./app_lifecycle.js?v=20260430k";
+import { clearTestData, getLastWorkflowDir, getLastWorkflowPath, getWorkflowTabState, importWorkflow, postToWorkflowTab, setLastWorkflowPath } from "./workflow_host_actions.js?v=20260430k";
+import { closeTab, closeTabsExcept, dockTab, floatTab, openBrowsingHistoryTab, openDatasetTab, openDFMTab, openProjectSettingsTab, openScriptingTab, openWorkflowTab, setActive, setDockedActive } from "./tab_actions.js?v=20260430k";
+import { applyDockedIframeLayout, clampFloatingTabsToContent, clampFloatRect, defaultFloatRectFromPointer, ensureContentContainers, ensureIframe, notifyBrowsingHistoryTabs, notifyTabActivated, printActiveTab, removeFloatPreview, renderContent, renderFloatingWindows, updateFloatPreview } from "./shell_content.js?v=20260430k";
+import { closeTabCtxMenu, initTabStrip, isTabStripDragging, renderTabs, togglePlusMenu } from "./tab_strip.js?v=20260430k";
+import { closeAllShellMenus, initShellMenus, isActiveDFMDetailsTab, isActiveDFMTab, isActiveProjectSettingsDatasetTypesTab, isActiveProjectSettingsReservingClassTypesTab, isActiveScriptingTab, isActiveWorkflowTab, sendDFMCommand, sendProjectSettingsCommand, sendScriptingCommand, sendWorkflowCommand, setDfmEditEnabled, toggleNavigationPanel, updateEditMenuState, updateFileMenuState, updateViewMenuState } from "./shell_menus.js?v=20260430k";
+import { initHotkeys, runHotkeyAction } from "./shell_hotkeys.js?v=20260430k";
+import { initShellMessages } from "./shell_messages.js?v=20260430k";
+import { initResizeHandle, initTitlebarControls } from "./titlebar_controls.js?v=20260430k";
 
 const UI_VERSION_PARAM = new URLSearchParams(window.location.search).get("v") || String(Date.now());
 

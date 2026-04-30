@@ -1,8 +1,8 @@
-﻿import { $, shell } from "./shell_context.js?v=20260430d";
-import { createIframeHost } from "./iframe_host.js?v=20260430d";
-import { createFloatingTabsController, isFloatingTab } from "./floating_tabs.js?v=20260430d";
+import { $, shell } from "./shell_context.js?v=20260430k";
+import { createIframeHost } from "./iframe_host.js?v=20260430k";
+import { createFloatingTabsController, isFloatingTab } from "./floating_tabs.js?v=20260430k";
 import { normalizeBrowsingHistoryEntry } from "/ui/shell/browsing_history.js";
-import { renderHomeViewOnce } from "./home_view.js?v=20260430d";
+import { renderHomeViewOnce } from "./home_view.js?v=20260430k";
 
 const datasetAutoRefreshDone = new Set();
 let homeView = null;

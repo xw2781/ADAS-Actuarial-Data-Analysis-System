@@ -1,5 +1,5 @@
-﻿import { shell } from "./shell_context.js?v=20260430d";
-import { isFloatingTab } from "./floating_tabs.js?v=20260430d";
+import { shell } from "./shell_context.js?v=20260430k";
+import { isFloatingTab } from "./floating_tabs.js?v=20260430k";
 import {
   getLastViewedDatasetInputs,
   normalizeBrowsingHistoryEntry,
@@ -29,6 +29,7 @@ export function floatTab(id, rect) {
   tab.floatRect = shell.clampFloatRect?.(rect || shell.defaultFloatRectFromPointer?.(window.innerWidth / 2, window.innerHeight / 2));
   tab.floatZ = shell.state.nextFloatZ++;
   tab.floatMinimized = false;
+  tab.floatAnimateIn = true;
   shell.state.activeId = tab.id;
   if (shell.state.lastDockedActiveId === tab.id) shell.state.lastDockedActiveId = shell.getFirstDockedTabId?.() || "home";
   shell.ensureActiveTabInvariant?.();
@@ -43,6 +44,7 @@ export function dockTab(id) {
   tab.floatRect = null;
   tab.floatZ = 0;
   tab.floatMinimized = false;
+  tab.floatRestoreRect = null;
   setDockedActive(tab.id);
   shell.render?.();
   shell.saveState?.();

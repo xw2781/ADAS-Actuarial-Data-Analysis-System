@@ -1,0 +1,15 @@
+{
+  "type": "improvement",
+  "scope": "shell",
+  "audience": "user",
+  "summary": "Main tab dragging now switches between tab reordering and floating-window preview based on vertical distance from the tab strip.",
+  "details": [
+    "Dragging a tab about 30px below the strip shows the floating-window preview, while dragging back near the strip hides the preview and resumes tab arrangement before release.",
+    "The floating window top-right resize hitbox stays clear of the title-bar window controls.",
+    "Floating windows can now be resized from each edge as well as each corner.",
+    "Floating windows can be moved partially beyond the left or right app-shell edge while keeping a reachable portion inside the app.",
+    "Floating and docking now use a short scale/fade animation while preserving the existing iframe session.",
+    "Dragging a floating window to the left or right shell edge now shows a half-frame snap preview and releasing there snaps the window into that half.",
+    "After a half-frame snap, dragging the snapped title bar beyond a small threshold restores the previous floating size before moving."
+  ]
+}
