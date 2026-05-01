@@ -7,19 +7,171 @@ from pathlib import Path
 from typing import Any
 
 
-def find_project_root(start_path: Path, root_name: str = "ADAS") -> Path:
+PROJECT_ROOT_NAMES = ("ArcRho Server", "ArcRho", "ADAS")
+
+COMPONENTS = {
+    "engine": {
+        "dirs": ("arcrho_engine", "ArcRho Engine", "ADAS Agent"),
+        "apps": ("ArcRho Engine", "ADAS Agent"),
+    },
+    "orchestrator": {
+        "dirs": ("arcrho_orchestrator", "ArcRho Orchestrator", "ADAS Master"),
+        "apps": ("ArcRho Orchestrator", "ADAS Master"),
+    },
+    "launcher": {
+        "dirs": ("arcrho_launcher", "ArcRho Launcher", "ADAS Shell"),
+        "apps": ("ArcRho Launcher", "ADAS Shell"),
+    },
+}
+
+COMPONENT_ALIASES = {
+    "agent": "engine",
+    "worker": "engine",
+    "engine": "engine",
+    "master": "orchestrator",
+    "manager": "orchestrator",
+    "supervisor": "orchestrator",
+    "orchestrator": "orchestrator",
+    "shell": "launcher",
+    "launcher": "launcher",
+}
+
+
+def find_project_root(start_path: Path, root_name: str | tuple[str, ...] = PROJECT_ROOT_NAMES) -> Path:
+    root_names = (root_name,) if isinstance(root_name, str) else root_name
+    root_names_lower = {name.lower() for name in root_names}
     current = start_path.resolve()
     for candidate in (current, *current.parents):
-        if candidate.name.lower() == root_name.lower():
+        if candidate.name.lower() in root_names_lower:
             return candidate
-    raise RuntimeError(f'Could not find parent folder "{root_name}" from: {start_path}')
+        if (
+            (candidate / "core" / "utils.py").exists()
+            and (
+                (candidate / "config" / "config.json").exists()
+                or (candidate / "core" / "config.json").exists()
+            )
+        ):
+            return candidate
+    names = ", ".join(root_names)
+    raise RuntimeError(f'Could not find parent folder named one of [{names}] from: {start_path}')
+
 
 PROJECT_ROOT = find_project_root(Path(__file__).resolve().parent)
 
-CONFIG_PATH = Path(os.environ.get(
-    "ADAS_CONFIG",
-    rf"{PROJECT_ROOT}\core\config.json"
-))
+_CONFIG_ENV = os.environ.get("ARCRHO_CONFIG") or os.environ.get("ADAS_CONFIG")
+_DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config" / "config.json"
+_LEGACY_CONFIG_PATH = PROJECT_ROOT / "core" / "config.json"
+CONFIG_PATH = Path(
+    _CONFIG_ENV
+    or (
+        _LEGACY_CONFIG_PATH
+        if _LEGACY_CONFIG_PATH.exists() and not _DEFAULT_CONFIG_PATH.exists()
+        else _DEFAULT_CONFIG_PATH
+    )
+)
+
+
+def get_project_root() -> Path:
+    configured_root = os.environ.get("ARCRHO_ROOT") or os.environ.get("ADAS_ROOT")
+    if configured_root:
+        return Path(configured_root).expanduser().resolve()
+    return PROJECT_ROOT
+
+
+def component_key(role: str) -> str:
+    key = COMPONENT_ALIASES.get(str(role).strip().lower())
+    if key is None:
+        known = ", ".join(sorted(COMPONENT_ALIASES))
+        raise KeyError(f"Unknown ArcRho component role '{role}'. Known roles: {known}")
+    return key
+
+
+def component_dir_candidates(role: str) -> tuple[str, ...]:
+    return COMPONENTS[component_key(role)]["dirs"]
+
+
+def component_app_candidates(role: str) -> tuple[str, ...]:
+    return COMPONENTS[component_key(role)]["apps"]
+
+
+def component_app_name(role: str) -> str:
+    return component_app_candidates(role)[0]
+
+
+def resolve_existing_path(*paths: str | os.PathLike) -> Path:
+    candidates = [Path(path) for path in paths]
+    for path in candidates:
+        if path.exists():
+            return path
+    return candidates[0]
+
+
+def resolve_app_dir(role: str) -> Path:
+    root = get_project_root()
+    candidates = [root / "core" / name for name in component_dir_candidates(role)]
+    return resolve_existing_path(*candidates)
+
+
+def resolve_app_path(role: str, *parts: str | os.PathLike) -> Path:
+    normalized_parts = tuple(str(part) for part in parts)
+    if normalized_parts and normalized_parts[0].lower() == "instances":
+        return get_project_root().joinpath(
+            "runtime",
+            "instances",
+            component_dir_candidates(role)[0],
+            *normalized_parts[1:],
+        )
+    return resolve_app_dir(role).joinpath(*parts)
+
+
+def resolve_app_exe(role: str) -> Path:
+    root = get_project_root()
+    app_dir = resolve_app_dir(role)
+    component_dir_name = component_dir_candidates(role)[0]
+    candidates = [
+        root / "builds" / component_dir_name / "dist" / app_name / f"{app_name}.exe"
+        for app_name in component_app_candidates(role)
+    ]
+    candidates.extend(
+        app_dir / "dist" / app_name / f"{app_name}.exe"
+        for app_name in component_app_candidates(role)
+    )
+    return resolve_existing_path(*candidates)
+
+
+FUNCTION_ALIASES = {
+    "ArcRhoTri": "ADASTri",
+    "ArcRhoVec": "ADASVec",
+    "ArcRhoProjectSettings": "ADASProjectSettings",
+    "ArcRhoHeaders": "ADASHeaders",
+}
+
+CONFIG_KEY_ALIASES = {
+    "apps.engine.": "apps.agent.",
+    "apps.agent.": "apps.engine.",
+    "apps.orchestrator.": "apps.master.",
+    "apps.master.": "apps.orchestrator.",
+}
+
+
+def normalize_function_name(function_name: Any) -> str:
+    return FUNCTION_ALIASES.get(str(function_name), str(function_name))
+
+
+def function_brand(function_name: Any) -> str:
+    return "ArcRho" if str(function_name).lower().startswith("arcrho") else "ADAS"
+
+
+def is_vector_function(function_name: Any) -> bool:
+    return normalize_function_name(function_name) == "ADASVec"
+
+
+def config_key_candidates(key_path: str) -> list[str]:
+    candidates = [key_path]
+    for prefix, alias_prefix in CONFIG_KEY_ALIASES.items():
+        if key_path.startswith(prefix):
+            candidates.append(alias_prefix + key_path[len(prefix):])
+    return candidates
 
 
 class File:
@@ -161,17 +313,23 @@ def get_config_value(
     """
     key_path example:
       'shared.data_dir'
-      'apps.agent.max_workers'
+      'apps.orchestrator.max_workers'
     """
     data = load_config()
 
-    cur = data
-    for key in key_path.split("."):
-        if not isinstance(cur, dict) or key not in cur:
-            return default
-        cur = cur[key]
+    if key_path == "root":
+        return str(get_project_root())
 
-    return cur
+    for candidate in config_key_candidates(key_path):
+        cur = data
+        for key in candidate.split("."):
+            if not isinstance(cur, dict) or key not in cur:
+                break
+            cur = cur[key]
+        else:
+            return cur
+
+    return default
 
 
 def set_config_value(
