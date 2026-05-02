@@ -55,5 +55,5 @@ Detected `arcrho:*` message types in key JS files:
 <!-- MANUAL:BEGIN -->
 - Keyboard handling is sensitive to edit mode, command mode, IME/composition, and Monaco focus.
 - Multi-cell selection, queueing, markdown folding, and drag/drop share state and can regress each other.
-- Long feature notes should stay in this module doc or release fragments, not in `docs/frontend/INDEX.md`.
+- Long feature notes should stay in this module doc or release fragments, not in `docs/ui/INDEX.md`.
 <!-- MANUAL:END -->

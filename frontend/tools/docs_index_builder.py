@@ -436,7 +436,7 @@ def parse_package_json() -> Dict[str, object]:
 
 FRONTEND_DOC_META: Mapping[str, Dict[str, object]] = {
     "shell": {
-        "doc": "docs/frontend/shell.md",
+        "doc": "docs/ui/shell.md",
         "html": ["ui/index.html"],
         "files": [
             ("ui/index.html", "Main desktop shell page and menu structure."),
@@ -462,7 +462,7 @@ FRONTEND_DOC_META: Mapping[str, Dict[str, object]] = {
         ],
     },
     "dataset": {
-        "doc": "docs/frontend/dataset.md",
+        "doc": "docs/ui/dataset.md",
         "html": ["ui/dataset/dataset_viewer.html"],
         "files": [
             ("ui/dataset/dataset_viewer.html", "Dataset page HTML entrypoint."),
@@ -473,7 +473,7 @@ FRONTEND_DOC_META: Mapping[str, Dict[str, object]] = {
         ],
     },
     "dfm": {
-        "doc": "docs/frontend/dfm.md",
+        "doc": "docs/ui/dfm.md",
         "html": ["ui/dfm/dfm.html"],
         "files": [
             ("ui/dfm/dfm.html", "DFM container page with tab slots."),
@@ -486,7 +486,7 @@ FRONTEND_DOC_META: Mapping[str, Dict[str, object]] = {
         ],
     },
     "workflow": {
-        "doc": "docs/frontend/workflow.md",
+        "doc": "docs/ui/workflow.md",
         "html": ["ui/workflow/workflow.html"],
         "files": [
             ("ui/workflow/workflow.html", "Workflow page layout and containers."),
@@ -496,7 +496,7 @@ FRONTEND_DOC_META: Mapping[str, Dict[str, object]] = {
         ],
     },
     "project_settings": {
-        "doc": "docs/frontend/project_settings.md",
+        "doc": "docs/ui/project_settings.md",
         "html": ["ui/project_settings/project_settings.html"],
         "files": [
             ("ui/project_settings/project_settings.html", "Project settings workspace and panels."),
@@ -508,7 +508,7 @@ FRONTEND_DOC_META: Mapping[str, Dict[str, object]] = {
         ],
     },
     "scripting_console": {
-        "doc": "docs/frontend/scripting_console.md",
+        "doc": "docs/ui/scripting_console.md",
         "html": ["ui/scripting_console/scripting_console.html"],
         "files": [
             ("ui/scripting_console/scripting_console.html", "Notebook-style scripting console page layout."),
@@ -669,7 +669,7 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
                 | Question | Where to start |
                 | --- | --- |
                 | Add or modify an app-server API endpoint | [`app_server/INDEX.md`](app_server/INDEX.md) |
-                | Trace a page to app-server endpoints | [`frontend/INDEX.md`](frontend/INDEX.md) |
+                | Trace a page to app-server endpoints | [`ui/INDEX.md`](ui/INDEX.md) |
                 | Update path/config behavior | [`runtime/config_paths.md`](runtime/config_paths.md) |
                 | Troubleshoot packaging/build | [`build/packaging.md`](build/packaging.md) |
                 | Inspect machine-generated inventories | [`generated/app_server_routes.md`](generated/app_server_routes.md), [`generated/frontend_entrypoints.md`](generated/frontend_entrypoints.md), [`generated/file_manifest.md`](generated/file_manifest.md) |
@@ -695,7 +695,7 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
                 """
                 High-frequency workflows:
                 1. Add/modify API endpoint: [`app_server/INDEX.md`](app_server/INDEX.md) -> target domain file under `app_server/domains/`.
-                2. Trace page -> API -> service: [`frontend/INDEX.md`](frontend/INDEX.md) then follow linked app-server domain files.
+                2. Trace page -> API -> service: [`ui/INDEX.md`](ui/INDEX.md) then follow linked app-server domain files.
                 3. Update config/path behavior: [`runtime/config_paths.md`](runtime/config_paths.md).
                 4. Package/build troubleshooting: [`build/packaging.md`](build/packaging.md).
                 """
@@ -712,8 +712,8 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
         },
     )
 
-    specs["docs/frontend/INDEX.md"] = ModuleDocSpec(
-        path="docs/frontend/INDEX.md",
+    specs["docs/ui/INDEX.md"] = ModuleDocSpec(
+        path="docs/ui/INDEX.md",
         title="Frontend Index",
         manual_sections={
             "Purpose": dedent(
@@ -838,14 +838,14 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
             "external": "- Called from shell as a scripting tab iframe.\n- Uses `/scripting/*` app-server routes for execution, variables, preferences, and notebook persistence.\n- Sends `arcrho:*` status and command messages to/from the shell.",
             "data": "- Stores per-tab draft notebook state with tab-scoped browser storage keys.\n- Saves notebooks as `.ipynb` files under the user scripting directory by default.\n- Persists keyboard shortcut preferences under APPDATA with browser storage fallback.",
             "tasks": "1. Change notebook model or persistence: update core state, notebook I/O, app-server scripting routes if needed, and docs together.\n2. Change cell behavior or shortcuts: update cells/core/shortcuts modules and verify command/edit mode interactions.\n3. Change sidebar or visual layout: update panels/cells/html together and keep INDEX.md as a short pointer only.",
-            "risks": "- Keyboard handling is sensitive to edit mode, command mode, IME/composition, and Monaco focus.\n- Multi-cell selection, queueing, markdown folding, and drag/drop share state and can regress each other.\n- Long feature notes should stay in this module doc or release fragments, not in `docs/frontend/INDEX.md`.",
+            "risks": "- Keyboard handling is sensitive to edit mode, command mode, IME/composition, and Monaco focus.\n- Multi-cell selection, queueing, markdown folding, and drag/drop share state and can regress each other.\n- Long feature notes should stay in this module doc or release fragments, not in `docs/ui/INDEX.md`.",
         },
     }
 
     for name in FRONTEND_DOC_META:
         manual = frontend_manual[name]
-        specs[f"docs/frontend/{name}.md"] = ModuleDocSpec(
-            path=f"docs/frontend/{name}.md",
+        specs[f"docs/ui/{name}.md"] = ModuleDocSpec(
+            path=f"docs/ui/{name}.md",
             title=f"Frontend: {name.replace('_', ' ').title()}",
             manual_sections={
                 "Purpose": manual["purpose"],
@@ -1071,7 +1071,7 @@ def conventions_doc() -> str:
 
         ## Naming and Placement
         - All docs live under `docs/`.
-        - Frontend indexes: `docs/frontend/`.
+        - Frontend indexes: `docs/ui/`.
         - App-server indexes: `docs/app_server/` and `docs/app_server/domains/`.
         - Runtime/config indexes: `docs/runtime/`.
         - Build indexes: `docs/build/`.
@@ -1203,7 +1203,7 @@ def render_app_server_index_entrypoints(doc_path: str, by_domain: Mapping[str, S
 
 def render_root_key_files(doc_path: str) -> str:
     files = [
-        ("docs/frontend/INDEX.md", "Frontend module index."),
+        ("docs/ui/INDEX.md", "Frontend module index."),
         ("docs/app_server/INDEX.md", "App-server domain index."),
         ("docs/runtime/config_paths.md", "Runtime config and path index."),
         ("docs/runtime/data_cache_files.md", "Runtime cache/data file index."),
@@ -1227,12 +1227,12 @@ def render_app_server_index_key_files(doc_path: str) -> str:
 
 def render_frontend_index_key_files(doc_path: str) -> str:
     files = [
-        ("docs/frontend/shell.md", "Shell tab host index."),
-        ("docs/frontend/dataset.md", "Dataset feature index."),
-        ("docs/frontend/dfm.md", "DFM feature index."),
-        ("docs/frontend/workflow.md", "Workflow feature index."),
-        ("docs/frontend/project_settings.md", "Project settings feature index."),
-        ("docs/frontend/scripting_console.md", "Scripting console feature index."),
+        ("docs/ui/shell.md", "Shell tab host index."),
+        ("docs/ui/dataset.md", "Dataset feature index."),
+        ("docs/ui/dfm.md", "DFM feature index."),
+        ("docs/ui/workflow.md", "Workflow feature index."),
+        ("docs/ui/project_settings.md", "Project settings feature index."),
+        ("docs/ui/scripting_console.md", "Scripting console feature index."),
     ]
     return render_key_files_block(doc_path, files)
 
@@ -1321,7 +1321,7 @@ def build_autogen_blocks(
 
     blocks["root.key_files"] = render_root_key_files("docs/INDEX.md")
     blocks["frontend.index.entry_points"] = render_frontend_index_entrypoints(entrypoints)
-    blocks["frontend.index.key_files"] = render_frontend_index_key_files("docs/frontend/INDEX.md")
+    blocks["frontend.index.key_files"] = render_frontend_index_key_files("docs/ui/INDEX.md")
     blocks["app_server.index.entry_points"] = render_app_server_index_entrypoints("docs/app_server/INDEX.md", by_domain)
     blocks["app_server.index.key_files"] = render_app_server_index_key_files("docs/app_server/INDEX.md")
 
@@ -1440,10 +1440,6 @@ def render_manifest_generated(entries: Sequence[ManifestEntry]) -> str:
     lines.append("## Top-Level Counts")
     summary_rows = [[f"`{k}`", str(v)] for k, v in sorted(top_counts.items())]
     lines.append(md_table(["Top-Level Segment", "File Count"], summary_rows))
-    lines.append("")
-    lines.append("## Full File List")
-    full_rows = [[f"`{e.path}`", str(e.size)] for e in entries]
-    lines.append(md_table(["Path", "Size (bytes)"], full_rows))
     lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 

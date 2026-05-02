@@ -29,7 +29,7 @@ Relevant files:
    - Defines the top-level `#tabs` strip, `#content` host, tab context menu, and shell CSS.
 2. `ui/shell/ui_shell.js`
    - Owns `state.tabs`, `state.activeId`, tab creation, close confirmation, render flow, iframe creation, and pointer-based horizontal tab reorder.
-3. `docs/frontend/shell.md`
+3. `docs/ui/shell.md`
    - Documents shell behavior and currently states detached tab pop-out windows are not supported.
 
 Current behavior to preserve:
@@ -270,7 +270,7 @@ Locked decisions:
 
 ### Phase 4: Docs and Release Notes
 
-1. Update `docs/frontend/shell.md` MANUAL sections:
+1. Update `docs/ui/shell.md` MANUAL sections:
    - Shell purpose/behavior
    - External interfaces if activation behavior changes
    - Data/state/caches for floating layout persistence

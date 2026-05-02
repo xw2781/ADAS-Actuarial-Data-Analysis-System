@@ -16,6 +16,6 @@ This contract applies when changing shell/tab orchestration, iframe pages, keybo
 
 ## Before Finishing
 1. State which behavior area changed, or state "no frontend behavior impact."
-2. Update relevant MANUAL sections in `docs/frontend/*.md` when behavior changes.
+2. Update relevant MANUAL sections in `docs/ui/*.md` when behavior changes.
 3. Run `python tools/docs_index_builder.py --write`.
 4. Run `python tools/docs_index_builder.py --check`.
