@@ -32,7 +32,7 @@ flowchart LR
         A[UDF Call\nArcRhoTri · ArcRhoVec]
     end
 
-    subgraph Engine["ArcRho Agent · Python"]
+    subgraph Engine["ArcRho Engine · Python"]
         B[Watchdog\nFile Listener] --> C[Parse Request\nProject · Path · Dataset] --> D[(In-Memory Cache\nData + Config)] --> E[Build Triangle\nFilter · Pivot] --> F[Formula Engine]
         subgraph Store["Local Storage"]
             K[(CSV\nSource Data)] ~~~ L[(JSON\nConfig)]
@@ -46,17 +46,14 @@ flowchart LR
 
 ### How It Works
 
-**1. Ask from Excel**
-Actuaries call ArcRho functions directly in Excel, such as `=ArcRhoTri(...)`. Each formula request tells ArcRho which project, reserving class, and dataset to retrieve.
+**1. Send a request from the frontend**
+Users call ArcRho functions directly in Excel or the ArcRho desktop app, such as `=ArcRhoTri(...)`, to get a loss triangle dataset. Each request tells ArcRho which project, reserving class, and dataset to retrieve.
 
 **2. Find the right data**
 ArcRho reads the project setup, filters the source data to the requested segment, and uses the configured dataset definitions to determine what should be returned.
 
 **3. Build the result on demand**
-Instead of pre-building thousands of triangles, ArcRho constructs only the triangle or vector needed for the current formula. Frequently used data stays warm in memory so repeated requests are fast.
-
-**4. Return it to the workbook**
-The result flows back into Excel as a normal worksheet output, so users can keep working in familiar spreadsheets while ArcRho handles the data preparation behind the scenes.
+Instead of pre-building thousands of triangles, ArcRho constructs only the triangle or vector needed for the current request. Frequently used data stays warm in memory so repeated requests are fast.
 
 ---
 
