@@ -29,7 +29,7 @@ ArcRho replaces the traditional vendor-based reserving database with a lightweig
 ```mermaid
 flowchart LR
     subgraph Excel["Excel · VBA"]
-        A[UDF Call\nADASTri · ADASVec]
+        A[UDF Call\nArcRhoTri · ArcRhoVec]
     end
 
     subgraph Engine["ArcRho Agent · Python"]
@@ -47,7 +47,7 @@ flowchart LR
 ### How It Works
 
 **1. Request-driven computation**
-Every Excel formula call (e.g. `=ADASTri(...)`) writes a small `.txt` request file into a watched folder. The Python agent detects the file via `watchdog`, parses the arguments, executes the calculation, and writes the result as a CSV — which Excel reads back into the cell range. No data is computed until it is explicitly requested.
+Every Excel formula call (e.g. `=ArcRhoTri(...)`) writes a small `.txt` request file into a watched folder. The Python agent detects the file via `watchdog`, parses the arguments, executes the calculation, and writes the result as a CSV — which Excel reads back into the cell range. No data is computed until it is explicitly requested.
 
 **2. Flat table + JSON configuration**
 Source data lives in a single flat CSV file per project (one row per origin–development observation). Project structure is defined entirely in three JSON files:
@@ -94,20 +94,20 @@ Dataset formulas are evaluated as arithmetic expressions over aligned triangle D
 
 ## Excel Add-in
 
-The ArcRho Excel Add-in exposes the data processing engine directly inside Excel through a set of worksheet functions (UDFs) and a custom **ADAS** ribbon tab. Actuaries work entirely within familiar Excel workflows — no scripting, no vendor GUI — while the Python data engine handles all data retrieval and triangle construction transparently.
+The ArcRho Excel Add-in exposes the data processing engine directly inside Excel through a set of worksheet functions (UDFs) and a custom **ArcRho** ribbon tab. Actuaries work entirely within familiar Excel workflows — no scripting, no vendor GUI — while the Python data engine handles all data retrieval and triangle construction transparently.
 
 ### Ribbon
 
 <img src="./assets/images/addin_ribbon_v2.png" width="600"/>
 
-The **ADAS** ribbon tab provides quick-access shortcuts for the two most common setup actions before calling any formula:
+The **ArcRho** ribbon tab provides quick-access shortcuts for the two most common setup actions before calling any formula:
 
 | Button | Purpose |
 |---|---|
 | **Load Reserving Classes** | Opens a dialog to select and confirm a reserving class path (e.g. `PRNJ-PA\PA\All States\All Channels\PD+UMPD`) |
 | **Select Datasets** | Opens a searchable list of all available datasets for the active project |
 | **Insert Function** | Inserts a UDF template into the active cell |
-| **Clear Formulas** | Removes all ADAS/Arc formulas from the active sheet |
+| **Clear Formulas** | Removes all ArcRho formulas from the active sheet |
 | **Calculate Workbook** | Forces a full recalculation |
 | **Refresh Database** | Reloads the source data cache on the data engine |
 
@@ -128,18 +128,18 @@ Click **Select Datasets** to browse all datasets defined for the active project.
 
 ### UDF Reference
 
-All functions are available under both the `ADAS` prefix and the `Arc` alias prefix (e.g. `ADASTri` ≡ `ArcTri`).
+All functions use the `ArcRho` prefix.
 
 | Function | Category | Description | Arguments |
 |---|---|---|---|
-| `ADASTri` | Triangle | Returns a full loss triangle as a spilled array | `Path`, `TriangleName`, `[Cumulative]`, `[Transposed]`, `[Calendar]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
-| `ADASTriDiag` | Triangle | Extracts a single diagonal. `DiagonalIndex = 0` = latest; negative values step back | `Path`, `TriangleName`, `[DiagonalIndex]`, `[Cumulative]`, `[Transposed]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
-| `ADASTriOrigin` | Triangle | Returns one origin-period row across all development ages | `Path`, `TriangleName`, `OriginPeriod`, `[Cumulative]`, `[Transposed]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
-| `ADASTriCell` | Triangle | Returns a single scalar cell at a specified origin and development position | `Path`, `TriangleName`, `OriginPeriod`, `DevelopmentPeriod`, `[Cumulative]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
-| `ADASVec` | Vector | Returns a one-dimensional origin-period vector (e.g. earned exposure, premium) | `Path`, `VectorName`, `[Transposed]`, `[ProjectName]`, `[PeriodLength]` |
-| `ADASVecCell` | Vector | Returns a single element from a vector by 1-based index | `Path`, `VectorName`, `Index`, `[ProjectName]`, `[PeriodLength]` |
-| `ADASHeaders` | Utility | Returns axis labels for triangle headers. `periodType = 0` = origin labels; `1` = development age labels | `periodType`, `Transposed`, `[PeriodLength]`, `[ProjectName]` |
-| `ADASProjectSettings` | Utility | Returns project metadata: name, origin type, start/end dates, development end date, period lengths | `[ProjectName]` |
+| `ArcRhoTri` | Triangle | Returns a full loss triangle as a spilled array | `Path`, `TriangleName`, `[Cumulative]`, `[Transposed]`, `[Calendar]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
+| `ArcRhoTriDiag` | Triangle | Extracts a single diagonal. `DiagonalIndex = 0` = latest; negative values step back | `Path`, `TriangleName`, `[DiagonalIndex]`, `[Cumulative]`, `[Transposed]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
+| `ArcRhoTriOrigin` | Triangle | Returns one origin-period row across all development ages | `Path`, `TriangleName`, `OriginPeriod`, `[Cumulative]`, `[Transposed]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
+| `ArcRhoTriCell` | Triangle | Returns a single scalar cell at a specified origin and development position | `Path`, `TriangleName`, `OriginPeriod`, `DevelopmentPeriod`, `[Cumulative]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
+| `ArcRhoVec` | Vector | Returns a one-dimensional origin-period vector (e.g. earned exposure, premium) | `Path`, `VectorName`, `[Transposed]`, `[ProjectName]`, `[PeriodLength]` |
+| `ArcRhoVecCell` | Vector | Returns a single element from a vector by 1-based index | `Path`, `VectorName`, `Index`, `[ProjectName]`, `[PeriodLength]` |
+| `ArcRhoHeaders` | Utility | Returns axis labels for triangle headers. `periodType = 0` = origin labels; `1` = development age labels | `periodType`, `Transposed`, `[PeriodLength]`, `[ProjectName]` |
+| `ArcRhoProjectSettings` | Utility | Returns project metadata: name, origin type, start/end dates, development end date, period lengths | `[ProjectName]` |
 
 ## License
 
