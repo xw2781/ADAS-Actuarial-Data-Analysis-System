@@ -12,7 +12,7 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `app_server` | 47 |
 | `build` | 7 |
 | `changes` | 16 |
-| `docs` | 36 |
+| `docs` | 35 |
 | `electron` | 2 |
 | `icons` | 17 |
 | `tools` | 2 |
@@ -126,7 +126,6 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `docs/frontend/scripting_console.md` | 3867 |
 | `docs/frontend/shell.md` | 11115 |
 | `docs/frontend/workflow.md` | 3145 |
-| `docs/landing - cn.html` | 194369 |
 | `docs/plans/arcrho_api_module_plan.md` | 9690 |
 | `docs/plans/main_tab_floating_window_plan.md` | 17229 |
 | `docs/releases/0.2.1.md` | 2088 |
