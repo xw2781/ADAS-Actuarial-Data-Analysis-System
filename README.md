@@ -6,11 +6,11 @@ It provides a structured framework for transforming raw insurance loss data into
 
 ## Background & Motivation
 
-Reserving teams face growing pressure from shifting claims settlement patterns, extraordinary loss events, and rapid operational changes — yet the tools most teams rely on were not built for this pace. The typical workflow stitches together a traditional vendor platform and a collection of Excel worksheets, connected by significant manual effort at every data handoff.
+Reserving teams face shifting claims patterns, extraordinary loss events, and rapid operational changes, but their tools often lag behind. The typical workflow still combines a rigid vendor platform with Excel worksheets and manual handoffs.
 
-The core problems are structural: the traditional vendor platform's hierarchical project model requires all datasets to be pre-computed before any can be accessed (a process that can consume half a working day), stores tens of thousands of datasets that are rarely used, and demands manual intervention whenever new coverage codes or company hierarchies are introduced. Automation APIs exist but remain inaccessible to most users without specialized scripting knowledge — so repetitive, low-value work crowds out strategic analysis every reserving cycle.
+The core problem is structural: traditional project hierarchies require pre-computing datasets before use, store thousands of rarely used outputs, and demand manual updates when coverage or company structures change. Automation APIs exist, but often require specialized scripting knowledge.
 
-ArcRho was built to break this pattern. By replacing the pre-computation model with on-demand query execution directly against flat source tables, and exposing the results through familiar Excel formulas, it eliminates manual data transfers, removes vendor dependency, and gives the reserving team the speed and flexibility to respond to emerging trends without waiting on system constraints.
+ArcRho replaces that model with on-demand queries against flat source tables, exposed through familiar Excel formulas. It reduces manual data transfer, removes vendor dependency, and gives reserving teams faster ways to respond to emerging trends.
 
 ## Modernized Web UI for a Seamless User Experience
 ![Screenshot](./assets/images/UI_Plots.png)
