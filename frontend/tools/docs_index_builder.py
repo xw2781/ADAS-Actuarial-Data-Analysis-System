@@ -20,7 +20,7 @@ import sys
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Sequence, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -60,6 +60,9 @@ FRONTEND_ENTRY_HTMLS = [
     "ui/project_settings/project_settings.html",
     "ui/scripting_console/scripting_console.html",
 ]
+
+FRONTEND_PURPOSE_MAX_LINES = 6
+FRONTEND_PURPOSE_MAX_CHARS = 900
 
 
 @dataclass(frozen=True)
@@ -1068,6 +1071,7 @@ def conventions_doc() -> str:
         Rule:
         - The script may update only AUTO-GEN blocks.
         - The script must not rewrite MANUAL blocks.
+        - Frontend module `Purpose` sections should stay under 6 nonblank lines and 900 characters; move behavior details to focused sections or source-specific docs.
 
         ## Naming and Placement
         - All docs live under `docs/`.
@@ -1522,6 +1526,37 @@ def validate_docs_links() -> List[str]:
     return broken
 
 
+def extract_manual_section(text: str, section: str) -> Optional[str]:
+    pattern = re.compile(
+        rf"^## {re.escape(section)}\n<!-- MANUAL:BEGIN -->\n(?P<body>.*?)\n<!-- MANUAL:END -->",
+        flags=re.DOTALL | re.MULTILINE,
+    )
+    match = pattern.search(text)
+    if not match:
+        return None
+    return match.group("body").strip()
+
+
+def validate_frontend_purpose_sections() -> List[str]:
+    issues: List[str] = []
+    for meta in FRONTEND_DOC_META.values():
+        rel = str(meta["doc"])
+        path = REPO_ROOT / rel
+        if not path.exists():
+            continue
+        body = extract_manual_section(read_text(path), "Purpose")
+        if body is None:
+            continue
+        nonblank_lines = [line for line in body.splitlines() if line.strip()]
+        if len(nonblank_lines) > FRONTEND_PURPOSE_MAX_LINES or len(body) > FRONTEND_PURPOSE_MAX_CHARS:
+            issues.append(
+                f"{rel}: Purpose section is too long "
+                f"({len(nonblank_lines)} lines, {len(body)} chars; "
+                f"limit {FRONTEND_PURPOSE_MAX_LINES} lines / {FRONTEND_PURPOSE_MAX_CHARS} chars)"
+            )
+    return issues
+
+
 def run_check(templates: Mapping[str, str]) -> Tuple[int, List[str]]:
     issues: List[str] = []
 
@@ -1562,6 +1597,7 @@ def run_check(templates: Mapping[str, str]) -> Tuple[int, List[str]]:
             issues.append(f"AUTO-GEN blocks are stale: {rel}")
 
     issues.extend(validate_docs_links())
+    issues.extend(validate_frontend_purpose_sections())
     return (1 if issues else 0), issues
 
 

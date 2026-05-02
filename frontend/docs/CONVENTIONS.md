@@ -33,6 +33,7 @@ MANUAL blocks are hand-maintained:
 Rule:
 - The script may update only AUTO-GEN blocks.
 - The script must not rewrite MANUAL blocks.
+- Frontend module `Purpose` sections should stay under 6 nonblank lines and 900 characters; move behavior details to focused sections or source-specific docs.
 
 ## Naming and Placement
 - All docs live under `docs/`.
