@@ -46,32 +46,17 @@ flowchart LR
 
 ### How It Works
 
-**1. Request-driven computation**
-Every Excel formula call (e.g. `=ArcRhoTri(...)`) writes a small `.txt` request file into a watched folder. The Python agent detects the file via `watchdog`, parses the arguments, executes the calculation, and writes the result as a CSV — which Excel reads back into the cell range. No data is computed until it is explicitly requested.
+**1. Ask from Excel**
+Actuaries call ArcRho functions directly in Excel, such as `=ArcRhoTri(...)`. Each formula request tells ArcRho which project, reserving class, and dataset to retrieve.
 
-**2. Flat table + JSON configuration**
-Source data lives in a single flat CSV file per project (one row per origin–development observation). Project structure is defined entirely in three JSON files:
+**2. Find the right data**
+ArcRho reads the project setup, filters the source data to the requested segment, and uses the configured dataset definitions to determine what should be returned.
 
-| File | Purpose |
-|---|---|
-| `field_mapping.json` | Maps raw column names to actuarial significance (Origin Date, Development Date, Reserving Class levels) |
-| `dataset_types.json` | Defines named datasets and their source formulas (e.g. `Paid_Loss / Earned_Exposure`) |
-| `reserving_class_types.json` | Defines the class hierarchy — inclusions, exclusions, and adjustments per level |
+**3. Build the result on demand**
+Instead of pre-building thousands of triangles, ArcRho constructs only the triangle or vector needed for the current formula. Frequently used data stays warm in memory so repeated requests are fast.
 
-**3. In-memory LRU cache**
-Loaded source tables and project configs are held in memory (`DATA_DICT`, `PROJECT_CONFIG`). Staleness is detected by comparing file modification timestamps, so updates take effect automatically without restarting the agent. The data cache evicts the oldest table when it exceeds 10 entries.
-
-**4. Triangle construction pipeline**
-
-```mermaid
-flowchart LR
-    A[Raw flat table] --> B[Filter\nby segment] --> D[GroupBy\n& Sum] --> E[Pivot\nOrigin × Dev Age]
-    E --> F{Cumulative?} -->|Yes| G[cumsum] --> H[Evaluate\nformula] --> J[Output\nDataset]
-    F -->|No| G
-```
-
-**5. Formula engine**
-Dataset formulas are evaluated as arithmetic expressions over aligned triangle DataFrames (e.g. `D = A / B * 1000`). pandas alignment handles index/column matching automatically, and division-by-zero cells are replaced with zero.
+**4. Return it to the workbook**
+The result flows back into Excel as a normal worksheet output, so users can keep working in familiar spreadsheets while ArcRho handles the data preparation behind the scenes.
 
 ---
 
