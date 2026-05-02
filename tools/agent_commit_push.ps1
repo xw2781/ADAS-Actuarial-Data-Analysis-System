@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Commit and push ArcRho frontend changes with an explicit agent-written message.
+Commit and push ArcRho changes with an explicit agent-written message.
 
 .DESCRIPTION
 This script is intended for coding agents. It keeps the commit/push workflow
@@ -16,6 +16,7 @@ Default behavior:
 
 Examples:
   .\tools\agent_commit_push.ps1 -Message "Reorganize frontend UI entrypoints"
+  .\tools\agent_commit_push.ps1 -Message "Sync data-engine core source" -SyncDataEngineCore -Pathspec data-engine,tools,.gitignore
   .\tools\agent_commit_push.ps1 -Message "Update docs index" -NoPush
   .\tools\agent_commit_push.ps1 -Message "Review commit scope" -DryRun
 #>
@@ -38,6 +39,10 @@ param(
   [switch]$DryRun,
 
   [switch]$AllowEmpty,
+
+  [switch]$SyncDataEngineCore,
+
+  [string]$CoreSourceRoot = "E:\ArcRho Server\core",
 
   [switch]$SkipRemoteCheck,
 
@@ -125,6 +130,21 @@ if (-not $repoRoot) {
 }
 
 Set-Location -LiteralPath $repoRoot
+
+if ($SyncDataEngineCore) {
+  $syncScript = Join-Path $repoRoot "tools\sync_data_engine_core.ps1"
+  if (-not (Test-Path -LiteralPath $syncScript)) {
+    throw "Data-engine sync script was not found: $syncScript"
+  }
+
+  Write-Host "SyncDataEngineCore set: mirroring active core source into data-engine/src..."
+  if ($DryRun) {
+    & $syncScript -CoreSourceRoot $CoreSourceRoot -DryRun
+  } else {
+    & $syncScript -CoreSourceRoot $CoreSourceRoot
+  }
+  Write-Host ""
+}
 
 $gitDir = (Invoke-Git -GitArgs @("rev-parse", "--git-dir") -Capture).Output[0].ToString().Trim()
 if (Test-Path -LiteralPath (Join-Path $gitDir "MERGE_HEAD")) {

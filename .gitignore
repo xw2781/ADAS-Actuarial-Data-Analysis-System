@@ -59,8 +59,8 @@ tmp_data/
 .shutdown_electron
 
 # ArcRho data-engine runtime instance state
-data-engine/src/agent/instances/
-data-engine/src/master/instances/
+data-engine/src/arcrho_engine/instances/
+data-engine/src/arcrho_orchestrator/instances/
 
 # Editor and agent-local state
 .claude/
