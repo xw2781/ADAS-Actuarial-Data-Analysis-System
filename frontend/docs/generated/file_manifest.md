@@ -12,7 +12,7 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `app_server` | 47 |
 | `build` | 7 |
 | `changes` | 16 |
-| `docs` | 37 |
+| `docs` | 36 |
 | `electron` | 2 |
 | `icons` | 17 |
 | `tools` | 2 |
@@ -127,15 +127,14 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `docs/frontend/shell.md` | 11115 |
 | `docs/frontend/workflow.md` | 3145 |
 | `docs/landing - cn.html` | 194369 |
-| `docs/landing.html` | 194621 |
 | `docs/plans/arcrho_api_module_plan.md` | 9690 |
 | `docs/plans/main_tab_floating_window_plan.md` | 17229 |
 | `docs/releases/0.2.1.md` | 2088 |
 | `docs/releases/INDEX.md` | 149 |
 | `docs/runtime/config_paths.md` | 3392 |
 | `docs/runtime/data_cache_files.md` | 2352 |
-| `electron/main.js` | 34462 |
-| `electron/preload.js` | 3421 |
+| `electron/main.js` | 34531 |
+| `electron/preload.js` | 3436 |
 | `electron_shell.py` | 2359 |
 | `icons/ico_arc_app_sq.svg` | 830 |
 | `icons/icon.png` | 18289 |
