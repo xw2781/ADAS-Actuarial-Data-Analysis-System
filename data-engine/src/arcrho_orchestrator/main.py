@@ -1,0 +1,154 @@
+import os
+import sys
+import time
+import uuid
+import json
+import psutil
+import subprocess
+from pathlib import Path
+from datetime import datetime
+
+# Resolve product root from __file__: main.py -> orchestrator app -> core -> project root
+_PRODUCT_ROOT = str(Path(__file__).resolve().parent.parent.parent)
+if _PRODUCT_ROOT not in sys.path:
+    sys.path.insert(0, _PRODUCT_ROOT)
+
+from core.utils import *
+
+engine_instance_path = str(resolve_app_path("engine", "instances"))
+orchestrator_instance_path = str(resolve_app_path("orchestrator", "instances"))
+
+device_name = os.environ.get("COMPUTERNAME")
+ts = datetime.now().strftime("%y%m%d-%H%M%S-%f")[:-3]
+orchestrator_id = f'{device_name}@' + os.getlogin() + "@" + ts
+
+id_folder = orchestrator_instance_path
+id_path = str(Path(id_folder) / f"{orchestrator_id}.json")
+
+
+def kill_extra_python_processes():
+    # collect python processes
+    py_procs = []
+    for proc in psutil.process_iter(['pid', 'name', 'exe', 'create_time']):
+        try:
+            proc_name = proc.info['name'].lower() if proc.info['name'] else ''
+            if any(name.lower() in proc_name for name in ('ADAS Master.exe', 'ArcRho Master.exe', 'ArcRho Orchestrator.exe')):
+                py_procs.append(proc)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+
+    # if only one, do nothing
+    if len(py_procs) <= 1:
+        return 0
+
+    # here we kill everything
+    killed = 0
+    for proc in py_procs[:-1]:
+        try:
+            proc.terminate()
+            killed += 1
+        except Exception:
+            pass
+
+    return killed
+
+def remove_old_instances(FOLDER, AGE_SECONDS=60):
+    if not os.path.isdir(FOLDER):
+        return
+
+    now = time.time()
+
+    for name in os.listdir(FOLDER):
+        path = os.path.join(FOLDER, name)
+        # only remove files
+        if not os.path.isfile(path):
+            continue
+        try:
+            mtime = os.path.getmtime(path)
+            if now - mtime > AGE_SECONDS:
+                os.remove(path)
+        except Exception:
+            # ignore locked / race-condition files
+            pass
+
+
+def file_counts(FOLDER):
+    if not os.path.isdir(FOLDER):
+        return 0
+    file_count = sum(
+        1 for name in os.listdir(FOLDER)
+        if os.path.isfile(os.path.join(FOLDER, name))
+        and name.lower().endswith(".json")
+    )
+    return file_count
+
+
+def read_json(json_file, retries=50, delay=0.02):
+    for _ in range(retries):
+        try:
+            with open(json_file, mode='r', encoding='utf-8') as f:
+                return json.load(f)
+        except (PermissionError, json.JSONDecodeError):
+            time.sleep(delay)
+    raise PermissionError(f"Cannot open {json_file}")
+
+
+def write_json(json_file, arg):
+    os.makedirs(os.path.dirname(json_file), exist_ok=True)
+    tmp_file = f"{json_file}.{uuid.uuid4()}.tmp"
+    with open(tmp_file, mode="w", encoding="utf-8") as file:
+        json.dump(arg, file, indent=2)
+        file.write("\n")
+    os.replace(tmp_file, json_file)
+
+
+def safe_remove(file_path, attempts=5, delay=0.1):
+    """Attempt to remove a file with retries on permission error."""
+    for _ in range(attempts):
+        try:
+            tmp = f"{file_path}.{uuid.uuid4()}.deleting"
+            os.replace(file_path, tmp)  # atomic
+            os.remove(tmp)
+            return True
+        except PermissionError:
+            time.sleep(delay)
+
+    return False
+
+
+current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+write_json(id_path, {'Server': orchestrator_id, 'Last seen': current_time})
+
+time.sleep(1)
+
+while True:
+    try:
+        if not os.path.exists(id_path):
+            break
+        
+        if get_config_value('apps.orchestrator.kill_all'):
+            safe_remove(id_path)
+            break
+
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+        # Update Status
+        arg_1 = read_json(id_path)
+        arg_1['Last seen'] = current_time
+        write_json(id_path, arg_1)
+
+        remove_old_instances(engine_instance_path)
+        remove_old_instances(orchestrator_instance_path)
+        remove_old_instances(str(get_project_root() / "requests"), 5*60)
+      
+        while get_config_value('apps.orchestrator.auto_create_workers') \
+          and get_config_value('apps.engine.kill_all') == False \
+          and file_counts(engine_instance_path) < get_config_value('apps.orchestrator.max_workers'):
+            exe = resolve_app_exe("engine")
+            subprocess.Popen([str(exe)], close_fds=True)
+            time.sleep(3)
+
+    except Exception as e:
+        print(e)
+        
+    time.sleep(15)

@@ -4,15 +4,27 @@ import sys
 import shutil
 
 BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE_DIR.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-VENV_PYTHON = BASE_DIR / ".venv" / "Scripts" / "python.exe"
+from core.utils import component_app_name, resolve_existing_path
+
+BUILD_ROOT = PROJECT_ROOT / "builds" / BASE_DIR.name
+VENV_PYTHON = PROJECT_ROOT / "venvs" / BASE_DIR.name / "Scripts" / "python.exe"
 REQ_FILE = BASE_DIR / "requirements.txt"
 
 ENTRY_PY = BASE_DIR / "main.py"
-ICON = r"E:\ADAS\library\icon\ADASV7.ico"
+APP_NAME = component_app_name("orchestrator")
+ICON = resolve_existing_path(
+    PROJECT_ROOT / "library" / "icon" / "ArcRho Orchestrator.ico",
+    PROJECT_ROOT / "library" / "icon" / "ArcRhoV7.ico",
+    PROJECT_ROOT / "library" / "icon" / "ADASV7.ico",
+)
 
-DIST_DIR = BASE_DIR / "dist"
-BUILD_DIR = BASE_DIR / "build"
+DIST_DIR = BUILD_ROOT / "dist"
+BUILD_DIR = BUILD_ROOT / "build"
+SPEC_DIR = BUILD_ROOT / "spec"
 
 try:
     shutil.rmtree(DIST_DIR)
@@ -24,7 +36,10 @@ try:
 except:
     pass
 
-shutil.rmtree(r"E:\ADAS\core\ADAS Master\spec")
+try:
+    shutil.rmtree(SPEC_DIR)
+except:
+    pass
 
 def run(cmd, check=True):
     print("\n>>>", " ".join(map(str, cmd)))
@@ -35,8 +50,8 @@ def ensure_venv():
     if VENV_PYTHON.exists():
         return
 
-    print("\n>>> Creating virtual environment (.venv)")
-    run([sys.executable, "-m", "venv", BASE_DIR / ".venv"])
+    print(f"\n>>> Creating virtual environment ({VENV_PYTHON.parent.parent})")
+    run([sys.executable, "-m", "venv", VENV_PYTHON.parent.parent])
 
     if not VENV_PYTHON.exists():
         raise RuntimeError("Failed to create virtual environment")
@@ -62,13 +77,13 @@ def build_exe():
     cmd = [
         VENV_PYTHON,
         "-m", "PyInstaller",
-        "--specpath", BASE_DIR / "spec",
+        "--specpath", SPEC_DIR,
         "--noconfirm",   
         f"--icon={ICON}",
         "--add-data", f"{ICON};.",
         "--noconsole",
         "--clean",
-        "--name", "ADAS Master",
+        "--name", APP_NAME,
         "--distpath", DIST_DIR,
         "--workpath", BUILD_DIR,
         ENTRY_PY,

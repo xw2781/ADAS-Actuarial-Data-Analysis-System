@@ -24,7 +24,7 @@ These contracts are mandatory whenever a task touches:
 ## Required Documentation Workflow
 After relevant code changes:
 1. Update contract docs (or explicitly state "no contract impact").
-2. Keep index docs concise. Put feature-specific behavior notes in the relevant module doc under `docs/frontend/`, `docs/app_server/domains/`, or `docs/runtime/`; do not paste long changelog/spec text into `INDEX.md` files.
+2. Keep index docs concise. Put feature-specific behavior notes in the relevant module doc under `docs/ui/`, `docs/app_server/domains/`, or `docs/runtime/`; do not paste long changelog/spec text into `INDEX.md` files.
 3. Run `python tools/docs_index_builder.py --write`.
 4. Run `python tools/docs_index_builder.py --check`.
 5. If `--check` fails, fix docs before finishing.

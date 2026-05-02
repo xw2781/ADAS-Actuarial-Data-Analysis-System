@@ -19,12 +19,12 @@ Frontend module map for page entrypoints, shell orchestration, and feature-speci
 
 ## Key Files
 <!-- AUTO-GEN:BEGIN frontend.index.key_files -->
-- [`docs/frontend/shell.md`](shell.md) - Shell tab host index.
-- [`docs/frontend/dataset.md`](dataset.md) - Dataset feature index.
-- [`docs/frontend/dfm.md`](dfm.md) - DFM feature index.
-- [`docs/frontend/workflow.md`](workflow.md) - Workflow feature index.
-- [`docs/frontend/project_settings.md`](project_settings.md) - Project settings feature index.
-- [`docs/frontend/scripting_console.md`](scripting_console.md) - Scripting console feature index.
+- [`docs/ui/shell.md`](shell.md) - Shell tab host index.
+- [`docs/ui/dataset.md`](dataset.md) - Dataset feature index.
+- [`docs/ui/dfm.md`](dfm.md) - DFM feature index.
+- [`docs/ui/workflow.md`](workflow.md) - Workflow feature index.
+- [`docs/ui/project_settings.md`](project_settings.md) - Project settings feature index.
+- [`docs/ui/scripting_console.md`](scripting_console.md) - Scripting console feature index.
 <!-- AUTO-GEN:END -->
 
 ## Non-Negotiable Contracts

@@ -6,11 +6,11 @@ It provides a structured framework for transforming raw insurance loss data into
 
 ## Background & Motivation
 
-Reserving teams face growing pressure from shifting claims settlement patterns, extraordinary loss events, and rapid operational changes — yet the tools most teams rely on were not built for this pace. The typical workflow stitches together a traditional vendor platform and a collection of Excel worksheets, connected by significant manual effort at every data handoff.
+Reserving teams face shifting claims patterns, extraordinary loss events, and rapid operational changes, but their tools often lag behind. The typical workflow still combines a rigid vendor platform with Excel worksheets and manual handoffs.
 
-The core problems are structural: the traditional vendor platform's hierarchical project model requires all datasets to be pre-computed before any can be accessed (a process that can consume half a working day), stores tens of thousands of datasets that are rarely used, and demands manual intervention whenever new coverage codes or company hierarchies are introduced. Automation APIs exist but remain inaccessible to most users without specialized scripting knowledge — so repetitive, low-value work crowds out strategic analysis every reserving cycle.
+The core problem is structural: traditional project hierarchies require pre-computing datasets before use, store thousands of rarely used outputs, and demand manual updates when coverage or company structures change. Automation APIs exist, but often require specialized scripting knowledge.
 
-ArcRho was built to break this pattern. By replacing the pre-computation model with on-demand query execution directly against flat source tables, and exposing the results through familiar Excel formulas, it eliminates manual data transfers, removes vendor dependency, and gives the reserving team the speed and flexibility to respond to emerging trends without waiting on system constraints.
+ArcRho replaces that model with on-demand queries against flat source tables, exposed through familiar Excel formulas. It reduces manual data transfer, removes vendor dependency, and gives reserving teams faster ways to respond to emerging trends.
 
 ## Modernized Web UI for a Seamless User Experience
 ![Screenshot](./assets/images/UI_Plots.png)
@@ -29,10 +29,10 @@ ArcRho replaces the traditional vendor-based reserving database with a lightweig
 ```mermaid
 flowchart LR
     subgraph Excel["Excel · VBA"]
-        A[UDF Call\nADASTri · ADASVec]
+        A[UDF Call\nArcRhoTri · ArcRhoVec]
     end
 
-    subgraph Engine["ArcRho Agent · Python"]
+    subgraph Engine["ArcRho Engine · Python"]
         B[Watchdog\nFile Listener] --> C[Parse Request\nProject · Path · Dataset] --> D[(In-Memory Cache\nData + Config)] --> E[Build Triangle\nFilter · Pivot] --> F[Formula Engine]
         subgraph Store["Local Storage"]
             K[(CSV\nSource Data)] ~~~ L[(JSON\nConfig)]
@@ -46,32 +46,14 @@ flowchart LR
 
 ### How It Works
 
-**1. Request-driven computation**
-Every Excel formula call (e.g. `=ADASTri(...)`) writes a small `.txt` request file into a watched folder. The Python agent detects the file via `watchdog`, parses the arguments, executes the calculation, and writes the result as a CSV — which Excel reads back into the cell range. No data is computed until it is explicitly requested.
+**1. Send a request from the frontend**
+Users call ArcRho functions directly in Excel or the ArcRho desktop app, such as `=ArcRhoTri(...)`, to get a loss triangle dataset. Each request tells ArcRho which project, reserving class, and dataset to retrieve.
 
-**2. Flat table + JSON configuration**
-Source data lives in a single flat CSV file per project (one row per origin–development observation). Project structure is defined entirely in three JSON files:
+**2. Find the right data**
+ArcRho reads the project setup, filters the source data to the requested segment, and uses the configured dataset definitions to determine what should be returned.
 
-| File | Purpose |
-|---|---|
-| `field_mapping.json` | Maps raw column names to actuarial significance (Origin Date, Development Date, Reserving Class levels) |
-| `dataset_types.json` | Defines named datasets and their source formulas (e.g. `Paid_Loss / Earned_Exposure`) |
-| `reserving_class_types.json` | Defines the class hierarchy — inclusions, exclusions, and adjustments per level |
-
-**3. In-memory LRU cache**
-Loaded source tables and project configs are held in memory (`DATA_DICT`, `PROJECT_CONFIG`). Staleness is detected by comparing file modification timestamps, so updates take effect automatically without restarting the agent. The data cache evicts the oldest table when it exceeds 10 entries.
-
-**4. Triangle construction pipeline**
-
-```mermaid
-flowchart LR
-    A[Raw flat table] --> B[Filter\nby segment] --> D[GroupBy\n& Sum] --> E[Pivot\nOrigin × Dev Age]
-    E --> F{Cumulative?} -->|Yes| G[cumsum] --> H[Evaluate\nformula] --> J[Output\nDataset]
-    F -->|No| G
-```
-
-**5. Formula engine**
-Dataset formulas are evaluated as arithmetic expressions over aligned triangle DataFrames (e.g. `D = A / B * 1000`). pandas alignment handles index/column matching automatically, and division-by-zero cells are replaced with zero.
+**3. Build the result on demand**
+Instead of pre-building thousands of triangles, ArcRho constructs only the triangle or vector needed for the current request. Frequently used data stays warm in memory so repeated requests are fast.
 
 ---
 
@@ -94,20 +76,20 @@ Dataset formulas are evaluated as arithmetic expressions over aligned triangle D
 
 ## Excel Add-in
 
-The ArcRho Excel Add-in exposes the data processing engine directly inside Excel through a set of worksheet functions (UDFs) and a custom **ADAS** ribbon tab. Actuaries work entirely within familiar Excel workflows — no scripting, no vendor GUI — while the Python data engine handles all data retrieval and triangle construction transparently.
+The ArcRho Excel Add-in exposes the data processing engine directly inside Excel through a set of worksheet functions (UDFs) and a custom **ArcRho** ribbon tab. Actuaries work entirely within familiar Excel workflows — no scripting, no vendor GUI — while the Python data engine handles all data retrieval and triangle construction transparently.
 
 ### Ribbon
 
-<img src="./assets/images/addin_ribbon.png" width="600"/>
+<img src="./assets/images/addin_ribbon_v2.png" width="600"/>
 
-The **ADAS** ribbon tab provides quick-access shortcuts for the two most common setup actions before calling any formula:
+The **ArcRho** ribbon tab provides quick-access shortcuts for the two most common setup actions before calling any formula:
 
 | Button | Purpose |
 |---|---|
 | **Load Reserving Classes** | Opens a dialog to select and confirm a reserving class path (e.g. `PRNJ-PA\PA\All States\All Channels\PD+UMPD`) |
 | **Select Datasets** | Opens a searchable list of all available datasets for the active project |
 | **Insert Function** | Inserts a UDF template into the active cell |
-| **Clear Formulas** | Removes all ADAS/Arc formulas from the active sheet |
+| **Clear Formulas** | Removes all ArcRho formulas from the active sheet |
 | **Calculate Workbook** | Forces a full recalculation |
 | **Refresh Database** | Reloads the source data cache on the data engine |
 
@@ -128,18 +110,18 @@ Click **Select Datasets** to browse all datasets defined for the active project.
 
 ### UDF Reference
 
-All functions are available under both the `ADAS` prefix and the `Arc` alias prefix (e.g. `ADASTri` ≡ `ArcTri`).
+All functions use the `ArcRho` prefix.
 
 | Function | Category | Description | Arguments |
 |---|---|---|---|
-| `ADASTri` | Triangle | Returns a full loss triangle as a spilled array | `Path`, `TriangleName`, `[Cumulative]`, `[Transposed]`, `[Calendar]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
-| `ADASTriDiag` | Triangle | Extracts a single diagonal. `DiagonalIndex = 0` = latest; negative values step back | `Path`, `TriangleName`, `[DiagonalIndex]`, `[Cumulative]`, `[Transposed]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
-| `ADASTriOrigin` | Triangle | Returns one origin-period row across all development ages | `Path`, `TriangleName`, `OriginPeriod`, `[Cumulative]`, `[Transposed]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
-| `ADASTriCell` | Triangle | Returns a single scalar cell at a specified origin and development position | `Path`, `TriangleName`, `OriginPeriod`, `DevelopmentPeriod`, `[Cumulative]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
-| `ADASVec` | Vector | Returns a one-dimensional origin-period vector (e.g. earned exposure, premium) | `Path`, `VectorName`, `[Transposed]`, `[ProjectName]`, `[PeriodLength]` |
-| `ADASVecCell` | Vector | Returns a single element from a vector by 1-based index | `Path`, `VectorName`, `Index`, `[ProjectName]`, `[PeriodLength]` |
-| `ADASHeaders` | Utility | Returns axis labels for triangle headers. `periodType = 0` = origin labels; `1` = development age labels | `periodType`, `Transposed`, `[PeriodLength]`, `[ProjectName]` |
-| `ADASProjectSettings` | Utility | Returns project metadata: name, origin type, start/end dates, development end date, period lengths | `[ProjectName]` |
+| `ArcRhoTri` | Triangle | Returns a full loss triangle as a spilled array | `Path`, `TriangleName`, `[Cumulative]`, `[Transposed]`, `[Calendar]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
+| `ArcRhoTriDiag` | Triangle | Extracts a single diagonal. `DiagonalIndex = 0` = latest; negative values step back | `Path`, `TriangleName`, `[DiagonalIndex]`, `[Cumulative]`, `[Transposed]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
+| `ArcRhoTriOrigin` | Triangle | Returns one origin-period row across all development ages | `Path`, `TriangleName`, `OriginPeriod`, `[Cumulative]`, `[Transposed]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
+| `ArcRhoTriCell` | Triangle | Returns a single scalar cell at a specified origin and development position | `Path`, `TriangleName`, `OriginPeriod`, `DevelopmentPeriod`, `[Cumulative]`, `[ProjectName]`, `[OriginLength]`, `[DevelopmentLength]` |
+| `ArcRhoVec` | Vector | Returns a one-dimensional origin-period vector (e.g. earned exposure, premium) | `Path`, `VectorName`, `[Transposed]`, `[ProjectName]`, `[PeriodLength]` |
+| `ArcRhoVecCell` | Vector | Returns a single element from a vector by 1-based index | `Path`, `VectorName`, `Index`, `[ProjectName]`, `[PeriodLength]` |
+| `ArcRhoHeaders` | Utility | Returns axis labels for triangle headers. `periodType = 0` = origin labels; `1` = development age labels | `periodType`, `Transposed`, `[PeriodLength]`, `[ProjectName]` |
+| `ArcRhoProjectSettings` | Utility | Returns project metadata: name, origin type, start/end dates, development end date, period lengths | `[ProjectName]` |
 
 ## License
 

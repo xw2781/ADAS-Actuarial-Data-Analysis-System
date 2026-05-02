@@ -16,7 +16,7 @@ System map:
 | Question | Where to start |
 | --- | --- |
 | Add or modify an app-server API endpoint | [`app_server/INDEX.md`](app_server/INDEX.md) |
-| Trace a page to app-server endpoints | [`frontend/INDEX.md`](frontend/INDEX.md) |
+| Trace a page to app-server endpoints | [`ui/INDEX.md`](ui/INDEX.md) |
 | Update path/config behavior | [`runtime/config_paths.md`](runtime/config_paths.md) |
 | Troubleshoot packaging/build | [`build/packaging.md`](build/packaging.md) |
 | Check mandatory behavior/logic/architecture rules | [`contracts/frontend_behavior_contract.md`](contracts/frontend_behavior_contract.md), [`contracts/business_logic_contract.md`](contracts/business_logic_contract.md), [`architecture/architecture_guardrails.md`](architecture/architecture_guardrails.md) |
@@ -25,7 +25,7 @@ System map:
 
 ## Key Files
 <!-- AUTO-GEN:BEGIN root.key_files -->
-- [`docs/frontend/INDEX.md`](frontend/INDEX.md) - Frontend module index.
+- [`docs/ui/INDEX.md`](ui/INDEX.md) - Frontend module index.
 - [`docs/app_server/INDEX.md`](app_server/INDEX.md) - App-server domain index.
 - [`docs/runtime/config_paths.md`](runtime/config_paths.md) - Runtime config and path index.
 - [`docs/runtime/data_cache_files.md`](runtime/data_cache_files.md) - Runtime cache/data file index.
@@ -66,7 +66,7 @@ Runtime/cache references are centralized in:
 <!-- MANUAL:BEGIN -->
 High-frequency workflows:
 1. Add/modify API endpoint: [`app_server/INDEX.md`](app_server/INDEX.md) -> target domain file under `app_server/domains/`.
-2. Trace page -> API -> service: [`frontend/INDEX.md`](frontend/INDEX.md) then follow linked app-server domain files.
+2. Trace page -> API -> service: [`ui/INDEX.md`](ui/INDEX.md) then follow linked app-server domain files.
 3. Update config/path behavior: [`runtime/config_paths.md`](runtime/config_paths.md).
 4. Package/build troubleshooting: [`build/packaging.md`](build/packaging.md).
 <!-- MANUAL:END -->

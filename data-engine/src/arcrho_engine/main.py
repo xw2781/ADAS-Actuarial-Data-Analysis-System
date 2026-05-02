@@ -12,10 +12,10 @@ from pathlib import Path
 from threading import Lock
 from datetime import date, datetime
 
-# Resolve ADAS root from __file__: main.py -> ADAS Agent -> core -> ADAS
-_ADAS_ROOT = str(Path(__file__).resolve().parent.parent.parent)
-if _ADAS_ROOT not in sys.path:
-    sys.path.insert(0, _ADAS_ROOT)
+# Resolve product root from __file__: main.py -> engine app -> core -> project root
+_PRODUCT_ROOT = str(Path(__file__).resolve().parent.parent.parent)
+if _PRODUCT_ROOT not in sys.path:
+    sys.path.insert(0, _PRODUCT_ROOT)
 
 import pandas as pd
 from watchdog.observers import Observer
@@ -24,12 +24,11 @@ from core.utils import *
 
 debug_mode = 0
 device_name = os.environ.get("COMPUTERNAME")
-project_map_path = rf"{PROJECT_ROOT}\projects\map.json"
-command_path = rf"{PROJECT_ROOT}\core\ADAS Master\command.txt"
+project_map_path = str(get_project_root() / "projects" / "map.json")
 ts = datetime.now().strftime("%y%m%d-%H%M%S-%f")[:-3]
 robot_id =  f'{device_name}@' + os.getlogin() + "@" + ts
-id_folder = rf"{PROJECT_ROOT}\core\ADAS Agent\instances"
-id_path = id_folder + '\\' + robot_id + '.txt'
+id_folder = str(resolve_app_path("engine", "instances"))
+id_path = str(Path(id_folder) / f"{robot_id}.json")
 
 
 BASE_DICT = {}  # Base Settings Table
@@ -51,11 +50,14 @@ PROJECT_SETTINGS_CACHE = {}
 
 
 def remove_old_instances():
-    today = date.today()
-    for f in Path(id_folder).iterdir():
+    folder = Path(id_folder)
+    if not folder.exists():
+        return
+    for f in folder.iterdir():
         if f.is_file():
+            is_instance_file = f.suffix.lower() in {".json", ".txt"}
             modified_date = datetime.fromtimestamp(f.stat().st_mtime).date()
-            if modified_date < today:
+            if is_instance_file and modified_date < date.today():
                 f.unlink()
 
 
@@ -150,7 +152,7 @@ def _load_project_settings(project_name, df=None, date_cols=None):
         Dictionary with keys: origin_start, origin_end, dev_end (all in YYYYMM format)
     """
     # Build path to project settings file
-    settings_path = PROJECT_ROOT / "projects" / project_name / "general_settings.json"
+    settings_path = get_project_root() / "projects" / project_name / "general_settings.json"
 
     # Check cache: reuse if file hasn't been modified since last load
     if project_name in PROJECT_SETTINGS_CACHE:
@@ -333,7 +335,7 @@ def get_current_time():
 
 
 def _project_json_paths(project_name):
-    project_dir = PROJECT_ROOT / "projects" / project_name
+    project_dir = get_project_root() / "projects" / project_name
     return {
         "source_table": project_dir / "field_mapping.json",
         "dataset_types": project_dir / "dataset_types.json",
@@ -511,11 +513,31 @@ def read_txt(txt_file, retries=50, delay=0.02):
 
 
 def write_txt(txt_file, arg):
+    os.makedirs(os.path.dirname(txt_file), exist_ok=True)
     content = ''
     for item in arg.items():
         content += item[0] + ' = ' + item[1] + '\n'
     with open(txt_file, "w") as file:
         file.write(content)
+
+
+def read_json(json_file, retries=50, delay=0.02):
+    for _ in range(retries):
+        try:
+            with open(json_file, mode='r', encoding='utf-8') as f:
+                return json.load(f)
+        except (PermissionError, json.JSONDecodeError):
+            time.sleep(delay)
+    raise PermissionError(f"Cannot open {json_file}")
+
+
+def write_json(json_file, arg):
+    os.makedirs(os.path.dirname(json_file), exist_ok=True)
+    tmp_file = f"{json_file}.{uuid.uuid4()}.tmp"
+    with open(tmp_file, mode="w", encoding="utf-8") as file:
+        json.dump(arg, file, indent=2)
+        file.write("\n")
+    os.replace(tmp_file, json_file)
 
 
 def time_diff(time_str_1, time_str_2 = 'Current Time'):
@@ -844,7 +866,7 @@ def UDF_ADASProjectSettings(arg):
         ['Development End Date', date(dev_end // 100, dev_end % 100, calendar.monthrange(dev_end // 100, dev_end % 100)[1])], 
         ['Origin Length', 12], 
         ['Development Length', 12], 
-        ['Folder', 'ADAS Virtual Project']
+        ['Folder', f'{function_brand(arg.get("Function"))} Virtual Project']
     ]
     write_lists_to_csv(arg['DataPath'], data_list)
 
@@ -1096,7 +1118,7 @@ def UDF_ADASTri(arg):
 
         df2.loc[acc, dev_label[max_dev_age:]] = np.nan
 
-    if output_data_format == 'Vector' or arg['Function'] == 'ADASVec':
+    if output_data_format == 'Vector' or is_vector_function(arg['Function']):
         df2 = df2.iloc[:, [0]].fillna(0)
 
     # Output
@@ -1184,11 +1206,12 @@ class RequestHandler(FileSystemEventHandler):
 
         # Go to Functions
         try:
-            if arg['Function'] in ['ADASTri', 'ADASVec']:
+            function_name = normalize_function_name(arg.get('Function'))
+            if function_name in ['ADASTri', 'ADASVec']:
                 UDF_ADASTri(arg)
-            elif arg['Function'] == 'ADASProjectSettings':
+            elif function_name == 'ADASProjectSettings':
                 UDF_ADASProjectSettings(arg)
-            elif arg['Function'] == 'ADASHeaders':
+            elif function_name == 'ADASHeaders':
                 UDF_ADASHeaders(arg)
             else:
                 write_lists_to_csv(arg['DataPath'], [['(invalid function name)']])
@@ -1218,7 +1241,7 @@ def start_monitoring(path):
 
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    write_txt(id_path, {'Server': robot_id, 'Last seen': current_time})
+    write_json(id_path, {'Server': robot_id, 'Last seen': current_time})
 
     try:
         while True:
@@ -1226,16 +1249,16 @@ def start_monitoring(path):
             if not os.path.exists(id_path):
                 observer.stop(); break
 
-            if get_config_value('apps.agent.kill_all'):
+            if get_config_value('apps.engine.kill_all'):
                 os.remove(id_path)
                 observer.stop(); break
             
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
             # Update Status
-            arg_1 = read_txt(id_path)
+            arg_1 = read_json(id_path)
             arg_1['Last seen'] = current_time
-            write_txt(id_path, arg_1)
+            write_json(id_path, arg_1)
 
             # Check Base Settings (New Version Available?)
             if BASE_DICT["Project Map - Version"] < datetime.fromtimestamp(os.path.getmtime(project_map_path)):
@@ -1250,4 +1273,4 @@ def start_monitoring(path):
     observer.join()
 
 
-start_monitoring(f"{PROJECT_ROOT}\\requests")
+start_monitoring(str(get_project_root() / "requests"))

@@ -7,6 +7,38 @@ from pathlib import Path
 from typing import Optional
 import subprocess
 
+_PRODUCT_ROOT = str(Path(__file__).resolve().parent.parent.parent)
+if _PRODUCT_ROOT not in sys.path:
+    sys.path.insert(0, _PRODUCT_ROOT)
+
+from core.utils import component_app_name, resolve_app_exe
+
+
+def remove_startup_shortcut(shortcut_name: str) -> Optional[Path]:
+    """
+    Delete a shortcut from the current user's Startup folder if it exists.
+
+    Args:
+      shortcut_name: Shortcut file name, with or without the .lnk suffix.
+
+    Returns:
+      Path to the deleted shortcut, or None if no shortcut was present.
+    """
+    name = shortcut_name.strip()
+    if not name:
+        raise ValueError("shortcut_name is empty")
+    if not name.lower().endswith(".lnk"):
+        name = f"{name}.lnk"
+
+    startup_dir = Path(os.environ["APPDATA"]) / r"Microsoft\Windows\Start Menu\Programs\Startup"
+    lnk_path = startup_dir / name
+    if not lnk_path.exists():
+        return None
+
+    lnk_path.unlink()
+    return lnk_path
+
+
 def install_startup_shortcut(
     exe_path: str | os.PathLike,
     shortcut_name: Optional[str] = None,
@@ -67,42 +99,23 @@ def install_startup_shortcut(
     return lnk_path
 
 
-# lnk = install_startup_shortcut(
-#     r"E:\ADAS\core\ADAS Master\dist\ADAS Master\ADAS Master.exe",
-#     shortcut_name="ADAS Master",
-#     args="--silent",
-#     description="Launch ADAS Master at login",
-# )
-# print("\n> App Installed/Updated:", lnk); time.sleep(0.5)
-
-
-# lnk = install_startup_shortcut(
-#     r"E:\ResQ\Excel Add-ins\URA master\dist\URA master.exe",
-#     shortcut_name="URA master",
-#     args="--silent",
-#     description="Launch URA master at login",
-# )
-# print("\n> App Installed/Updated:", lnk); time.sleep(0.5)
-
+removed_lnk = remove_startup_shortcut("ADAS Shell")
+if removed_lnk:
+    print("\n> Removed old startup shortcut:", removed_lnk); time.sleep(0.5)
 
 lnk = install_startup_shortcut(
-    r"E:\ADAS\core\ADAS Shell\dist\ADAS Shell\ADAS Shell.exe",
-    shortcut_name="ADAS Shell",
+    resolve_app_exe("launcher"),
+    shortcut_name=component_app_name("launcher"),
     args="--silent",
-    description="Launch ADAS Shell at login",
+    description=f"Launch {component_app_name('launcher')} at login",
 )
 
 print("\n> Shortcut created:", lnk); time.sleep(0.5)
 
 print('\n> Start Applications ...')
 
-# subprocess.Popen([r"E:\ADAS\core\ADAS Master\dist\ADAS Master\ADAS Master.exe"], close_fds=True)
-# subprocess.Popen([r"E:\ResQ\Excel Add-ins\URA master\dist\URA master.exe"], close_fds=True)
-
-os.startfile(r"E:\ADAS\core\ADAS Master\dist\ADAS Master\ADAS Master.exe")
+os.startfile(str(resolve_app_exe("orchestrator")))
 os.startfile(r"E:\ResQ\Excel Add-ins\URA master\dist\URA master.exe")
-
-# time.sleep(0.5)
 
 print('\n> Done'); time.sleep(2)
 
