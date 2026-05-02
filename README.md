@@ -98,7 +98,7 @@ The ArcRho Excel Add-in exposes the data processing engine directly inside Excel
 
 ### Ribbon
 
-<img src="./assets/images/addin_ribbon.png" width="600"/>
+<img src="./assets/images/addin_ribbon_v2.png" width="600"/>
 
 The **ADAS** ribbon tab provides quick-access shortcuts for the two most common setup actions before calling any formula:
 
