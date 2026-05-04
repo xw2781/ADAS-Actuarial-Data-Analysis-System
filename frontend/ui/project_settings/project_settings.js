@@ -102,7 +102,6 @@ const detailTitle = document.getElementById("detailTitle");
 const detailForm = document.getElementById("detailForm");
 const openProjectFolderBtn = document.getElementById("openProjectFolderBtn");
 const openInTabBtn = document.getElementById("openInTabBtn");
-const editSettingsBtn = document.getElementById("editSettingsBtn");
 const treePanel = document.getElementById("treePanel");
 const resizeHandle = document.getElementById("resizeHandle");
 const treeHeader = document.querySelector(".tree-header");
@@ -612,47 +611,6 @@ function toWinPath(pathValue) {
   return String(pathValue || "").trim().replace(/\//g, "\\");
 }
 
-function inferArcRhoRootPath(...candidates) {
-  for (const candidate of candidates) {
-    const value = toWinPath(candidate);
-    if (!value) continue;
-
-    const lower = value.toLowerCase();
-    const projectsIdx = lower.indexOf("\\projects\\");
-    if (projectsIdx > 1) return value.slice(0, projectsIdx);
-
-    const dataIdx = lower.indexOf("\\data\\");
-    if (dataIdx > 1) return value.slice(0, dataIdx);
-  }
-  return "E:\\ArcRho";
-}
-
-function sanitizeProjectFolderName(projectName) {
-  return String(projectName || "").trim().replace(/[\\/:*?"<>|]/g, "_");
-}
-
-function buildCanonicalProjectSettingsPath(projectName, legacySettingsPath, tablePath) {
-  const folderName = sanitizeProjectFolderName(projectName);
-  if (!folderName) return toWinPath(legacySettingsPath);
-  const root = inferArcRhoRootPath(legacySettingsPath, tablePath);
-  return `${root}\\projects\\${folderName}\\project_settings.json`;
-}
-
-function resolveProjectSettingsPath(projectName, legacySettingsPath, tablePath) {
-  const legacyPath = toWinPath(legacySettingsPath);
-  const canonicalPath = buildCanonicalProjectSettingsPath(projectName, legacyPath, tablePath);
-  if (!legacyPath) return canonicalPath;
-
-  const lower = legacyPath.toLowerCase();
-  if (
-    lower.endsWith("_summary.json") ||
-    lower.endsWith("\\project_settings.json")
-  ) {
-    return canonicalPath;
-  }
-  return legacyPath;
-}
-
 function normalizeTreePath(pathValue) {
   const raw = String(pathValue || "").trim().replace(/\//g, "\\");
   if (!raw) return "";
@@ -714,7 +672,6 @@ function buildSelectedProjectSnapshot(project) {
   return {
     name,
     folder: normalizeTreePath(project.folder || ""),
-    settings: toWinPath(project.settings || ""),
     tablePath: toWinPath(project.tablePath || ""),
   };
 }
@@ -753,7 +710,6 @@ function findProjectBySnapshot(snapshot) {
   const nameKey = String(snapshot.name || "").trim().toLowerCase();
   if (!nameKey) return null;
   const folderKey = normalizeTreePath(snapshot.folder || "").toLowerCase();
-  const settingsKey = toWinPath(snapshot.settings || "").toLowerCase();
   const tablePathKey = toWinPath(snapshot.tablePath || "").toLowerCase();
 
   const candidates = [];
@@ -765,13 +721,6 @@ function findProjectBySnapshot(snapshot) {
     }
   }
   if (!candidates.length) return null;
-
-  const byFolderAndSettings = candidates.find((project) => {
-    const projectFolder = normalizeTreePath(project.folder || "").toLowerCase();
-    const projectSettings = toWinPath(project.settings || "").toLowerCase();
-    return !!folderKey && !!settingsKey && projectFolder === folderKey && projectSettings === settingsKey;
-  });
-  if (byFolderAndSettings) return byFolderAndSettings;
 
   const byFolderAndTablePath = candidates.find((project) => {
     const projectFolder = normalizeTreePath(project.folder || "").toLowerCase();
@@ -785,12 +734,6 @@ function findProjectBySnapshot(snapshot) {
     return !!folderKey && projectFolder === folderKey;
   });
   if (byFolder) return byFolder;
-
-  const bySettings = candidates.find((project) => {
-    const projectSettings = toWinPath(project.settings || "").toLowerCase();
-    return !!settingsKey && projectSettings === settingsKey;
-  });
-  if (bySettings) return bySettings;
 
   return candidates[0];
 }
@@ -917,6 +860,37 @@ function removeProjectPathFromStructure(projectName) {
   if (idx >= 0) projectData.projectPaths.splice(idx, 1);
 }
 
+const OBSOLETE_PROJECT_MAP_COLUMNS = new Set(["Folder", "Preload", "Project Settings", "Settings Profile"]);
+
+function removeObsoleteProjectMapColumns(data) {
+  if (!data || typeof data !== "object") return data;
+
+  for (const sheetName of Object.keys(data)) {
+    if (sheetName === "customFolders" || sheetName === "projectPaths") continue;
+    const sheet = data[sheetName];
+    if (!sheet || typeof sheet !== "object" || !Array.isArray(sheet.headers)) continue;
+
+    const keepIndexes = [];
+    const nextHeaders = [];
+    sheet.headers.forEach((header, index) => {
+      if (OBSOLETE_PROJECT_MAP_COLUMNS.has(String(header || ""))) return;
+      keepIndexes.push(index);
+      nextHeaders.push(header);
+    });
+
+    if (keepIndexes.length === sheet.headers.length) continue;
+    sheet.headers = nextHeaders;
+    if (Array.isArray(sheet.rows)) {
+      sheet.rows = sheet.rows.map((row) => {
+        const sourceRow = Array.isArray(row) ? row : [];
+        return keepIndexes.map((index) => sourceRow[index]);
+      });
+    }
+  }
+
+  return data;
+}
+
 // ============ Load JSON Data ============
 async function loadProjectData(sourceKey = DEFAULT_SOURCE) {
   setStatus("Loading projects...");
@@ -930,6 +904,7 @@ async function loadProjectData(sourceKey = DEFAULT_SOURCE) {
     const result = await res.json();
     projectData = result.data;
     currentMtime = result.mtime;
+    removeObsoleteProjectMapColumns(projectData);
 
     // Load folder structure from folder_structure.json.
     try {
@@ -948,17 +923,6 @@ async function loadProjectData(sourceKey = DEFAULT_SOURCE) {
     } catch {
       projectData.customFolders = [];
       projectData.projectPaths = [];
-    }
-
-    // Migrate "Settings Profile" -> "Project Settings" in headers so next save updates JSON
-    for (const sheetName of Object.keys(projectData)) {
-      const sheet = projectData[sheetName];
-      if (sheet && typeof sheet === "object" && Array.isArray(sheet.headers)) {
-        const idx = sheet.headers.indexOf("Settings Profile");
-        if (idx >= 0) {
-          sheet.headers[idx] = "Project Settings";
-        }
-      }
     }
 
     buildTreeData();
@@ -1002,12 +966,11 @@ function buildTreeData() {
   const headers = sheet.headers || [];
   const rows = sheet.rows || [];
 
-  // Find column indices (support "Project Settings" or legacy "Settings Profile")
+  // Find column indices.
   const colIdx = {};
   headers.forEach((h, i) => {
     colIdx[h] = i;
   });
-  const settingsCol = colIdx["Project Settings"] ?? colIdx["Settings Profile"] ?? -1;
 
   const projectFolderMap = new Map();
   for (const fullPath of projectData.projectPaths || []) {
@@ -1025,8 +988,6 @@ function buildTreeData() {
     const projectName = row[colIdx["Project Name"]] || "";
     const folder = projectFolderMap.get(String(projectName || "").trim().toLowerCase()) || "Uncategorized";
     const tablePath = row[colIdx["Table Path"]] || "";
-    const rawSettings = settingsCol >= 0 ? (row[settingsCol] || "") : "";
-    const settingsPath = resolveProjectSettingsPath(projectName, rawSettings, tablePath);
 
     if (!projectName) continue;
 
@@ -1039,9 +1000,7 @@ function buildTreeData() {
 
     treeData[folder].projects.push({
       name: projectName,
-      settings: settingsPath,
       tablePath: tablePath,
-      preload: row[colIdx["Preload"]] || null,
       folder: folder,
       _row: row
     });
@@ -1385,25 +1344,18 @@ async function saveTablePathField(project, nextTablePath) {
   if (tablePathCol < 0) {
     throw new Error('Column "Table Path" was not found.');
   }
-  const settingsCol = headers.indexOf("Project Settings") >= 0
-    ? headers.indexOf("Project Settings")
-    : headers.indexOf("Settings Profile");
 
   const prevTablePath = String(project._row[tablePathCol] || "");
   const prevProjectTablePath = String(project.tablePath || "");
-  const prevProjectSettings = String(project.settings || "");
   const nextValue = String(nextTablePath || "").trim();
 
   project._row[tablePathCol] = nextValue;
   project.tablePath = nextValue;
-  const rawSettings = settingsCol >= 0 ? String(project._row[settingsCol] || "") : "";
-  project.settings = resolveProjectSettingsPath(project.name, rawSettings, nextValue);
 
   const saved = await saveProjectData(DEFAULT_SOURCE);
   if (!saved) {
     project._row[tablePathCol] = prevTablePath;
     project.tablePath = prevProjectTablePath;
-    project.settings = prevProjectSettings;
     throw new Error("Save failed.");
   }
 
@@ -2263,30 +2215,12 @@ function openProjectInNewTab(project) {
     type: "arcrho:open-project",
     project: {
       name: project.name,
-      settings: project.settings,
       tablePath: project.tablePath,
       folder: project.folder
     }
   }, "*");
 
   setStatus(`Opening: ${project.name}`);
-}
-
-// ============ Edit Settings ============
-function openProjectSettings(project) {
-  const settingsPath = project.settings;
-  if (!settingsPath) {
-    alert("No settings file specified for this project.");
-    return;
-  }
-
-  // Send message to open settings workbook
-  window.parent.postMessage({
-    type: "arcrho:open-workbook",
-    path: settingsPath
-  }, "*");
-
-  setStatus(`Opening settings: ${settingsPath}`);
 }
 
 async function openProjectFolderInExplorer(project) {
@@ -2355,12 +2289,6 @@ document.addEventListener("mouseup", () => {
 openInTabBtn?.addEventListener("click", () => {
   if (selectedProject) {
     openProjectInNewTab(selectedProject);
-  }
-});
-
-editSettingsBtn?.addEventListener("click", () => {
-  if (selectedProject) {
-    openProjectSettings(selectedProject);
   }
 });
 
@@ -2764,6 +2692,7 @@ async function createProjectInFolder(folderNode) {
     dataToSave[sheetName] = { ...currentSheet, rows: currentRows };
     delete dataToSave.customFolders;
     delete dataToSave.projectPaths;
+    removeObsoleteProjectMapColumns(dataToSave);
 
     const saveRes = await fetch(`/project_settings/${DEFAULT_SOURCE}`, {
       method: "POST",
@@ -2950,6 +2879,7 @@ async function renameProject(project) {
     dataToSave[sheetName] = { ...currentSheet, rows: currentRows };
     delete dataToSave.customFolders;
     delete dataToSave.projectPaths;
+    removeObsoleteProjectMapColumns(dataToSave);
 
     const saveRes = await fetch(`/project_settings/${DEFAULT_SOURCE}`, {
       method: "POST",
@@ -3128,6 +3058,7 @@ async function duplicateProject(project) {
     dataToSave[sheetName] = { ...currentSheet, rows: currentRows };
     delete dataToSave.customFolders;
     delete dataToSave.projectPaths;
+    removeObsoleteProjectMapColumns(dataToSave);
 
     const saveRes = await fetch(`/project_settings/${DEFAULT_SOURCE}`, {
       method: "POST",
@@ -3446,6 +3377,7 @@ async function saveProjectData(sourceKey = DEFAULT_SOURCE) {
     const dataToSave = { ...projectData };
     delete dataToSave.customFolders;
     delete dataToSave.projectPaths;
+    removeObsoleteProjectMapColumns(dataToSave);
 
     const res = await fetch(`/project_settings/${sourceKey}`, {
       method: "POST",

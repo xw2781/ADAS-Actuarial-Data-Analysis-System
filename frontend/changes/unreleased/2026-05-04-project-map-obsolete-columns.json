@@ -1,0 +1,9 @@
+{
+  "type": "fix",
+  "scope": "project-settings",
+  "audience": "user",
+  "summary": "Project Settings no longer uses legacy folder, Preload, or project settings path columns from the project map.",
+  "details": [
+    "Project map saves now keep project name and table path data while dropping obsolete Folder, Preload, Project Settings, and Settings Profile columns."
+  ]
+}

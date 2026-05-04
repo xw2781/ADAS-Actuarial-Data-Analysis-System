@@ -11,7 +11,7 @@ Excluded directories: `__pycache__`, `dist`, `node-portable`, `node-v24.13.0-win
 | `.claude` | 1 |
 | `app_server` | 47 |
 | `build` | 7 |
-| `changes` | 16 |
+| `changes` | 17 |
 | `docs` | 35 |
 | `electron` | 2 |
 | `icons` | 17 |

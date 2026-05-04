@@ -32,7 +32,6 @@ Detected `arcrho:*` message types in key JS files:
 - `arcrho:close-shell-menus`
 - `arcrho:hotkey`
 - `arcrho:open-project`
-- `arcrho:open-workbook`
 - `arcrho:project-settings-ribbon-changed`
 - `arcrho:status`
 - `arcrho:zoom`
@@ -59,7 +58,7 @@ Detected `arcrho:*` message types in key JS files:
 
 ## Data/State/Caches
 <!-- MANUAL:BEGIN -->
-- Reads/writes settings payloads and folder structures.
+- Reads/writes settings payloads and folder structures. Project map rows use `Project Name` and `Table Path`; folder placement is stored in `folder_structure.json`; obsolete `Folder`, `Preload`, `Project Settings`, and `Settings Profile` columns are stripped from in-memory data and saved payloads.
 - `Project Settings` ribbon page includes an `Open Folder` action button with folder icon styling and disabled-state feedback while the request is in flight.
 - Coordinates feature modules for mapping/type editors.
 - Dataset Types row mutations (add/edit/delete) update in-memory state and schedule per-project debounced save.
