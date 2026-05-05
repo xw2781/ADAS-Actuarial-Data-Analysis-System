@@ -61,14 +61,19 @@ PROJECT_ROOT = find_project_root(Path(__file__).resolve().parent)
 _CONFIG_ENV = os.environ.get("ARCRHO_CONFIG") or os.environ.get("ADAS_CONFIG")
 _DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config" / "config.json"
 _LEGACY_CONFIG_PATH = PROJECT_ROOT / "core" / "config.json"
-CONFIG_PATH = Path(
-    _CONFIG_ENV
-    or (
-        _LEGACY_CONFIG_PATH
-        if _LEGACY_CONFIG_PATH.exists() and not _DEFAULT_CONFIG_PATH.exists()
-        else _DEFAULT_CONFIG_PATH
-    )
-)
+
+
+def resolve_config_path() -> Path:
+    if _DEFAULT_CONFIG_PATH.exists():
+        return _DEFAULT_CONFIG_PATH
+    if _CONFIG_ENV:
+        return Path(_CONFIG_ENV)
+    if _LEGACY_CONFIG_PATH.exists():
+        return _LEGACY_CONFIG_PATH
+    return _DEFAULT_CONFIG_PATH
+
+
+CONFIG_PATH = resolve_config_path()
 
 
 def get_project_root() -> Path:
