@@ -5,7 +5,7 @@
 import { AuditLogStore } from "/ui/project_settings/project_settings_audit.js?v=20260223";
 import { createFieldMappingFeature } from "/ui/project_settings/project_settings_field_mapping.js?v=20260315";
 import { createDatasetTypesFeature } from "/ui/project_settings/project_settings_dataset_types.js?v=2026040308";
-import { createReservingClassTypesFeature } from "/ui/project_settings/project_settings_reserving_class_types.js?v=2026040309";
+import { createReservingClassTypesFeature } from "/ui/project_settings/project_settings_reserving_class_types.js?v=2026050803";
 
 // ============ Zoom & Hotkey Handling ============
 const ZOOM_STORAGE_KEY = "arcrho_ui_zoom_pct";
@@ -56,6 +56,10 @@ window.addEventListener("message", (e) => {
   }
   if (msgType === "arcrho:project-settings-dataset-types-load-local") {
     handleShellDatasetTypesLocalLoad();
+    return;
+  }
+  if (msgType === "arcrho:server-connection-updated") {
+    loadProjectData(DEFAULT_SOURCE);
   }
 });
 
@@ -2582,9 +2586,6 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (datasetTypeEditor?.classList.contains("show")) {
       datasetTypesFeature?.closeDatasetTypeEditor();
-    }
-    if (reservingClassTypeEditor?.classList.contains("show")) {
-      reservingClassTypesFeature?.closeReservingClassTypeEditor();
     }
   }
 });

@@ -186,9 +186,7 @@ export function initAppLifecycle() {
     return showAppConfirm({ title: "Warning", message: "Quit the application?", okText: "Quit" });
   };
   window.addEventListener("beforeunload", () => {
-    if (window.__appRestarting) return;
-    if (window.__appRefreshing) return;
-    if (appShutdownRequested) return;
-    sendShutdownSignal();
+    // Shutdown is handled by explicit Quit actions and the Electron window close path.
+    // Treating every document unload as shutdown makes ordinary reloads quit the app.
   });
 }

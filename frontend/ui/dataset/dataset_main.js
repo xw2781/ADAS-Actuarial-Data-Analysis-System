@@ -20,6 +20,7 @@ import {
   loadProjectValidValueList,
   loadDatasetValidValueList,
   loadReservingClassValidValueList,
+  clearValidValueListCache,
   validateReservingClassPathByTypeNames,
   buildReservingClassPathPartLookup,
   normalizeReservingClassPathByPartLookup,
@@ -116,6 +117,11 @@ window.addEventListener("message", (e) => {
     } catch {
       // ignore
     }
+    return;
+  }
+  if (e?.data?.type === "arcrho:server-connection-updated") {
+    clearValidValueListCache();
+    logLine("Server connection updated.");
   }
 });
 

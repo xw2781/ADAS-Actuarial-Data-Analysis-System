@@ -44,6 +44,10 @@ export function createReservingClassTypesFeature(deps = {}) {
   let reservingClassTypesSortState = loadReservingClassTypesSortState();
   let reservingClassTypesValidationTooltip = null;
   let reservingClassTypesValidationTooltipWired = false;
+  let rctFormulaComponentsBox = null;
+  let rctFormulaComponentsLabel = null;
+  let rctFormulaComponentsWired = false;
+  let rctFormulaComponentsMenu = null;
 
   function escapeHtml(str) {
     return String(str)
@@ -323,8 +327,357 @@ export function createReservingClassTypesFeature(deps = {}) {
   function ensureReservingClassTypesValidationTooltipWiring() {
     if (reservingClassTypesValidationTooltipWired) return;
     reservingClassTypesValidationTooltipWired = true;
-    rctEditFormula?.addEventListener("input", () => hideReservingClassTypesValidationTooltip());
+    rctEditFormula?.addEventListener("input", () => {
+      hideReservingClassTypesValidationTooltip();
+      autoSizeReservingClassFormulaInput();
+      renderReservingClassFormulaComponents();
+    });
     rctEditEexFormula?.addEventListener("input", () => hideReservingClassTypesValidationTooltip());
+  }
+
+  function autoSizeReservingClassFormulaInput() {
+    if (!rctEditFormula) return;
+    rctEditFormula.style.height = "auto";
+    const minHeight = 58;
+    const scrollHeight = Number(rctEditFormula.scrollHeight || 0);
+    const nextHeight = Math.max(minHeight, scrollHeight + 2);
+    rctEditFormula.style.height = `${nextHeight}px`;
+  }
+
+  function sanitizeReservingClassFormulaSyntax(value) {
+    const text = normalizeOperatorSpacing(value);
+    if (!text) return "";
+
+    const tokens = [];
+    let current = "";
+    for (let i = 0; i < text.length; i += 1) {
+      const ch = text[i];
+      if (ch === "\"") {
+        if (current.trim()) tokens.push({ type: "operand", value: current.trim() });
+        current = "\"";
+        i += 1;
+        while (i < text.length) {
+          current += text[i];
+          if (text[i] === "\"") break;
+          i += 1;
+        }
+        tokens.push({ type: "operand", value: current.trim() });
+        current = "";
+        continue;
+      }
+      if (/[+\-*/]/.test(ch)) {
+        if (current.trim()) tokens.push({ type: "operand", value: current.trim().replace(/\s+/g, " ") });
+        tokens.push({ type: "operator", value: ch });
+        current = "";
+        continue;
+      }
+      current += ch;
+    }
+    if (current.trim()) tokens.push({ type: "operand", value: current.trim().replace(/\s+/g, " ") });
+
+    const out = [];
+    let expectOperand = true;
+    for (const token of tokens) {
+      if (token.type === "operand") {
+        if (!expectOperand && out.length) out.push("+");
+        out.push(token.value);
+        expectOperand = false;
+        continue;
+      }
+      if (expectOperand) continue;
+      out.push(token.value);
+      expectOperand = true;
+    }
+    while (out.length && /[+\-*/]/.test(out[out.length - 1])) out.pop();
+    return normalizeOperatorSpacing(out.join(" "));
+  }
+
+  function formatReservingClassFormulaComponent(value) {
+    const text = String(value ?? "").trim();
+    if (!text) return "";
+    return `"${text}"`;
+  }
+
+  function closeReservingClassFormulaComponentsMenu() {
+    if (!rctFormulaComponentsMenu) return;
+    const { menu, onMouseDown, onKeyDown, onContextMenu } = rctFormulaComponentsMenu;
+    document.removeEventListener("mousedown", onMouseDown, true);
+    document.removeEventListener("keydown", onKeyDown, true);
+    document.removeEventListener("contextmenu", onContextMenu, true);
+    if (menu?.parentNode) menu.parentNode.removeChild(menu);
+    rctFormulaComponentsMenu = null;
+  }
+
+  function getReservingClassFormulaComponentValues(projectName) {
+    const selectedLevel = String(rctEditLevel?.value ?? "").trim();
+    if (!projectName || !selectedLevel) return { level: selectedLevel, values: [] };
+
+    const state = getProjectReservingClassTypesState(projectName);
+    const columns = Array.isArray(state.columns) && state.columns.length ? state.columns : [...RESERVING_CLASS_TYPES_COLUMNS];
+    const idx = getReservingClassTypeColIndexes(columns);
+    const nameIdx = idx.name >= 0 ? idx.name : 0;
+    const levelIdx = idx.level >= 0 ? idx.level : 1;
+    const seen = new Set();
+    const values = [];
+
+    for (const row of Array.isArray(state.rows) ? state.rows : []) {
+      if (!Array.isArray(row)) continue;
+      const level = String(row?.[levelIdx] ?? "").trim();
+      if (level !== selectedLevel) continue;
+      const name = String(row?.[nameIdx] ?? "").trim();
+      const key = canonReservingClassTypeName(name);
+      if (!name || !key || seen.has(key)) continue;
+      seen.add(key);
+      values.push(name);
+    }
+
+    values.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true }));
+    return { level: selectedLevel, values };
+  }
+
+  function appendReservingClassFormulaComponents(rawValues, options = {}) {
+    if (!rctEditFormula || rctEditFormula.disabled) return false;
+    const values = Array.isArray(rawValues) ? rawValues : [rawValues];
+    if (options.replaceFormula) {
+      rctEditFormula.value = "";
+    }
+    const existing = sanitizeReservingClassFormulaSyntax(rctEditFormula.value ?? "");
+    const tokens = [];
+    const seenInThisAppend = new Set();
+    let existingKeys = null;
+
+    if (options.skipExisting) {
+      const knownValues = getReservingClassFormulaComponentValues(rctEditorProject).values;
+      existingKeys = new Set(
+        extractFormulaComponentRefs(existing, knownValues)
+          .map((component) => canonReservingClassTypeName(component?.name))
+          .filter(Boolean),
+      );
+    }
+
+    for (const raw of values) {
+      const value = String(raw ?? "").trim();
+      const key = canonReservingClassTypeName(value);
+      if (!value || !key || seenInThisAppend.has(key)) continue;
+      if (existingKeys?.has(key)) continue;
+      const token = formatReservingClassFormulaComponent(value);
+      if (!token) continue;
+      seenInThisAppend.add(key);
+      tokens.push(token);
+    }
+
+    if (!tokens.length) return false;
+    const next = existing ? `${existing} + ${tokens.join(" + ")}` : tokens.join(" + ");
+    rctEditFormula.value = sanitizeReservingClassFormulaSyntax(next);
+    hideReservingClassTypesValidationTooltip();
+    try {
+      rctEditFormula.dispatchEvent(new Event("input", { bubbles: true }));
+    } catch {
+      // ignore synthetic event failures
+    }
+    rctEditFormula.focus();
+    return true;
+  }
+
+  function parseReservingClassFormulaComponentDragPayload(evt) {
+    let raw = "";
+    try {
+      raw = String(evt?.dataTransfer?.getData("application/json") || "").trim();
+    } catch {
+      raw = "";
+    }
+    if (!raw) {
+      try {
+        raw = String(evt?.dataTransfer?.getData("text/plain") || "").trim();
+      } catch {
+        raw = "";
+      }
+    }
+    if (!raw) return null;
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") return parsed;
+    } catch {
+      // text fallback below
+    }
+    return { value: raw };
+  }
+
+  function ensureReservingClassFormulaComponentsSection() {
+    if (!rctEditFormula) return null;
+    const doc = rctEditFormula.ownerDocument || document;
+    rctFormulaComponentsBox = doc.getElementById("rctFormulaComponentsBox") || rctFormulaComponentsBox;
+    rctFormulaComponentsLabel = doc.getElementById("rctFormulaComponentsLabel") || rctFormulaComponentsLabel;
+
+    if (!rctFormulaComponentsBox) {
+      const body = rctEditFormula.closest?.(".rct-row-editor-body");
+      if (!body) return null;
+      rctFormulaComponentsLabel = doc.createElement("label");
+      rctFormulaComponentsLabel.id = "rctFormulaComponentsLabel";
+      rctFormulaComponentsLabel.setAttribute("for", "rctFormulaComponentsBox");
+      rctFormulaComponentsLabel.textContent = "Components";
+
+      rctFormulaComponentsBox = doc.createElement("div");
+      rctFormulaComponentsBox.id = "rctFormulaComponentsBox";
+      rctFormulaComponentsBox.className = "rct-formula-components-box";
+      rctFormulaComponentsBox.setAttribute("role", "listbox");
+      rctFormulaComponentsBox.setAttribute("tabindex", "0");
+      rctFormulaComponentsBox.setAttribute("aria-label", "Formula components for selected level");
+
+      const next = rctEditFormula.nextSibling;
+      body.insertBefore(rctFormulaComponentsLabel, next);
+      body.insertBefore(rctFormulaComponentsBox, next);
+    }
+
+    if (!rctFormulaComponentsWired) {
+      rctFormulaComponentsWired = true;
+      rctEditLevel?.addEventListener("input", () => renderReservingClassFormulaComponents());
+      rctEditLevel?.addEventListener("change", () => renderReservingClassFormulaComponents());
+
+      rctEditFormula.addEventListener("dragover", (evt) => {
+        if (rctEditFormula.disabled) return;
+        evt.preventDefault();
+        if (evt.dataTransfer) evt.dataTransfer.dropEffect = "copy";
+        rctEditFormula.classList.add("rct-formula-drop-target");
+      });
+      rctEditFormula.addEventListener("dragleave", () => {
+        rctEditFormula.classList.remove("rct-formula-drop-target");
+      });
+      rctEditFormula.addEventListener("drop", (evt) => {
+        if (rctEditFormula.disabled) return;
+        evt.preventDefault();
+        evt.stopPropagation();
+        rctEditFormula.classList.remove("rct-formula-drop-target");
+        const payload = parseReservingClassFormulaComponentDragPayload(evt);
+        const selected = getReservingClassFormulaComponentValues(rctEditorProject);
+        const payloadLevel = String(payload?.level ?? payload?.level_number ?? "").trim();
+        if (payloadLevel && selected.level && payloadLevel !== selected.level) return;
+        const value = String(payload?.value ?? payload?.name ?? "").trim();
+        const validKeys = new Set(selected.values.map((item) => canonReservingClassTypeName(item)).filter(Boolean));
+        if (!validKeys.has(canonReservingClassTypeName(value))) return;
+        appendReservingClassFormulaComponents(value);
+      });
+      rctEditFormula.addEventListener("keydown", (evt) => {
+        if (String(evt?.key || "") !== "Escape") return;
+        evt.preventDefault();
+        evt.stopPropagation();
+        if (typeof evt.stopImmediatePropagation === "function") evt.stopImmediatePropagation();
+        autoSizeReservingClassFormulaInput();
+        rctEditFormula.blur();
+      });
+
+      rctFormulaComponentsBox.addEventListener("contextmenu", (evt) => {
+        evt.preventDefault();
+        evt.stopPropagation();
+        openReservingClassFormulaComponentsMenu(evt.clientX, evt.clientY);
+      });
+    }
+
+    return rctFormulaComponentsBox;
+  }
+
+  function openReservingClassFormulaComponentsMenu(x, y) {
+    closeReservingClassFormulaComponentsMenu();
+    const selected = getReservingClassFormulaComponentValues(rctEditorProject);
+    const canAppend = !rctEditFormula?.disabled && selected.values.length > 0;
+    const menu = document.createElement("div");
+    menu.className = "context-menu rct-formula-components-menu show";
+
+    const item = document.createElement("div");
+    item.className = `context-menu-item${canAppend ? "" : " disabled"}`;
+    item.textContent = "Select all components";
+    item.setAttribute("role", "menuitem");
+    item.setAttribute("aria-disabled", canAppend ? "false" : "true");
+    item.addEventListener("click", (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      if (!canAppend) return;
+      appendReservingClassFormulaComponents(selected.values, { replaceFormula: true });
+      closeReservingClassFormulaComponentsMenu();
+    });
+    menu.appendChild(item);
+    document.body.appendChild(menu);
+
+    const rect = menu.getBoundingClientRect();
+    const left = Math.max(8, Math.min(window.innerWidth - rect.width - 8, Number(x) || 0));
+    const top = Math.max(8, Math.min(window.innerHeight - rect.height - 8, Number(y) || 0));
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+
+    const onMouseDown = (evt) => {
+      if (menu.contains(evt.target)) return;
+      closeReservingClassFormulaComponentsMenu();
+    };
+    const onKeyDown = (evt) => {
+      if (String(evt?.key || "") !== "Escape") return;
+      evt.preventDefault();
+      evt.stopPropagation();
+      closeReservingClassFormulaComponentsMenu();
+    };
+    const onContextMenu = (evt) => {
+      if (menu.contains(evt.target)) return;
+      closeReservingClassFormulaComponentsMenu();
+    };
+    document.addEventListener("mousedown", onMouseDown, true);
+    document.addEventListener("keydown", onKeyDown, true);
+    document.addEventListener("contextmenu", onContextMenu, true);
+    rctFormulaComponentsMenu = { menu, onMouseDown, onKeyDown, onContextMenu };
+  }
+
+  function renderReservingClassFormulaComponents() {
+    const box = ensureReservingClassFormulaComponentsSection();
+    if (!box) return;
+    const selected = getReservingClassFormulaComponentValues(rctEditorProject);
+    const locked = !!rctEditFormula?.disabled;
+    box.innerHTML = "";
+    box.classList.toggle("disabled", locked);
+
+    const appendEmpty = (message) => {
+      const empty = document.createElement("div");
+      empty.className = "rct-formula-components-empty";
+      empty.textContent = message;
+      box.appendChild(empty);
+    };
+
+    if (locked) {
+      appendEmpty("Formula is locked.");
+      return;
+    }
+    if (!selected.level) {
+      appendEmpty("Enter a level to show components.");
+      return;
+    }
+    if (!selected.values.length) {
+      appendEmpty("No components at selected level.");
+      return;
+    }
+
+    const formulaRefs = new Set(
+      extractFormulaComponentRefs(rctEditFormula?.value ?? "", selected.values)
+        .map((component) => canonReservingClassTypeName(component?.name))
+        .filter(Boolean),
+    );
+    for (const value of selected.values) {
+      const selectedInFormula = formulaRefs.has(canonReservingClassTypeName(value));
+      const chip = document.createElement("span");
+      chip.className = `rct-formula-component-chip${selectedInFormula ? " selected" : ""}`;
+      chip.draggable = true;
+      chip.textContent = value;
+      chip.title = "Drag to Formula, or click to add";
+      chip.setAttribute("role", "option");
+      chip.addEventListener("dragstart", (evt) => {
+        if (!evt.dataTransfer) return;
+        const payload = JSON.stringify({ type: "rct_formula_component", level: selected.level, value });
+        evt.dataTransfer.effectAllowed = "copy";
+        try { evt.dataTransfer.setData("application/json", payload); } catch {}
+        try { evt.dataTransfer.setData("text/plain", payload); } catch {}
+      });
+      chip.addEventListener("click", () => {
+        appendReservingClassFormulaComponents(value);
+      });
+      box.appendChild(chip);
+    }
   }
 
   function uniqueReservingClassTypeNames(names) {
@@ -532,8 +885,10 @@ export function createReservingClassTypesFeature(deps = {}) {
 
   function closeReservingClassTypeEditor() {
     hideReservingClassTypesValidationTooltip();
+    closeReservingClassFormulaComponentsMenu();
     if (!reservingClassTypeEditor) return;
     reservingClassTypeEditor.classList.remove("show");
+    rctEditFormula?.classList.remove("rct-formula-drop-target");
     reservingClassTypeEditor.style.left = "";
     reservingClassTypeEditor.style.top = "";
     reservingClassTypeEditor.style.transform = "translateX(-50%)";
@@ -547,6 +902,7 @@ export function createReservingClassTypesFeature(deps = {}) {
   function openReservingClassTypeEditor(projectName, rowIndex, options = {}) {
     hideReservingClassTypesValidationTooltip();
     ensureReservingClassTypesValidationTooltipWiring();
+    ensureReservingClassFormulaComponentsSection();
     if (!reservingClassTypeEditor || !projectName) return;
     const mode = String(options?.mode || "edit").toLowerCase() === "add" ? "add" : "edit";
     const state = getProjectReservingClassTypesState(projectName);
@@ -588,6 +944,7 @@ export function createReservingClassTypesFeature(deps = {}) {
       const formulaIdx = idx.formula >= 0 ? idx.formula : 2;
       rctEditFormula.value = mode === "add" ? "" : String(row?.[formulaIdx] ?? "");
       rctEditFormula.disabled = isSourceDerived;
+      rctEditFormula.style.height = "";
     }
     if (rctEditEexFormula) {
       const eexIdx = idx.eexFormula >= 0 ? idx.eexFormula : 3;
@@ -601,6 +958,8 @@ export function createReservingClassTypesFeature(deps = {}) {
     rctEditorInsertAfterIndex = Number.isInteger(options?.insertAfterIndex)
       ? options.insertAfterIndex
       : (Number.isInteger(rowIndex) ? rowIndex : -1);
+    autoSizeReservingClassFormulaInput();
+    renderReservingClassFormulaComponents();
     reservingClassTypeEditor.style.transform = "translateX(-50%)";
     reservingClassTypeEditor.style.left = "50%";
     reservingClassTypeEditor.style.top = "140px";

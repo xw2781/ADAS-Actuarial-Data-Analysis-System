@@ -10,14 +10,13 @@ Detailed menu, floating-window, lifecycle, and bridge behavior belongs in focuse
 
 ## Entry Points
 <!-- AUTO-GEN:BEGIN frontend.shell.entry_points -->
-- `ui/index.html`: external scripts `/ui/shell/ui_shell.js?v=20260430r`; inline imports _none_.
+- `ui/index.html`: external scripts `/ui/shell/ui_shell.js?v=20260506a`; inline imports _none_.
 
 Detected `fetch(...)` targets in key JS files:
 - `/`
 - `/app/restart`
 - `/app/restart_electron`
 - `/app/shutdown`
-- `/restart`
 - `/workflow/default_dir`
 - `/workflow/load`
 - `/workspace_paths`
@@ -30,6 +29,7 @@ Detected `arcrho:*` message types in key JS files:
 - `arcrho:force-rebuild-toggle`
 - `arcrho:hotkey`
 - `arcrho:open-path-result`
+- `arcrho:server-connection-updated`
 - `arcrho:set-app-font`
 - `arcrho:set-zoom`
 - `arcrho:tab-activated`
@@ -67,8 +67,10 @@ Detected `arcrho:*` message types in key JS files:
 <!-- MANUAL:BEGIN -->
 - Communicates with child iframes via `arcrho:*` postMessage events.
 - Invokes app-server endpoints for workflow import helpers and configuration endpoints.
-- Uses Electron host bridge for shutdown/clear-cache actions; app-server startup is host-managed with retry on transient launch failures.
+- Uses Electron host bridge and explicit shell commands for shutdown/clear-cache actions; ordinary document unloads and reloads do not send app shutdown.
+- App-server startup is host-managed with retry on transient launch failures.
 - Uses Electron host bridge for Server Connection folder browsing and first-time `ArcRho Server` drive detection.
+- Saving Server Connection updates `/workspace_paths` without restarting the app, then broadcasts `arcrho:server-connection-updated` to open feature iframes so page-local path caches can refresh.
 - Consumes dataset-page browsing updates (`arcrho:dataset-settings-changed`, `arcrho:browsing-history-updated`) and forwards updates to any open Browsing History tab.
 - Receives `arcrho:open-dataset-from-history` from Browsing History tab to open dataset tabs with selected inputs.
 - OS-level detached tab pop-out windows are not supported; floating tabs stay inside the main shell and reuse the same iframe/message contracts as docked tabs.

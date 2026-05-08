@@ -10,6 +10,13 @@ function setRootPathSetupMessage(text, isError = false) {
   msg.classList.toggle("error", !!isError);
 }
 
+function notifyServerConnectionUpdated(config) {
+  try {
+    window.dispatchEvent(new CustomEvent("arcrho:server-connection-updated", { detail: { config } }));
+  } catch {}
+  shell.notifyServerConnectionUpdated?.(config);
+}
+
 async function scanInitialServerPath(input) {
   const hostApi = shell.getHostApi?.();
   if (!hostApi || typeof hostApi.findArcRhoServerRoot !== "function") {
@@ -105,6 +112,8 @@ export function initRootPathSettingsModal() {
       alert("Please enter a valid path.");
       return;
     }
+    applyBtn.disabled = true;
+    applyBtn.textContent = "Saving...";
     try {
       const res = await fetch("/workspace_paths", {
         method: "POST",
@@ -112,17 +121,19 @@ export function initRootPathSettingsModal() {
         body: JSON.stringify({ workspace_root: newPath })
       });
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
         closeRootPathSettingsModal();
-        shell.updateStatusBar?.("Root path updated. Restarting...");
-        setTimeout(() => {
-          fetch("/restart", { method: "POST" }).catch(() => {});
-          setTimeout(() => location.reload(), 1500);
-        }, 500);
+        notifyServerConnectionUpdated(data.config || { workspace_root: newPath });
+        shell.updateStatusBar?.("Server connection updated.");
       } else {
-        alert("Failed to save root path.");
+        const detail = await res.text().catch(() => "");
+        alert(detail || "Failed to save root path.");
       }
     } catch (err) {
       alert("Error saving root path: " + err.message);
+    } finally {
+      applyBtn.disabled = false;
+      applyBtn.textContent = "Save";
     }
   });
 

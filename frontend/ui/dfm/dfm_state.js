@@ -206,6 +206,11 @@ export async function getRootPath() {
   return cachedRootPath;
 }
 
+export function setCachedRootPath(value) {
+  const next = String(value || "").trim();
+  cachedRootPath = next || null;
+}
+
 export function getDefaultMethodName() {
   const tri = document.getElementById("triInput")?.value?.trim();
   return tri ? `DFM ${tri}` : "DFM";

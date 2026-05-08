@@ -86,6 +86,15 @@ export function notifyBrowsingHistoryTabs(message = {}) {
   }
 }
 
+export function notifyServerConnectionUpdated(config = {}) {
+  const message = { type: "arcrho:server-connection-updated", config };
+  for (const t of shell.state.tabs || []) {
+    if (t.type === "home") continue;
+    if (!t.iframe || !t.iframe.contentWindow) continue;
+    try { t.iframe.contentWindow.postMessage(message, "*"); } catch {}
+  }
+}
+
 function autoRefreshDatasetOnce(tab) {
   if (!tab || tab.type !== "dataset") return false;
   const key = tab.id || tab.dsInst || "";

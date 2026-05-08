@@ -1,0 +1,10 @@
+{
+  "type": "feature",
+  "scope": "project-settings",
+  "audience": "user",
+  "summary": "Add a selected-level component tray to Reserving Class Types formulas.",
+  "details": [
+    "Users can drag or click components into the formula field as double-quoted tokens with plus operators, see components already present in the formula highlighted, and right-click the tray to replace the formula with all selected-level components.",
+    "The formula field auto-sizes as components are added and Escape now leaves formula editing without closing the reserving class type editor."
+  ]
+}

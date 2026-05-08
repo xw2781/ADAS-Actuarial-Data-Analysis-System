@@ -156,6 +156,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Item -Path '%APP_BUI
 exit /b 0
 
 :run_electron
+call "%NODE_HOME%\node.exe" build\patch_nsis_installer_progress.js
+if errorlevel 1 (
+    echo ERROR: Failed to prepare NSIS installer progress patch.
+    exit /b 1
+)
 call "%NODE_HOME%\node.exe" node_modules\electron-builder\cli.js --win
 if not errorlevel 1 exit /b 0
 
@@ -163,6 +168,11 @@ echo.
 echo WARNING: Electron build failed on first attempt.
 echo Retrying once after re-preparing app-builder...
 call :prepare_app_builder
+call "%NODE_HOME%\node.exe" build\patch_nsis_installer_progress.js
+if errorlevel 1 (
+    echo ERROR: Failed to prepare NSIS installer progress patch.
+    exit /b 1
+)
 timeout /t 2 /nobreak >nul
 call "%NODE_HOME%\node.exe" node_modules\electron-builder\cli.js --win
 if not errorlevel 1 exit /b 0

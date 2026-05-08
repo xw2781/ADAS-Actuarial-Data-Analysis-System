@@ -8,7 +8,7 @@ Source Data tab derives origin/development date boundary inputs from table summa
 
 ## Entry Points
 <!-- AUTO-GEN:BEGIN frontend.project_settings.entry_points -->
-- `ui/project_settings/project_settings.html`: external scripts `/ui/project_settings/project_settings.js?v=2026040309`; inline imports _none_.
+- `ui/project_settings/project_settings.html`: external scripts `/ui/project_settings/project_settings.js?v=2026050803`; inline imports _none_.
 
 Detected `fetch(...)` targets in key JS files:
 - `/arcrho/headers/cache/clear`
@@ -78,6 +78,7 @@ Detected `arcrho:*` message types in key JS files:
 - Reserving Class Types source-derived rows are now generated per `(Name, Level)` pair, so duplicate names across levels (for example `PA` at level 2 and level 3) appear in each corresponding level group.
 - Reserving Class Types `Source` output always quotes each component separately (for example `"All States"` for one component, `"A" + "B"` for multi-component formulas), and quoted `Formula` / `EEX Formula` tokens remain atomic so operator auto-formatting does not insert spaces inside quoted names such as `"eSales - Teachers"` or `"Affinity/Referral Partners"`.
 - Reserving Class Types formula validation is scoped to the row currently being edited: `Apply` checks only that row's `Formula` / `EEX Formula`, and project save/autosave still proceeds even if untouched legacy rows contain invalid references; formulas may reference any existing reserving class type name in the current table, including user-defined rows, but any referenced name containing `+`, `-`, `*`, or `/` must be wrapped in double quotes. When the edited row references a missing name or leaves an operator-bearing name unquoted, the editor shows a floating tooltip above the relevant formula input with a check-spacing/check-spelling hint instead of opening a separate popup window.
+- Reserving Class Types editor shows a wider component tray under the auto-sizing `Formula` field containing distinct names from the selected `Level`; components already present in the formula are highlighted, dragging or clicking a component appends it as a double-quoted formula token with `+` while cleaning invalid adjacent operators, right-clicking the tray replaces the formula with all selected-level components, and `Escape` blurs the formula field without closing the editor.
 - Reserving Class Types table right-click menu includes `Copy` before `Edit`; `Copy` copies the exact displayed text from the clicked cell to the clipboard.
 - Project Settings page uses the same global WebKit scrollbar visual style as `dataset_shared.css`.
 - Dataset Types header auto-fit measures full header content (label plus sort/filter controls); all Dataset Types headers are kept single-line.

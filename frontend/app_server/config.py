@@ -185,6 +185,12 @@ def refresh_runtime_paths() -> None:
 # In-memory dataset cache
 DATASETS: Dict[str, str] = {}
 
+
+def clear_runtime_path_caches() -> None:
+    """Clear in-memory caches that contain absolute workspace paths."""
+    DATASETS.clear()
+
+
 # Initialise paths on first import
 refresh_runtime_paths()
 

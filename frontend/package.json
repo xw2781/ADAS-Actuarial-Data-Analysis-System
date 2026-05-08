@@ -1,12 +1,12 @@
 {
   "name": "arcrho-electron",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "main": "electron/main.js",
   "scripts": {
     "electron": "electron .",
     "build:python": "pyinstaller build/server.spec --distpath python_dist --workpath python_build --noconfirm",
-    "build:electron": "electron-builder --win",
+    "build:electron": "node-portable\\node.exe build/patch_nsis_installer_progress.js && node-portable\\node.exe node_modules/electron-builder/cli.js --win",
     "clean:python-artifacts": "node -e \"const fs=require('fs'); ['python_dist','python_build'].forEach((p)=>fs.rmSync(p,{recursive:true,force:true}));\"",
     "build": "npm run build:python && npm run build:electron && npm run clean:python-artifacts"
   },

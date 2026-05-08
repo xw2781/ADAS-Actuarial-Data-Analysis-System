@@ -38,6 +38,7 @@ def _persist_workspace_paths(cfg: Dict[str, Any]) -> Dict[str, Any]:
     try:
         config.save_workspace_paths(cfg)
         config.refresh_runtime_paths()
+        config.clear_runtime_path_caches()
         return {
             "ok": True,
             "config": config.load_workspace_paths(),

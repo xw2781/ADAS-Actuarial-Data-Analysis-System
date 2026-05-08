@@ -18,6 +18,7 @@ Document path/config setup, AppData-backed workspace path persistence, and runti
   - `_get_workflow_dir`
   - `_infer_project_name_from_table_path`
   - `_sanitize_project_dir_name`
+  - `clear_runtime_path_caches`
   - `get_audit_log_path`
   - `get_cache_path`
   - `get_dataset_types_path`
@@ -55,13 +56,16 @@ Document path/config setup, AppData-backed workspace path persistence, and runti
 - Frontend shell settings modal calls `/workspace_paths` routes.
 - App-server modules import `app_server.config` for runtime path resolution.
 - On first-time setup, the Electron shell searches `D:\ArcRho Server` through `Z:\ArcRho Server` and fills the Server Connection root path when found.
+- Saving Server Connection hot-applies the new config by refreshing `app_server.config` runtime globals and notifying open UI frames; app restart is not required for new server requests.
 <!-- MANUAL:END -->
 
 ## Data/State/Caches
 <!-- MANUAL:BEGIN -->
 - `%APPDATA%\ArcRho\workspace_paths.json` is the persistent user-local source-of-truth for workspace root/path mapping.
 - If the AppData workspace path file does not exist yet, the app uses built-in defaults until the Server Connection setting is saved.
-- Runtime globals in `app_server/config.py` are refreshed from config.
+- Runtime globals in `app_server/config.py` are refreshed from config after `/workspace_paths` updates.
+- In-memory runtime caches that contain absolute workspace paths, including the app-server dataset registry, are cleared after `/workspace_paths` updates.
+- Dataset valid-value caches and the DFM root-path cache are cleared or replaced when the shell broadcasts a Server Connection update.
 - User-local fixed paths are also refreshed in `app_server/config.py`, including workflow export path (`~/Documents/ArcRho/workflows`) and scripting notebook path (`~/Documents/ArcRho/scripts`).
 <!-- MANUAL:END -->
 

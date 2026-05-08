@@ -23,6 +23,8 @@ venv_*/
 
 # Build and packaging outputs
 build/
+!frontend/build/
+!frontend/build/**
 dist/
 python_build/
 python_dist/
