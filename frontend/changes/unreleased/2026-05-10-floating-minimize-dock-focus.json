@@ -1,0 +1,10 @@
+{
+  "type": "improvement",
+  "scope": "shell",
+  "audience": "user",
+  "summary": "Floating window minimize now docks the window without stealing focus.",
+  "details": [
+    "Clicking the floating window minimize button now docks that tab at the end of the main tab strip instead of collapsing it in place.",
+    "The docked tab is not activated by the minimize action; if another floating window remains, the top layered floating window becomes active, otherwise the prior docked tab stays active."
+  ]
+}

@@ -1,8 +1,8 @@
-import { $, shell } from "./shell_context.js?v=20260430r";
-import { createIframeHost } from "./iframe_host.js?v=2026050801";
-import { createFloatingTabsController, isFloatingTab } from "./floating_tabs.js?v=20260430r";
+import { $, shell } from "./shell_context.js?v=20260510a";
+import { createIframeHost } from "./iframe_host.js?v=20260510a";
+import { createFloatingTabsController, isFloatingTab } from "./floating_tabs.js?v=20260510a";
 import { normalizeBrowsingHistoryEntry } from "/ui/shell/browsing_history.js";
-import { renderHomeViewOnce } from "./home_view.js?v=20260430r";
+import { renderHomeViewOnce } from "./home_view.js?v=20260510a";
 
 const datasetAutoRefreshDone = new Set();
 let homeView = null;
@@ -34,6 +34,7 @@ function initShellControllers() {
       getContentElement: () => $("content"),
       getFloatingHost: () => floatingHost,
       getState: () => shell.state,
+      render: () => shell.render?.(),
       saveState: () => shell.saveState?.(),
       setActive: (id) => shell.setActive?.(id),
     });

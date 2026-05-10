@@ -5,12 +5,13 @@
 Shell-level tab/iframe host for all feature pages.
 It owns the main desktop frame, home view, docked/floating tab layout, scoped menus, hotkeys, shell preferences, iframe message routing, and Electron host bridge coordination.
 The shell keeps one active top-level tab across docked and floating tabs while preserving iframe sessions as tabs move between layouts.
+The floating window minimize control docks that window back to the end of the main tab strip without activating the docked tab; focus remains on the prior docked tab unless another floating window is still present, in which case the top layered floating window becomes active.
 Detailed menu, floating-window, lifecycle, and bridge behavior belongs in focused sections or source-specific docs, not this overview.
 <!-- MANUAL:END -->
 
 ## Entry Points
 <!-- AUTO-GEN:BEGIN frontend.shell.entry_points -->
-- `ui/index.html`: external scripts `/ui/shell/ui_shell.js?v=2026050801`; inline imports _none_.
+- `ui/index.html`: external scripts `/ui/shell/ui_shell.js?v=20260510a`; inline imports _none_.
 
 Detected `fetch(...)` targets in key JS files:
 - `/`

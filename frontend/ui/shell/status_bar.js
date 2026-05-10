@@ -1,4 +1,4 @@
-import { $ } from "./shell_context.js?v=20260430r";
+import { $ } from "./shell_context.js?v=20260510a";
 
 export function updateStatusBar(text, options = {}) {
   const tone = String(options?.tone || "").trim().toLowerCase();

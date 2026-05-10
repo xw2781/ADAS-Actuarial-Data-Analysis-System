@@ -1,4 +1,4 @@
-import { shell } from "./shell_context.js?v=20260430r";
+import { shell } from "./shell_context.js?v=20260510a";
 import { normalizeBrowsingHistoryEntry } from "/ui/shell/browsing_history.js";
 
 let shellMessagesWired = false;
