@@ -31,6 +31,7 @@ Project workbook domain resolved by project name and source folders.
 ## Data/State/Caches
 <!-- MANUAL:BEGIN -->
 - Depends on project settings path resolution.
+- Project map rows are expected to carry `Project Name` and `Table Path`; folder placement lives in `folder_structure.json`; legacy `Folder`, `Preload`, `Project Settings`, and `Settings Profile` columns are no longer consumed by Project Settings saves.
 <!-- MANUAL:END -->
 
 ## Common Change Tasks

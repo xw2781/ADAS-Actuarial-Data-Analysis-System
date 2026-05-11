@@ -6,19 +6,19 @@ Shell-level tab/iframe host for all feature pages.
 It owns the main desktop frame, home view, docked/floating tab layout, scoped menus, hotkeys, shell preferences, iframe message routing, and Electron host bridge coordination.
 The shell keeps one active top-level tab across docked and floating tabs while preserving iframe sessions as tabs move between layouts.
 The desktop shell also hosts ArcBot, a bottom-right floating Codex CLI assistant panel that runs in Review Mode by default.
+The floating window minimize control docks that window back to the end of the main tab strip without activating the docked tab; focus remains on the prior docked tab unless another floating window is still present, in which case the top layered floating window becomes active.
 Detailed menu, floating-window, lifecycle, and bridge behavior belongs in focused sections or source-specific docs, not this overview.
 <!-- MANUAL:END -->
 
 ## Entry Points
 <!-- AUTO-GEN:BEGIN frontend.shell.entry_points -->
-- `ui/index.html`: external scripts `/ui/shell/ui_shell.js?v=20260430r`; inline imports _none_.
+- `ui/index.html`: external scripts `/ui/shell/ui_shell.js?v=20260510a`; inline imports _none_.
 
 Detected `fetch(...)` targets in key JS files:
 - `/`
 - `/app/restart`
 - `/app/restart_electron`
 - `/app/shutdown`
-- `/restart`
 - `/workflow/default_dir`
 - `/workflow/load`
 - `/workspace_paths`
@@ -31,6 +31,7 @@ Detected `arcrho:*` message types in key JS files:
 - `arcrho:force-rebuild-toggle`
 - `arcrho:hotkey`
 - `arcrho:open-path-result`
+- `arcrho:server-connection-updated`
 - `arcrho:set-app-font`
 - `arcrho:set-zoom`
 - `arcrho:tab-activated`
@@ -68,9 +69,13 @@ Detected `arcrho:*` message types in key JS files:
 <!-- MANUAL:BEGIN -->
 - Communicates with child iframes via `arcrho:*` postMessage events.
 - Invokes app-server endpoints for workflow import helpers and configuration endpoints.
-- Uses Electron host bridge for shutdown/clear-cache actions; app-server startup is host-managed with retry on transient launch failures.
+- Uses Electron host bridge and explicit shell commands for shutdown/clear-cache actions; ordinary document unloads and reloads do not send app shutdown.
+- Clear Cache & Reload reloads the shell with a fresh timestamped UI URL after clearing Electron cache/storage, and Project Settings iframes include the shell UI version query parameter so reloads fetch the current Project Settings HTML/module graph consistently.
+- App-server startup is host-managed with retry on transient launch failures.
+- The home sidebar brand reads the Windows username from the Electron host bridge when available, then renders the username and a generated SVG initial mark; plain browser sessions keep the default ArcRho brand.
 - Uses Electron host bridge for Server Connection folder browsing and first-time `ArcRho Server` drive detection.
 - Uses Electron host bridge for desktop-only ArcBot Codex CLI status, install, login, and read-only `codex exec` requests.
+- Saving Server Connection updates `/workspace_paths` without restarting the app, then broadcasts `arcrho:server-connection-updated` to open feature iframes so page-local path caches can refresh.
 - Consumes dataset-page browsing updates (`arcrho:dataset-settings-changed`, `arcrho:browsing-history-updated`) and forwards updates to any open Browsing History tab.
 - Receives `arcrho:open-dataset-from-history` from Browsing History tab to open dataset tabs with selected inputs.
 - OS-level detached tab pop-out windows are not supported; floating tabs stay inside the main shell and reuse the same iframe/message contracts as docked tabs.

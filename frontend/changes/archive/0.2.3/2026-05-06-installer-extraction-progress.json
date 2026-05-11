@@ -1,0 +1,9 @@
+{
+  "type": "improvement",
+  "scope": "build",
+  "audience": "user",
+  "summary": "Installer progress now advances during the long ArcRho package extraction step instead of staying at 10% until completion.",
+  "details": [
+    "The Windows installer now uses an ArcRho extraction helper that reads 7-Zip progress and updates the installer details and progress bar while the embedded application package is unpacked."
+  ]
+}

@@ -3,7 +3,7 @@
 Mirror the actively tested ArcRho core source into data-engine/src.
 
 .DESCRIPTION
-Copies the three data-engine component source folders from an active ArcRho
+Copies the data-engine component source folders from an active ArcRho
 Server core tree into the repository layout. Generated/runtime artifacts are
 excluded so commits stay focused on source code.
 
@@ -34,6 +34,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $ComponentMappings = @(
+  @{ Source = "arcrho_admin"; Destination = "arcrho_admin" },
   @{ Source = "arcrho_engine"; Destination = "arcrho_engine" },
   @{ Source = "arcrho_launcher"; Destination = "arcrho_launcher" },
   @{ Source = "arcrho_orchestrator"; Destination = "arcrho_orchestrator" }

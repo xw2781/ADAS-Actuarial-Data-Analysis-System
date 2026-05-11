@@ -1,0 +1,10 @@
+{
+  "type": "improvement",
+  "scope": "shell",
+  "audience": "user",
+  "summary": "Server Connection changes now apply without restarting the app.",
+  "details": [
+    "Saving a new root path refreshes runtime paths and notifies open views so cached path data is cleared.",
+    "Ordinary page reloads no longer send app shutdown, preventing a Server Connection save from quitting the app."
+  ]
+}

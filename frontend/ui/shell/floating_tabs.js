@@ -40,6 +40,7 @@ export function createFloatingTabsController(deps) {
     getContentElement,
     getFloatingHost,
     getState,
+    render,
     saveState,
     setActive,
   } = deps;
@@ -324,6 +325,67 @@ export function createFloatingTabsController(deps) {
     }, window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ? 0 : 150);
   }
 
+  function getTopFloatingTab(excludeId = null) {
+    const state = getState();
+    return state.tabs
+      .filter(t => isFloatingTab(t) && t.id !== excludeId)
+      .sort((a, b) => (Number(b.floatZ) || 0) - (Number(a.floatZ) || 0))[0] || null;
+  }
+
+  function getDockedFocusFallback(excludeId = null) {
+    const state = getState();
+    const lastDocked = state.tabs.find(t => t.id === state.lastDockedActiveId && t.id !== excludeId && !isFloatingTab(t));
+    if (lastDocked) return lastDocked.id;
+    return state.tabs.find(t => t.id !== excludeId && !isFloatingTab(t))?.id || "home";
+  }
+
+  function commitDockTabToStripEndWithoutFocus(tabId) {
+    const state = getState();
+    const index = state.tabs.findIndex(t => t.id === tabId);
+    if (index < 0) return;
+    const topFloating = getTopFloatingTab(tabId);
+    const fallbackDockedId = getDockedFocusFallback(tabId);
+    const [tab] = state.tabs.splice(index, 1);
+    tab.layout = "docked";
+    tab.floatRect = null;
+    tab.floatZ = 0;
+    tab.floatMinimized = false;
+    tab.floatRestoreRect = null;
+
+    let insertIndex = state.tabs.length;
+    for (let i = 0; i < state.tabs.length; i++) {
+      if (!isFloatingTab(state.tabs[i])) insertIndex = i + 1;
+    }
+    state.tabs.splice(insertIndex, 0, tab);
+    state.lastDockedActiveId = fallbackDockedId;
+    state.activeId = topFloating?.id || fallbackDockedId;
+    render?.();
+    saveState();
+  }
+
+  function dockTabToStripEndWithoutFocus(tabId) {
+    const state = getState();
+    const tab = state.tabs.find(t => t.id === tabId);
+    if (!tab || dockingTabIds.has(tabId)) return;
+    const frame = getFloatingHost()?.querySelector?.(`.floatingTabWindow[data-tab-id="${CSS.escape(tabId)}"]`);
+    if (!frame) {
+      commitDockTabToStripEndWithoutFocus(tabId);
+      return;
+    }
+    dockingTabIds.add(tabId);
+    const nodes = [frame, tab.iframe].filter(Boolean);
+    nodes.forEach((node) => {
+      node.classList.remove("floatingTabAnimateDock");
+      void node.offsetWidth;
+      node.classList.add("floatingTabAnimateDock");
+    });
+    window.setTimeout(() => {
+      dockingTabIds.delete(tabId);
+      nodes.forEach((node) => node.classList.remove("floatingTabAnimateDock"));
+      commitDockTabToStripEndWithoutFocus(tabId);
+    }, window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ? 0 : 150);
+  }
+
   function getFloatingLayerBase(tab) {
     return 100 + (Number(tab?.floatZ) || 0) * 10;
   }
@@ -538,7 +600,7 @@ export function createFloatingTabsController(deps) {
             <span class="floatingTabTitle"></span>
             <span class="floatingTabDirty" aria-hidden="true"></span>
             <span class="floatingTabControls">
-              <button class="titlebarBtn floatingTabButton" data-action="minimize" type="button" title="Minimize" aria-label="Minimize">
+              <button class="titlebarBtn floatingTabButton" data-action="minimize" type="button" title="Dock to tab strip" aria-label="Dock to tab strip">
                 <svg class="titlebarIcon" viewBox="0 0 10 10" aria-hidden="true">
                   <line x1="2" y1="7" x2="8" y2="7"></line>
                 </svg>
@@ -578,12 +640,12 @@ export function createFloatingTabsController(deps) {
           if (e.target?.closest?.("button")) return;
           animateDockTab(tab.id);
         });
+        frame.querySelectorAll(".floatingTabButton").forEach((button) => {
+          button.addEventListener("pointerdown", (e) => e.stopPropagation());
+        });
         frame.querySelector('[data-action="minimize"]')?.addEventListener("click", (e) => {
           e.stopPropagation();
-          tab.floatMinimized = !tab.floatMinimized;
-          setActive(tab.id);
-          renderFloatingWindows();
-          saveState();
+          dockTabToStripEndWithoutFocus(tab.id);
         });
         frame.querySelector('[data-action="dock"]')?.addEventListener("click", (e) => {
           e.stopPropagation();
@@ -610,8 +672,8 @@ export function createFloatingTabsController(deps) {
       if (dirty) dirty.classList.toggle("show", !!tab.isDirty);
       const minimizeButton = frame.querySelector('[data-action="minimize"]');
       if (minimizeButton) {
-        minimizeButton.title = tab.floatMinimized ? "Restore" : "Minimize";
-        minimizeButton.setAttribute("aria-label", tab.floatMinimized ? "Restore" : "Minimize");
+        minimizeButton.title = "Dock to tab strip";
+        minimizeButton.setAttribute("aria-label", "Dock to tab strip");
       }
       runFloatIntroAnimation(tab, frame);
     }

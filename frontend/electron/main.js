@@ -1036,54 +1036,60 @@ ipcMain.handle("save-text-file", async (_event, payload) => {
       return formatRowArrayJson(data);
     }
     if (data && typeof data === "object") {
-      const pattern = data.pattern;
-      const avgFormula = data["average formulas"] ?? data["average formula"];
+      const ratioPattern = data["ratio pattern"];
+      const originLabels = data["origin labels"];
+      const developmentLabels = data["development labels"];
+      const avgFormula = data["average formulas"];
       const avgIndex = data["average index"];
       const summaryRows = data["summary rows"];
-      const summaryHidden = data["summary hidden"];
       const summaryOrder = data["summary order"];
-      const resultVector = data["result vector"];
+      const ultimateVector = data["ultimate vector"];
       const notes = data.notes;
-      const methodName = data.name ?? data["method name"];
-      const outputType = data["output type"] ?? data.outputType;
+      const methodName = data.name;
+      const outputType = data["output type"];
       const inputTriangle = data["input triangle"];
+      const originLength = data["origin length"];
+      const developmentLength = data["development length"];
       const decimalPlaces = data["decimal places"];
       const ultimateRatioDecimalPlaces = data["ultimate ratio decimal places"];
       const ratioBasisDataset = data["ratio basis dataset"];
-      const hasPattern = Array.isArray(pattern) && pattern.every((row) => Array.isArray(row));
+      const lastModified = data["last modified"];
+      const hasRatioPattern = Array.isArray(ratioPattern) && ratioPattern.every((row) => Array.isArray(row));
+      const hasOriginLabels = Array.isArray(originLabels);
+      const hasDevelopmentLabels = Array.isArray(developmentLabels);
       const hasAvgIndex = Array.isArray(avgIndex) && avgIndex.every((row) => Array.isArray(row));
-      const hasSelected = "selected" in data;
-      const hasAvgFormula = "average formulas" in data || "average formula" in data;
+      const hasAvgFormula = "average formulas" in data;
       const hasSummaryRows = "summary rows" in data;
-      const hasSummaryHidden = "summary hidden" in data;
       const hasSummaryOrder = "summary order" in data;
-      const hasResultVector = "result vector" in data;
+      const hasUltimateVector = "ultimate vector" in data;
       const hasNotes = "notes" in data;
-      const hasMethodName = "name" in data || "method name" in data;
-      const hasOutputType = "output type" in data || "outputType" in data;
+      const hasMethodName = "name" in data;
+      const hasOutputType = "output type" in data;
       const hasInputTriangle = "input triangle" in data;
+      const hasOriginLength = "origin length" in data;
+      const hasDevelopmentLength = "development length" in data;
       const hasDecimalPlaces = "decimal places" in data;
       const hasUltimateRatioDecimalPlaces = "ultimate ratio decimal places" in data;
       const hasRatioBasisDataset = "ratio basis dataset" in data;
-      const hasOriginLen = "originLen" in data;
-      const hasDevLen = "devLen" in data;
-      if (hasPattern || hasAvgIndex || hasSelected || hasAvgFormula || hasSummaryRows || hasSummaryHidden || hasSummaryOrder || hasResultVector || hasNotes || hasInputTriangle || hasDecimalPlaces || hasUltimateRatioDecimalPlaces || hasRatioBasisDataset || hasOriginLen || hasDevLen) {
+      const hasLastModified = "last modified" in data;
+      if (hasRatioPattern || hasOriginLabels || hasDevelopmentLabels || hasAvgIndex || hasAvgFormula || hasSummaryRows || hasSummaryOrder || hasUltimateVector || hasNotes || hasInputTriangle || hasOriginLength || hasDevelopmentLength || hasDecimalPlaces || hasUltimateRatioDecimalPlaces || hasRatioBasisDataset || hasLastModified) {
         const lines = [];
         lines.push("{");
         let wroteSection = false;
-        if (hasOriginLen) {
-          lines.push(`  "originLen": ${JSON.stringify(data.originLen)}`);
-          wroteSection = true;
-        }
-        if (hasDevLen) {
-          if (wroteSection) lines[lines.length - 1] += ",";
-          lines.push(`  "devLen": ${JSON.stringify(data.devLen)}`);
-          wroteSection = true;
-        }
-        if (hasPattern) {
-          lines.push('  "pattern": [');
-        lines.push(formatRowArrayLines(pattern, "    "));
+        if (hasRatioPattern) {
+          lines.push('  "ratio pattern": [');
+        lines.push(formatRowArrayLines(ratioPattern, "    "));
         lines.push("  ]");
+        wroteSection = true;
+      }
+      if (hasOriginLabels) {
+        if (wroteSection) lines[lines.length - 1] += ",";
+        lines.push(`  "origin labels": ${JSON.stringify(originLabels)}`);
+        wroteSection = true;
+      }
+      if (hasDevelopmentLabels) {
+        if (wroteSection) lines[lines.length - 1] += ",";
+        lines.push(`  "development labels": ${JSON.stringify(developmentLabels)}`);
         wroteSection = true;
       }
       if (hasAvgFormula) {
@@ -1107,15 +1113,6 @@ ipcMain.handle("save-text-file", async (_event, payload) => {
           }
           wroteSection = true;
         }
-        if (hasSummaryHidden) {
-          if (wroteSection) lines[lines.length - 1] += ",";
-          const hiddenJson = JSON.stringify(summaryHidden, null, 2).split("\n");
-          lines.push(`  "summary hidden": ${hiddenJson[0]}`);
-          for (let i = 1; i < hiddenJson.length; i++) {
-            lines.push(`  ${hiddenJson[i]}`);
-          }
-          wroteSection = true;
-        }
         if (hasSummaryOrder) {
           if (wroteSection) lines[lines.length - 1] += ",";
           const orderJson = JSON.stringify(summaryOrder, null, 2).split("\n");
@@ -1125,15 +1122,10 @@ ipcMain.handle("save-text-file", async (_event, payload) => {
           }
           wroteSection = true;
         }
-        if (hasSelected) {
+        if (hasUltimateVector) {
           if (wroteSection) lines[lines.length - 1] += ",";
-          lines.push(`  "selected": ${JSON.stringify(data.selected)}`);
-          wroteSection = true;
-        }
-        if (hasResultVector) {
-          if (wroteSection) lines[lines.length - 1] += ",";
-          const vectorJson = JSON.stringify(resultVector, null, 2).split("\n");
-          lines.push(`  "result vector": ${vectorJson[0]}`);
+          const vectorJson = JSON.stringify(ultimateVector, null, 2).split("\n");
+          lines.push(`  "ultimate vector": ${vectorJson[0]}`);
           for (let i = 1; i < vectorJson.length; i++) {
             lines.push(`  ${vectorJson[i]}`);
           }
@@ -1159,6 +1151,16 @@ ipcMain.handle("save-text-file", async (_event, payload) => {
           lines.push(`  "input triangle": ${JSON.stringify(typeof inputTriangle === "string" ? inputTriangle : "")}`);
           wroteSection = true;
         }
+        if (hasOriginLength) {
+          if (wroteSection) lines[lines.length - 1] += ",";
+          lines.push(`  "origin length": ${JSON.stringify(Number.isFinite(Number(originLength)) ? Number(originLength) : null)}`);
+          wroteSection = true;
+        }
+        if (hasDevelopmentLength) {
+          if (wroteSection) lines[lines.length - 1] += ",";
+          lines.push(`  "development length": ${JSON.stringify(Number.isFinite(Number(developmentLength)) ? Number(developmentLength) : null)}`);
+          wroteSection = true;
+        }
         if (hasDecimalPlaces) {
           if (wroteSection) lines[lines.length - 1] += ",";
           lines.push(`  "decimal places": ${JSON.stringify(Number.isFinite(Number(decimalPlaces)) ? Number(decimalPlaces) : 4)}`);
@@ -1172,6 +1174,11 @@ ipcMain.handle("save-text-file", async (_event, payload) => {
         if (hasRatioBasisDataset) {
           if (wroteSection) lines[lines.length - 1] += ",";
           lines.push(`  "ratio basis dataset": ${JSON.stringify(typeof ratioBasisDataset === "string" ? ratioBasisDataset : "")}`);
+          wroteSection = true;
+        }
+        if (hasLastModified) {
+          if (wroteSection) lines[lines.length - 1] += ",";
+          lines.push(`  "last modified": ${JSON.stringify(typeof lastModified === "string" ? lastModified : "")}`);
           wroteSection = true;
         }
       lines.push("}");
@@ -1267,9 +1274,14 @@ ipcMain.handle("app-clear-cache-reload", async () => {
     // ignore
   }
   try {
-    win.webContents.reloadIgnoringCache();
+    const reloadUrl = `http://${HOST}:${PORT}/ui/?v=${encodeURIComponent(String(Date.now()))}`;
+    await win.loadURL(reloadUrl);
   } catch {
-    // ignore
+    try {
+      win.webContents.reloadIgnoringCache();
+    } catch {
+      // ignore
+    }
   }
   return true;
 });
@@ -1423,6 +1435,15 @@ ipcMain.handle("focus-window", () => {
 ipcMain.handle("get-documents-path", () => {
   try {
     return app.getPath("documents") || "";
+  } catch {
+    return "";
+  }
+});
+ipcMain.handle("get-windows-user-name", () => {
+  const envUser = String(process.env.USERNAME || process.env.USER || "").trim();
+  if (envUser) return envUser;
+  try {
+    return String(os.userInfo()?.username || "").trim();
   } catch {
     return "";
   }

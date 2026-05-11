@@ -1019,10 +1019,10 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
         title="Build and Packaging",
         manual_sections={
             "Purpose": "Document Electron + Python packaging inputs and scripts.",
-            "External Interfaces": "- Node scripts from `package.json` drive build orchestration.\n- PyInstaller spec (`build/server.spec`) builds app-server executable artifacts.\n- `build/release_notes.py` validates unreleased change fragments and generates versioned release notes in `docs/releases/`.",
-            "Data/State/Caches": "- Build outputs: `dist/`, `python_build/`, `python_dist/`.\n- Installer settings live in `package.json` and `build/installer.nsh`.\n- Release tracking data lives under `changes/unreleased/`, `changes/archive/`, and `docs/releases/`.",
-            "Common Change Tasks": "1. Update app packaging metadata: edit `package.json` `build` block.\n2. Update bundled app server: edit `build/server.spec` and verify `extraResources` mappings.\n3. Add or update unreleased change fragments in `changes/unreleased/` before packaging a release.\n4. If you need a specific release version, run `build\\build_app.bat <version>` (for example `build\\build_app.bat 2.0.0`); otherwise the script auto-increments the patch version.",
-            "Known Risks": "- Packaging excludes can accidentally omit runtime files.\n- Divergence between dev and packaged paths causes startup failures.",
+            "External Interfaces": "- Node scripts from `package.json` drive build orchestration.\n- PyInstaller spec (`build/server.spec`) builds app-server executable artifacts.\n- `build/release_notes.py` validates unreleased change fragments and generates versioned release notes in `docs/releases/`.\n- Electron packaging enables NSIS's built-in compressor path before `electron-builder` runs so installer file progress is visible during the main install phase.",
+            "Data/State/Caches": "- Build outputs: `dist/`, `python_build/`, `python_dist/`.\n- Installer settings live in `package.json`, `build/installer.nsh`, and `build/patch_nsis_installer_progress.js`.\n- Release tracking data lives under `changes/unreleased/`, `changes/archive/`, and `docs/releases/`.",
+            "Common Change Tasks": "1. Update app packaging metadata: edit `package.json` `build` block.\n2. Update bundled app server: edit `build/server.spec` and verify `extraResources` mappings.\n3. Add or update unreleased change fragments in `changes/unreleased/` before packaging a release.\n4. If you need a specific release version, run `build\\build_app.bat <version>` (for example `build\\build_app.bat 2.0.0`); otherwise the script auto-increments the patch version.\n5. If electron-builder is reinstalled or upgraded, rerun `npm run build:electron` or `build\\build_app.bat`; both paths reapply the ArcRho NSIS installer-progress patch before packaging.",
+            "Known Risks": "- Packaging excludes can accidentally omit runtime files.\n- Divergence between dev and packaged paths causes startup failures.\n- electron-builder NSIS implementation changes can break the ArcRho installer-progress patch; `build/patch_nsis_installer_progress.js` fails fast when the upstream compressor setting no longer matches the expected form.",
         },
         auto_sections={
             "Entry Points": "build.packaging.entry_points",
@@ -1307,6 +1307,7 @@ def render_build_key_files(doc_path: str) -> str:
         ("electron/main.js", "Electron main process entry."),
         ("app_launcher.py", "Python host launcher used by packaged runtime."),
         ("build/installer.nsh", "NSIS custom installer script include."),
+        ("build/patch_nsis_installer_progress.js", "Build-time helper that enables NSIS built-in file progress before electron-builder runs."),
         ("build/build_app.bat", "Convenience build script wrapper."),
         ("build/convert_icon.js", "Build helper for regenerating Windows icon assets."),
     ]

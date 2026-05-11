@@ -1,4 +1,4 @@
-import { isFloatingTab, normalizeFloatRect } from "./floating_tabs.js?v=20260430r";
+import { isFloatingTab, normalizeFloatRect } from "./floating_tabs.js?v=20260510a";
 import { normalizeBrowsingHistoryEntry } from "/ui/shell/browsing_history.js";
 
 const STORAGE_KEY = "arcrho_ui_shell_state_v4";

@@ -1,5 +1,5 @@
-import { $, shell } from "./shell_context.js?v=20260430r";
-import { FLOAT_VERTICAL_RETURN_THRESHOLD_PX, FLOAT_VERTICAL_THRESHOLD_PX, isFloatingTab } from "./floating_tabs.js?v=20260430r";
+import { $, shell } from "./shell_context.js?v=20260510a";
+import { FLOAT_VERTICAL_RETURN_THRESHOLD_PX, FLOAT_VERTICAL_THRESHOLD_PX, isFloatingTab } from "./floating_tabs.js?v=20260510a";
 
 let draggedTabId = null;
 let dragEl = null;

@@ -1,4 +1,4 @@
-import { $, getHostApi, shell } from "./shell_context.js?v=20260430r";
+import { $, getHostApi, shell } from "./shell_context.js?v=20260510a";
 
 const assistantMessages = [];
 const ASSISTANT_MODE = "review";

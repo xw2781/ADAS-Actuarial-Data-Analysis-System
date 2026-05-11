@@ -23,7 +23,7 @@ Runtime workspace path read/update domain.
 ## External Interfaces
 <!-- MANUAL:BEGIN -->
 - Used by shell root-path settings modal.
-- Triggers `config.refresh_runtime_paths()` on updates.
+- Triggers `config.refresh_runtime_paths()` and clears absolute-path runtime caches on updates.
 - `GET /workspace_paths` reports whether the AppData config file already exists so the shell can detect first-time setup.
 <!-- MANUAL:END -->
 
@@ -31,6 +31,7 @@ Runtime workspace path read/update domain.
 <!-- MANUAL:BEGIN -->
 - Persists config in `%APPDATA%\ArcRho\workspace_paths.json`.
 - Uses built-in defaults until Server Connection is saved.
+- Clears the in-memory dataset registry after updates so stale dataset IDs do not keep writing to the previous workspace root.
 <!-- MANUAL:END -->
 
 ## Common Change Tasks

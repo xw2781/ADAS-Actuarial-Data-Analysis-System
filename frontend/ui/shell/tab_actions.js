@@ -1,5 +1,5 @@
-import { shell } from "./shell_context.js?v=20260430r";
-import { isFloatingTab } from "./floating_tabs.js?v=20260430r";
+import { shell } from "./shell_context.js?v=20260510a";
+import { isFloatingTab } from "./floating_tabs.js?v=20260510a";
 import {
   getLastViewedDatasetInputs,
   normalizeBrowsingHistoryEntry,

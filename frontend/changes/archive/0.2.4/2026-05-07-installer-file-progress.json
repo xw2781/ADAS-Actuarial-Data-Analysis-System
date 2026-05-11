@@ -1,0 +1,11 @@
+{
+  "type": "improvement",
+  "scope": "build",
+  "audience": "user",
+  "summary": "Installer progress now advances while ArcRho files are installed instead of staying at 10% through most of setup.",
+  "details": [
+    "The Windows installer now uses NSIS's built-in file installation path for the single-architecture build so progress and file details update during the main install phase without opening a helper console window.",
+    "The install-page status text now follows the actual progress bar percentage while ArcRho files are being installed.",
+    "The installer details panel now stays enabled during file installation so users can see ongoing file-install activity instead of a static preparation message."
+  ]
+}

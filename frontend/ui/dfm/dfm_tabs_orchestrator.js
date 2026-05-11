@@ -10,6 +10,7 @@ import {
   getDfmInst,
   ALLOWED_DFM_TABS,
   setShowNaBorders,
+  setCachedRootPath,
   setCurrentDfmTab,
   isRatiosTabVisible,
   isResultsTabVisible,
@@ -41,6 +42,7 @@ import {
 } from "/ui/dfm/dfm_details.js";
 import { scheduleRatioSelectionLoad, saveRatioSelectionPattern, saveDfmTemplate, loadDfmTemplate } from "/ui/dfm/dfm_persistence.js";
 import { wireRatioSyncChannel, requestRatioStateSync } from "/ui/dfm/dfm_sync.js";
+import { wireDfmRpcBridgePathBar } from "/ui/dfm/dfm_rpc_bridge_pathbar.js";
 
 function handleDatasetUpdated() {
   if (isRatiosTabVisible()) renderRatioTable();
@@ -111,6 +113,7 @@ export function initDfmRatios() {
   syncMethodNameFromInputs();
   syncOutputTypeFromProject();
   updatePathBar();
+  wireDfmRpcBridgePathBar();
   setTimeout(() => {
     syncOutputTypeFromProject();
     updatePathBar();
@@ -171,9 +174,13 @@ export function initDfmRatios() {
       scheduleRatioSelectionLoad("global-changed");
       return;
     }
+    if (e?.data?.type === "arcrho:server-connection-updated") {
+      setCachedRootPath(e.data.config?.workspace_root || "");
+      window.parent.postMessage({ type: "arcrho:status", text: "Server connection updated." }, "*");
+      return;
+    }
     if (e?.data?.type === "arcrho:dfm-request-state" || e?.data?.type === "arcrho:dfm-tab-activated") {
       notifyDfmEditState();
-      scheduleRatioSelectionLoad("tab-activated");
       return;
     }
     if (e?.data?.type === "arcrho:dfm-exclude-high") {
