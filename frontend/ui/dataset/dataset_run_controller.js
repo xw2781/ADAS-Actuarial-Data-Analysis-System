@@ -336,6 +336,12 @@ export function createDatasetRunController(deps) {
   async function loadDataset() {
     state.dirty.clear();
 
+    const { project } = getTriInputs();
+    if (project) {
+      await ensureHeadersForProject(project);
+      await ensureDevHeadersForProject(project);
+    }
+
     const { ok, status, data } = await getDataset(config.DS_ID, config.START_YEAR);
 
     if (!ok) {

@@ -29,20 +29,51 @@ Relevant current behavior:
 
    ```json
    {
-    "ratio pattern": [],
-    "average formulas": [],
-    "average index": [],
-    "summary rows": [],
-    "summary order": [],
-    "ultimate vector": [],
-     "notes": "",
-     "name": "",
-     "output type": "",
-     "input triangle": "",
-    "decimal places": 4,
-    "ultimate ratio decimal places": 2,
-    "ratio basis dataset": "",
-    "last modified": ""
+     "json format": "arcrho-dfm-method-by-tab-v1",
+     "details tab": {
+       "name": "",
+       "output type": "",
+       "input triangle": "",
+       "origin length": 12,
+       "development length": 12,
+       "decimal places": 4
+     },
+     "data tab": {
+       "origin labels": [],
+       "development labels": [],
+       "input data triangle values": [],
+       "input data triangle csv path": ""
+     },
+     "ratios tab": {
+       "ratio triangle": {
+         "origin labels": [],
+         "development labels": [],
+         "ratio values": [],
+         "excluded": []
+       },
+       "average formulas": {
+         "label": [],
+         "custom average formula settings": {
+           "averageType": [],
+           "base": [],
+           "periods": [],
+           "exclude": []
+         },
+         "selected": [],
+         "values": []
+       }
+     },
+     "results tab": {
+       "ultimate vector": [],
+       "ultimate ratio decimal places": 2,
+       "ratio basis dataset": ""
+     },
+     "notes tab": {
+       "notes": ""
+     },
+     "method metadata": {
+       "last modified": ""
+     }
    }
    ```
 
@@ -103,7 +134,7 @@ Old local DFM filenames and JSON files are explicitly out of scope.
 9. Frontend shows a draggable and resizable floating compare window with Local/Remote Server version cards. The cards resize with the window, their snapshot content scrolls internally when space is tight, and the Notes preview expands vertically from its 42px minimum height up to 300px when extra space is available. Local always appears on the left and Remote Server always appears on the right, while the `NEW` seal is based on JSON `last modified` timestamps:
    - Each card shows the source side (`Local` or `Remote Server`) in a top-left framed label with dark blue border and light blue fill, `last modified` timestamp, ratio selection snapshot, average formula names, and notes preview. JSON file paths are not shown in the comparison window.
    - The newer card shows a `NEW` seal instead of a warning banner.
-   - Ratio-pattern snapshots preserve `0`/`1`/`2` values; `2` cells are masked, cells use a wide rectangular shape, common exclusions are dark grey, exclusions added in the new version are green only on the new card, exclusions removed from the old version are red only on the old card, the green legend appears only on the new card, the red legend appears only on the old card, and each visible cell tooltip shows the same origin/development labels used by the Ratios triangle table.
+   - Excluded ratio-triangle snapshots preserve `0`/`1`/`2` values; `2` cells are masked, cells use a wide rectangular shape, common exclusions are dark grey, exclusions added in the new version are green only on the new card, exclusions removed from the old version are red only on the old card, the green legend appears only on the new card, the red legend appears only on the old card, and each visible cell tooltip shows the same origin/development labels used by the Ratios triangle table.
    - Notes snapshots highlight deleted text from the older source with a red background and newly added text from the newer source with a green background.
    - User can select either `Local` or `Remote Server`.
    - If the selected version is local, the primary button says `Keep Using Local` and the app keeps the local JSON unchanged without sending `Function = SyncDFM`.
@@ -185,11 +216,28 @@ The returned JSON from data-engine should be accepted if it contains at least:
 
 ```json
 {
-  "ratio pattern": [[1, 0], [1, 1]],
-  "average formulas": ["Volume - all"],
-  "average index": [[1, 1]],
-  "notes": "...",
-  "last modified": "2026-05-10T12:00:00.000Z"
+  "json format": "arcrho-dfm-method-by-tab-v1",
+  "ratios tab": {
+    "ratio triangle": {
+      "excluded": [[1, 0], [1, 1]]
+    },
+    "average formulas": {
+      "label": ["Volume - all"],
+      "custom average formula settings": {
+        "averageType": ["custom"],
+        "base": ["volume"],
+        "periods": ["all"],
+        "exclude": [0]
+      },
+      "selected": [[1, 1]]
+    }
+  },
+  "notes tab": {
+    "notes": "..."
+  },
+  "method metadata": {
+    "last modified": "2026-05-10T12:00:00.000Z"
+  }
 }
 ```
 
@@ -197,26 +245,55 @@ Recommended canonical full payload:
 
 ```json
 {
-  "ratio pattern": [],
-  "average formulas": [],
-  "average index": [],
-  "summary rows": [],
-  "summary order": [],
-  "ultimate vector": [],
-  "notes": "",
-  "name": "",
-  "output type": "",
-  "input triangle": "",
-  "origin length": 12,
-  "development length": 12,
-  "decimal places": 4,
-  "ultimate ratio decimal places": 2,
-  "ratio basis dataset": "",
-  "last modified": ""
+  "json format": "arcrho-dfm-method-by-tab-v1",
+  "details tab": {
+    "name": "",
+    "output type": "",
+    "input triangle": "",
+    "origin length": 12,
+    "development length": 12,
+    "decimal places": 4
+  },
+  "data tab": {
+    "origin labels": [],
+    "development labels": [],
+    "input data triangle values": [],
+    "input data triangle csv path": ""
+  },
+  "ratios tab": {
+    "ratio triangle": {
+      "origin labels": [],
+      "development labels": [],
+      "ratio values": [],
+      "excluded": []
+    },
+    "average formulas": {
+      "label": [],
+      "custom average formula settings": {
+        "averageType": [],
+        "base": [],
+        "periods": [],
+        "exclude": []
+      },
+      "selected": [],
+      "values": []
+    }
+  },
+  "results tab": {
+    "ultimate vector": [],
+    "ultimate ratio decimal places": 2,
+    "ratio basis dataset": ""
+  },
+  "notes tab": {
+    "notes": ""
+  },
+  "method metadata": {
+    "last modified": ""
+  }
 }
 ```
 
-Use only the canonical DFM method JSON keys shown above. `summary rows` is the persisted average formula row list; `summary hidden` is not part of the contract. Old files and alias spellings are intentionally out of scope.
+Use only the canonical DFM method JSON keys shown above. `average formulas` is the persisted formula row identity/metadata object; `summary rows`, `summary order`, and `summary hidden` are not part of the contract. Old files and alias spellings are intentionally out of scope.
 
 ---
 
@@ -308,7 +385,7 @@ Add new files instead of placing new feature logic into existing DFM files:
    - Floating compare window.
    - Shows local and remote JSON `last modified` timestamps, with Local on the left and Remote Server on the right.
    - Shows a `NEW` seal on the latest version card.
-   - Shows ratio-pattern differences with masked `2` cells, dark grey common exclusions, green newly excluded cells on the new card, and red removed exclusions on the old card.
+   - Shows excluded ratio-triangle differences with masked `2` cells, dark grey common exclusions, green newly excluded cells on the new card, and red removed exclusions on the old card.
    - Closes the large comparison window after a version action is selected and shows a smaller same-style DFM Sync message box for waiting/final status.
    - Buttons: one contextual primary action, Refresh, Cancel.
    - Primary label proposal:

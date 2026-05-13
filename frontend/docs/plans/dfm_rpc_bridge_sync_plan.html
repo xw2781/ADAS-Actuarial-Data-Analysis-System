@@ -559,7 +559,7 @@
             <span class="step-index">5</span>
             <div class="step-body">
               <p class="step-title">Select Old or New</p>
-              <p class="step-text">The draggable and resizable floating window resizes the comparison cards with the window, lets the Notes preview expand from 42px up to 300px, shows <code>Local</code> in a framed top-left label on the left card and <code>Remote Server</code> in a framed top-left label on the right card, hides JSON file paths, adds a <code>NEW</code> seal on the newer card, color-codes wide ratio-pattern cells with dark grey for common exclusions, green for newly excluded cells on the new card, and red for removed exclusions on the old card, shows card-specific legends for green/red states, shows Ratios-table origin/development labels on cell hover, and highlights notes deletions in red and additions in green. After a version action is selected, the comparison window closes and a smaller same-style DFM Sync message box shows waiting/final status.</p>
+              <p class="step-text">The draggable and resizable floating window resizes the comparison cards with the window, lets the Notes preview expand from 42px up to 300px, shows <code>Local</code> in a framed top-left label on the left card and <code>Remote Server</code> in a framed top-left label on the right card, hides JSON file paths, adds a <code>NEW</code> seal on the newer card, color-codes wide excluded ratio-triangle cells with dark grey for common exclusions, green for newly excluded cells on the new card, and red for removed exclusions on the old card, shows card-specific legends for green/red states, shows Ratios-table origin/development labels on cell hover, and highlights notes deletions in red and additions in green. After a version action is selected, the comparison window closes and a smaller same-style DFM Sync message box shows waiting/final status.</p>
             </div>
           </div>
         </div>
@@ -624,11 +624,28 @@ UserName = &lt;current_user&gt;</code></pre>
           <div class="card">
             <h3>Minimum DFM Method JSON</h3>
             <pre><code>{
-  "ratio pattern": [[1, 0], [1, 1]],
-  "average formulas": ["Volume - all"],
-  "average index": [[1, 1]],
-  "notes": "...",
-  "last modified": "2026-05-10T12:00:00.000Z"
+  "json format": "arcrho-dfm-method-by-tab-v1",
+  "ratios tab": {
+    "ratio triangle": {
+      "excluded": [[1, 0], [1, 1]]
+    },
+    "average formulas": {
+      "label": ["Volume - all"],
+      "custom average formula settings": {
+        "averageType": ["custom"],
+        "base": ["volume"],
+        "periods": ["all"],
+        "exclude": [0]
+      },
+      "selected": [[1, 1]]
+    }
+  },
+  "notes tab": {
+    "notes": "..."
+  },
+  "method metadata": {
+    "last modified": "2026-05-10T12:00:00.000Z"
+  }
 }</code></pre>
           </div>
           <div class="card">
@@ -643,26 +660,55 @@ UserName = &lt;current_user&gt;</code></pre>
 
         <h3>Canonical Method Payload</h3>
         <pre><code>{
-  "ratio pattern": [],
-  "average formulas": [],
-  "average index": [],
-  "summary rows": [],
-  "summary order": [],
-  "ultimate vector": [],
-  "notes": "",
-  "name": "",
-  "output type": "",
-  "input triangle": "",
-  "origin length": 12,
-  "development length": 12,
-  "decimal places": 4,
-  "ultimate ratio decimal places": 2,
-  "ratio basis dataset": "",
-  "last modified": ""
+  "json format": "arcrho-dfm-method-by-tab-v1",
+  "details tab": {
+    "name": "",
+    "output type": "",
+    "input triangle": "",
+    "origin length": 12,
+    "development length": 12,
+    "decimal places": 4
+  },
+  "data tab": {
+    "origin labels": [],
+    "development labels": [],
+    "input data triangle values": [],
+    "input data triangle csv path": ""
+  },
+  "ratios tab": {
+    "ratio triangle": {
+      "origin labels": [],
+      "development labels": [],
+      "ratio values": [],
+      "excluded": []
+    },
+    "average formulas": {
+      "label": [],
+      "custom average formula settings": {
+        "averageType": [],
+        "base": [],
+        "periods": [],
+        "exclude": []
+      },
+      "selected": [],
+      "values": []
+    }
+  },
+  "results tab": {
+    "ultimate vector": [],
+    "ultimate ratio decimal places": 2,
+    "ratio basis dataset": ""
+  },
+  "notes tab": {
+    "notes": ""
+  },
+  "method metadata": {
+    "last modified": ""
+  }
 }</code></pre>
 
         <div class="callout">
-          Use only the canonical DFM method JSON keys shown above. <code>summary rows</code> is the persisted average formula row list; <code>summary hidden</code> is not part of the contract. Old files and alias spellings are intentionally out of scope.
+          Use only the canonical DFM method JSON keys shown above. <code>average formulas</code> is the persisted formula row identity/metadata object; <code>summary rows</code>, <code>summary order</code>, and <code>summary hidden</code> are not part of the contract. Old files and alias spellings are intentionally out of scope.
         </div>
       </section>
 
@@ -840,7 +886,7 @@ UserName = &lt;current_user&gt;</code></pre>
         <div class="checklist">
           <div class="check-item">Sync button appears in <code>dfmPathBar</code>.</div>
           <div class="check-item">Floating window shows local and remote JSON <code>last modified</code> timestamps, with Local fixed on the left and Remote Server fixed on the right.</div>
-          <div class="check-item">Local/Remote Server cards show masked triangle ratio-pattern snapshots with wide cells, dark grey common exclusions, green newly excluded cells on the new card, red removed exclusions on the old card, Ratios-table origin/development cell tooltips, and notes snapshots with red deleted text and green added text.</div>
+          <div class="check-item">Local/Remote Server cards show masked excluded ratio-triangle snapshots with wide cells, dark grey common exclusions, green newly excluded cells on the new card, red removed exclusions on the old card, Ratios-table origin/development cell tooltips, and notes snapshots with red deleted text and green added text.</div>
           <div class="check-item">Selecting a local version keeps local JSON and does not send <code>Function = SyncDFM</code>.</div>
           <div class="check-item">Selecting a remote version triggers local update.</div>
           <div class="check-item">Equal state shows in-sync message with no action.</div>

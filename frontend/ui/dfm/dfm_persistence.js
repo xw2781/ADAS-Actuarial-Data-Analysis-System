@@ -12,6 +12,7 @@ import {
   RATIO_SAVE_PATH_KEY,
   getHostApi,
   buildRatioSavePath,
+  buildInputTriangleCsvPath,
   getRatioSaveBaseDir,
   getRatioDataDir,
   getRatioSaveSuggestedName,
@@ -27,14 +28,15 @@ import {
   getDfmDecimalPlaces,
   getEffectiveDevLabelsForModel,
   getRatioHeaderLabels,
+  calcRatio,
+  roundRatio,
+  computeAverageForColumn,
+  buildExcludedSetForColumn,
 } from "/ui/dfm/dfm_state.js";
 import {
   getSummaryConfigKey,
-  getSummaryOrderKey,
   saveCustomSummaryRows,
   loadCustomSummaryRows,
-  saveSummaryOrder,
-  loadSummaryOrder,
   markMethodSaved,
   clearMethodSavedFlag,
 } from "/ui/dfm/dfm_storage.js";
@@ -59,12 +61,21 @@ import {
   hideDfmSettingsLoadingPopup,
   showDfmSettingsLoadingPopup,
 } from "/ui/dfm/dfm_loading_popup.js";
-import { buildDfmSummaryRowsFromAverageFormulas } from "/ui/dfm/dfm_average_formula_rows.js";
+import {
+  buildDfmAverageFormulaObject,
+  buildDfmSummaryRowsFromAverageFormulaObject,
+  buildDfmSummaryRowsFromAverageFormulas,
+  getDfmAverageFormulaLabels,
+  getDfmAverageFormulaSelectedIndex,
+  getDfmAverageFormulaValues,
+} from "/ui/dfm/dfm_average_formula_rows.js?v=20260513b";
 
 let ratioLoadTimer = null;
 let ratioLoadPendingReason = "";
 const DFM_INSTANCE_PRESENCE_EVENT = "arcrho:dfm-instance-presence";
 const DFM_LOCAL_LOOKUP_DEBUG_STATUS = true; // Temporary debug aid.
+const DFM_ANALYSIS_DECIMALS = 4;
+const DFM_METHOD_JSON_FORMAT = "arcrho-dfm-method-by-tab-v1";
 
 function getRatioLoadReasonPriority(reason) {
   const key = String(reason || "").trim().toLowerCase();
@@ -139,9 +150,34 @@ function hasRequiredDfmLookupInputs() {
   return !!(project && reservingClass && methodName);
 }
 
+function getDfmJsonTab(payload, tabKey) {
+  const tab = payload && typeof payload === "object" && !Array.isArray(payload) ? payload[tabKey] : null;
+  return tab && typeof tab === "object" && !Array.isArray(tab) ? tab : {};
+}
+
+function getDfmDetailsTab(payload) {
+  return getDfmJsonTab(payload, "details tab");
+}
+
+function getDfmRatiosTab(payload) {
+  return getDfmJsonTab(payload, "ratios tab");
+}
+
+function getDfmRatioTriangleTab(payload) {
+  return getDfmJsonTab(getDfmRatiosTab(payload), "ratio triangle");
+}
+
+function getDfmResultsTab(payload) {
+  return getDfmJsonTab(payload, "results tab");
+}
+
+function getDfmNotesTab(payload) {
+  return getDfmJsonTab(payload, "notes tab");
+}
+
 function getSavedInputTriangleValue(payload) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
-  if ("input triangle" in payload) return String(payload["input triangle"] ?? "");
+  const details = getDfmDetailsTab(payload);
+  if ("input triangle" in details) return String(details["input triangle"] ?? "");
   return null;
 }
 
@@ -156,14 +192,14 @@ function readSelectedLengthNumber(id, fallback = 12) {
 }
 
 function getSavedOriginLengthValue(payload) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
-  if ("origin length" in payload) return normalizeSavedLengthValue(payload["origin length"]);
+  const details = getDfmDetailsTab(payload);
+  if ("origin length" in details) return normalizeSavedLengthValue(details["origin length"]);
   return null;
 }
 
 function getSavedDevelopmentLengthValue(payload) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
-  if ("development length" in payload) return normalizeSavedLengthValue(payload["development length"]);
+  const details = getDfmDetailsTab(payload);
+  if ("development length" in details) return normalizeSavedLengthValue(details["development length"]);
   return null;
 }
 
@@ -184,8 +220,8 @@ function applySavedSelectValueToUi(id, rawValue) {
 }
 
 function getSavedMethodNameValue(payload) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
-  if ("name" in payload) return String(payload["name"] ?? "");
+  const details = getDfmDetailsTab(payload);
+  if ("name" in details) return String(details["name"] ?? "");
   return null;
 }
 
@@ -204,8 +240,8 @@ function applySavedMethodNameToUi(rawValue) {
 }
 
 function getSavedOutputTypeValue(payload) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
-  if ("output type" in payload) return String(payload["output type"] ?? "");
+  const details = getDfmDetailsTab(payload);
+  if ("output type" in details) return String(details["output type"] ?? "");
   return null;
 }
 
@@ -235,8 +271,8 @@ function applySavedInputTriangleToUi(rawValue) {
 }
 
 function getSavedDecimalPlacesValue(payload) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
-  if ("decimal places" in payload) return payload["decimal places"];
+  const details = getDfmDetailsTab(payload);
+  if ("decimal places" in details) return details["decimal places"];
   return null;
 }
 
@@ -254,8 +290,8 @@ function applySavedDecimalPlacesToUi(rawValue) {
 }
 
 function getSavedUltimateRatioDecimalPlacesValue(payload) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
-  if ("ultimate ratio decimal places" in payload) return payload["ultimate ratio decimal places"];
+  const results = getDfmResultsTab(payload);
+  if ("ultimate ratio decimal places" in results) return results["ultimate ratio decimal places"];
   return null;
 }
 
@@ -417,7 +453,238 @@ function getSummaryRowsForPersistence(cfgKey) {
   const sourceRows = savedSummaryRows.length
     ? savedSummaryRows
     : (summaryRowConfigs.length ? summaryRowConfigs : BASE_SUMMARY_ROWS);
-  return sourceRows.map((row) => ({ ...row }));
+  return sourceRows.map((row) => {
+    const { id: _id, ...rowWithoutId } = row || {};
+    if (!isUserEntrySummaryRow(rowWithoutId)) return { ...rowWithoutId };
+    const {
+      values: _values,
+      inputs: _inputs,
+      formulas: _legacyFormulas,
+      ...baseRow
+    } = rowWithoutId;
+    return { ...baseRow };
+  });
+}
+
+function buildRatioDisplayHeaderLabels(devs) {
+  const ratioLabels = getRatioHeaderLabels(devs);
+  return ratioLabels.map((label, index) => {
+    const text = String(label ?? "");
+    if (index === ratioLabels.length - 1) return text || "Ult";
+    return text ? `(${index + 1}) ${text}` : `(${index + 1})`;
+  });
+}
+
+function roundAnalysisValue(value) {
+  return Number.isFinite(Number(value)) ? roundRatio(Number(value), DFM_ANALYSIS_DECIMALS) : null;
+}
+
+function trimTrailingNulls(row) {
+  const out = Array.isArray(row) ? row.slice() : [];
+  while (out.length && out[out.length - 1] === null) {
+    out.pop();
+  }
+  return out;
+}
+
+function normalizeSummaryUserEntryValue(raw) {
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : 1;
+}
+
+function isUserEntrySummaryRow(cfg) {
+  return String(cfg?.averageType || "").trim().toLowerCase() === "user_entry";
+}
+
+function buildInputDataTriangleValues() {
+  const model = state.model;
+  if (!model || !Array.isArray(model.values) || !Array.isArray(model.mask)) return [];
+  const values = model.values;
+  const mask = model.mask;
+  const rowCount = Array.isArray(model.origin_labels) ? model.origin_labels.length : values.length;
+  const devs = getEffectiveDevLabelsForModel(model);
+  const colCount = devs.length || values.reduce((max, row) => Math.max(max, Array.isArray(row) ? row.length : 0), 0);
+  const out = [];
+  for (let r = 0; r < rowCount; r++) {
+    const row = [];
+    for (let c = 0; c < colCount; c++) {
+      row.push(mask?.[r]?.[c] ? roundAnalysisValue(values?.[r]?.[c]) : null);
+    }
+    out.push(trimTrailingNulls(row));
+  }
+  return out;
+}
+
+function buildCalculatedRatioTriangleValues() {
+  const model = state.model;
+  if (!model || !Array.isArray(model.values) || !Array.isArray(model.mask)) return [];
+  const values = model.values;
+  const mask = model.mask;
+  const rowCount = Array.isArray(model.origin_labels) ? model.origin_labels.length : values.length;
+  const devs = getEffectiveDevLabelsForModel(model);
+  const ratioLabels = getRatioHeaderLabels(devs);
+  const out = [];
+  for (let r = 0; r < rowCount; r++) {
+    const row = [];
+    for (let c = 0; c < ratioLabels.length; c++) {
+      if (c >= devs.length - 1 || !mask?.[r]?.[c] || !mask?.[r]?.[c + 1]) {
+        row.push(null);
+        continue;
+      }
+      row.push(roundAnalysisValue(calcRatio(values?.[r]?.[c], values?.[r]?.[c + 1])));
+    }
+    out.push(trimTrailingNulls(row));
+  }
+  return out;
+}
+
+function trimMatrixToReferenceRowShape(matrix, reference) {
+  if (!Array.isArray(matrix)) return [];
+  return matrix.map((row, rowIndex) => {
+    const out = Array.isArray(row) ? row.slice() : [];
+    const referenceRow = Array.isArray(reference?.[rowIndex]) ? reference[rowIndex] : null;
+    return referenceRow ? out.slice(0, referenceRow.length) : out;
+  });
+}
+
+function getSummaryRowsForValues() {
+  return Array.isArray(summaryRowConfigs) && summaryRowConfigs.length
+    ? summaryRowConfigs
+    : buildSummaryRows();
+}
+
+function buildAverageFormulaValues() {
+  const model = state.model;
+  if (!model || !Array.isArray(model.values) || !Array.isArray(model.mask)) return [];
+  const rows = getSummaryRowsForValues();
+  const devs = getEffectiveDevLabelsForModel(model);
+  const ratioLabels = getRatioHeaderLabels(devs);
+  const values = rows.map(() => new Array(ratioLabels.length).fill(null));
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+    const cfg = rows[rowIndex];
+    for (let c = 0; c < ratioLabels.length; c++) {
+      if (c >= devs.length - 1) {
+        values[rowIndex][c] = roundAnalysisValue(1);
+        continue;
+      }
+      if (isUserEntrySummaryRow(cfg)) {
+        const raw = Array.isArray(cfg.values) ? cfg.values[c] : 1;
+        values[rowIndex][c] = roundAnalysisValue(normalizeSummaryUserEntryValue(raw));
+        continue;
+      }
+      const excluded = buildExcludedSetForColumn(model, c, cfg, ratioStrikeSet);
+      const summary = computeAverageForColumn(model, c, excluded, cfg);
+      if (summary.totalValid > 0 && summary.totalIncluded === 0) {
+        values[rowIndex][c] = roundAnalysisValue(1);
+        continue;
+      }
+      const isVolume = String(cfg.base || "volume").toLowerCase() === "volume";
+      const hasValue =
+        summary.value !== null &&
+        (isVolume ? summary.sumA : summary.totalIncluded > 0);
+      values[rowIndex][c] = roundAnalysisValue(hasValue ? summary.value : 1);
+    }
+  }
+  return values.map((row) => trimTrailingNulls(row));
+}
+
+function hydrateUserEntryValuesFromAverageFormulaValues(summaryRows, formulas, averageFormulaValues) {
+  if (!Array.isArray(summaryRows) || !Array.isArray(formulas) || !Array.isArray(averageFormulaValues)) {
+    return summaryRows;
+  }
+  const formulaIndexByLabel = new Map();
+  formulas.forEach((formula, index) => {
+    const key = String(formula || "").replace(/\s+/g, " ").trim().toLowerCase();
+    if (key && !formulaIndexByLabel.has(key)) formulaIndexByLabel.set(key, index);
+  });
+  return summaryRows.map((row) => {
+    if (!isUserEntrySummaryRow(row) || Array.isArray(row?.values)) return row;
+    const labelKey = String(row?.label || row?.id || "").replace(/\s+/g, " ").trim().toLowerCase();
+    const rowIndex = formulaIndexByLabel.get(labelKey);
+    const valueRow = Number.isInteger(rowIndex) ? averageFormulaValues[rowIndex] : null;
+    if (!Array.isArray(valueRow)) return row;
+    return {
+      ...row,
+      values: valueRow.map((value) => normalizeSummaryUserEntryValue(value)),
+    };
+  });
+}
+
+export async function buildDfmMethodPayloadWithPaths(options = {}) {
+  let inputTriangleCsvPath = String(options?.inputTriangleCsvPath || "").trim();
+  if (!inputTriangleCsvPath) {
+    try {
+      inputTriangleCsvPath = await buildInputTriangleCsvPath();
+    } catch {
+      inputTriangleCsvPath = "";
+    }
+  }
+  return buildDfmMethodPayload({
+    ...options,
+    inputTriangleCsvPath,
+  });
+}
+
+function copyExistingFields(source, keys) {
+  const out = {};
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
+      out[key] = source[key];
+    }
+  }
+  return out;
+}
+
+function copyExistingField(source, sourceKey, target, targetKey = sourceKey) {
+  if (Object.prototype.hasOwnProperty.call(source, sourceKey)) {
+    target[targetKey] = source[sourceKey];
+  }
+}
+
+function buildDfmGroupedMethodPayload(methodPayload) {
+  const data = methodPayload && typeof methodPayload === "object" ? methodPayload : {};
+  const dataTab = {};
+  copyExistingField(data, "origin labels", dataTab);
+  copyExistingField(data, "data development labels", dataTab, "development labels");
+  copyExistingField(data, "input data triangle values", dataTab);
+  copyExistingField(data, "input data triangle csv path", dataTab);
+  const ratiosTab = {};
+  const ratioTriangle = {};
+  copyExistingField(data, "origin labels", ratioTriangle);
+  copyExistingField(data, "ratio development labels", ratioTriangle, "development labels");
+  copyExistingField(data, "ratio values", ratioTriangle);
+  copyExistingField(data, "excluded", ratioTriangle);
+  ratiosTab["ratio triangle"] = ratioTriangle;
+  copyExistingField(data, "average formulas", ratiosTab);
+  const grouped = {
+    "json format": DFM_METHOD_JSON_FORMAT,
+    "details tab": copyExistingFields(data, [
+      "name",
+      "output type",
+      "input triangle",
+      "origin length",
+      "development length",
+      "decimal places",
+    ]),
+    "data tab": dataTab,
+    "ratios tab": ratiosTab,
+    "results tab": copyExistingFields(data, [
+      "ratio basis dataset",
+      "ultimate ratio decimal places",
+      "ultimate vector",
+    ]),
+    "notes tab": copyExistingFields(data, [
+      "notes",
+    ]),
+    "method metadata": copyExistingFields(data, [
+      "last modified",
+    ]),
+  };
+  return grouped;
+}
+
+export async function buildDfmAssistantContextPayload(options = {}) {
+  return buildDfmMethodPayloadWithPaths(options);
 }
 
 export async function applyDfmMethodPayload(payload, options = {}) {
@@ -426,35 +693,40 @@ export async function applyDfmMethodPayload(payload, options = {}) {
     applySavedSelectValueToUi("devLenSelect", getSavedDevelopmentLengthValue(payload));
   }
 
-  const pattern = Array.isArray(payload) ? payload : payload?.["ratio pattern"];
+  const ratiosTab = getDfmRatiosTab(payload);
+  const ratioTriangle = getDfmRatioTriangleTab(payload);
+  const resultsTab = getDfmResultsTab(payload);
+  const notesTab = getDfmNotesTab(payload);
+  const pattern = Array.isArray(payload) ? payload : ratioTriangle.excluded;
   const applied = applyRatioSelectionPattern(pattern);
   if (payload && !Array.isArray(payload)) {
     const cfgKey = getSummaryConfigKey();
-    const orderKey = getSummaryOrderKey();
-    const formulas = payload["average formulas"];
-    const matrix = payload["average index"];
-    const resolvedSummary = buildDfmSummaryRowsFromAverageFormulas(payload["summary rows"], formulas);
-    const summaryRows = resolvedSummary.rows;
-    const summaryOrder = resolvedSummary.inferred ? resolvedSummary.order : payload["summary order"];
+    const averageFormulas = ratiosTab["average formulas"];
+    const formulas = getDfmAverageFormulaLabels(averageFormulas);
+    const matrix = getDfmAverageFormulaSelectedIndex(averageFormulas);
+    const averageFormulaValues = getDfmAverageFormulaValues(averageFormulas);
+    const averageFormulaRows = buildDfmSummaryRowsFromAverageFormulaObject(averageFormulas);
+    const resolvedSummary = buildDfmSummaryRowsFromAverageFormulas(averageFormulaRows, formulas);
+    const summaryRows = hydrateUserEntryValuesFromAverageFormulaValues(
+      resolvedSummary.rows,
+      formulas,
+      averageFormulaValues,
+    );
     let summaryUpdated = false;
 
     if (Array.isArray(summaryRows) && cfgKey) {
       saveCustomSummaryRows(cfgKey, summaryRows);
       summaryUpdated = true;
     }
-    if (Array.isArray(summaryOrder) && orderKey) {
-      saveSummaryOrder(orderKey, summaryOrder);
-      summaryUpdated = true;
-    }
     if (summaryUpdated) buildSummaryRows();
 
-    const notesText = payload["notes"];
+    const notesText = notesTab["notes"];
     const savedMethodName = getSavedMethodNameValue(payload);
     const savedOutputType = getSavedOutputTypeValue(payload);
     const savedInputTriangle = getSavedInputTriangleValue(payload);
     const savedDecimalPlaces = getSavedDecimalPlacesValue(payload);
     const savedUltimateRatioDecimalPlaces = getSavedUltimateRatioDecimalPlacesValue(payload);
-    const ratioBasisDataset = payload["ratio basis dataset"] ?? "";
+    const ratioBasisDataset = resultsTab["ratio basis dataset"] ?? "";
     applySavedOutputTypeToUi(savedOutputType);
     applySavedInputTriangleToUi(savedInputTriangle);
     // Apply saved Name after tri-input restore because tri change triggers
@@ -546,14 +818,17 @@ export function scheduleRatioSelectionLoad(reason) {
 }
 
 export function buildDfmMethodPayload(options = {}) {
-  const { persistSummaryOrder = true } = options;
-  const pattern = buildRatioSelectionPattern();
+  const devs = getEffectiveDevLabelsForModel(state?.model || {});
   const originLabels = Array.isArray(state?.model?.origin_labels)
     ? state.model.origin_labels.map((label) => String(label ?? ""))
     : [];
-  const developmentLabels = getRatioHeaderLabels(getEffectiveDevLabelsForModel(state?.model || {}))
-    .map((label) => String(label ?? ""));
+  const dataDevelopmentLabels = devs.map((label) => String(label ?? ""));
+  const ratioDevelopmentLabels = buildRatioDisplayHeaderLabels(devs);
   const avgSelection = buildAverageSelectionPayload();
+  const inputDataTriangleValues = buildInputDataTriangleValues();
+  const calculatedRatioTriangleValues = buildCalculatedRatioTriangleValues();
+  const pattern = trimMatrixToReferenceRowShape(buildRatioSelectionPattern(), calculatedRatioTriangleValues);
+  const averageFormulaValues = buildAverageFormulaValues();
   const resultVector = buildResultsVector();
   const notesText = getDfmNotesText();
   const ratioBasisDataset = getResultsRatioBasisSelection();
@@ -565,24 +840,16 @@ export function buildDfmMethodPayload(options = {}) {
   const decimalPlaces = getDfmDecimalPlaces();
   const ultimateRatioDecimalPlaces = getResultsUltimateRatioDecimalPlacesSelection();
   const cfgKey = getSummaryConfigKey();
-  const orderKey = getSummaryOrderKey();
   const summaryRows = getSummaryRowsForPersistence(cfgKey);
-  let summaryOrder = orderKey ? loadSummaryOrder(orderKey) : null;
-  if (!Array.isArray(summaryOrder) || summaryOrder.length === 0) {
-    summaryOrder = summaryRowConfigs
-      .map((row) => row.id)
-      .filter((id) => id != null && String(id).trim() !== "");
-    if (persistSummaryOrder && orderKey && summaryOrder.length) {
-      saveSummaryOrder(orderKey, summaryOrder);
-    }
-  }
   const data = {
-    "ratio pattern": pattern,
+    excluded: pattern,
     "origin labels": originLabels,
-    "development labels": developmentLabels,
-    "average formulas": avgSelection.formulas,
-    "average index": avgSelection.matrix,
-    "summary rows": summaryRows,
+    "data development labels": dataDevelopmentLabels,
+    "ratio development labels": ratioDevelopmentLabels,
+    "input data triangle values": inputDataTriangleValues,
+    "input data triangle csv path": String(options?.inputTriangleCsvPath || ""),
+    "ratio values": calculatedRatioTriangleValues,
+    "average formulas": buildDfmAverageFormulaObject(summaryRows, avgSelection.matrix, averageFormulaValues),
     "ultimate vector": resultVector,
     notes: notesText,
     name: methodName,
@@ -595,10 +862,7 @@ export function buildDfmMethodPayload(options = {}) {
     "ratio basis dataset": ratioBasisDataset,
     "last modified": new Date().toISOString(),
   };
-  if (Array.isArray(summaryOrder) && summaryOrder.length) {
-    data["summary order"] = summaryOrder;
-  }
-  return data;
+  return buildDfmGroupedMethodPayload(data);
 }
 
 export async function saveRatioSelectionPattern(forceSaveAs) {
@@ -608,7 +872,7 @@ export async function saveRatioSelectionPattern(forceSaveAs) {
     window.parent.postMessage({ type: "arcrho:status", text: "Save failed: desktop app required." }, "*");
     return { ok: false, error: "desktop app required" };
   }
-  const data = buildDfmMethodPayload();
+  const data = await buildDfmMethodPayloadWithPaths();
   const resultVector = buildResultsVector();
   const payload = {
     data,
@@ -700,25 +964,13 @@ export async function saveDfmTemplate() {
 
   const avgSelection = buildAverageSelectionPayload();
   const cfgKey = getSummaryConfigKey();
-  const orderKey = getSummaryOrderKey();
   const summaryRows = getSummaryRowsForPersistence(cfgKey);
-  let summaryOrder = orderKey ? loadSummaryOrder(orderKey) : null;
-  if (!Array.isArray(summaryOrder) || summaryOrder.length === 0) {
-    summaryOrder = summaryRowConfigs
-      .map((row) => row.id)
-      .filter((id) => id != null && String(id).trim() !== "");
-  }
 
-  const data = {
+  const data = buildDfmGroupedMethodPayload({
     "origin length": readSelectedLengthNumber("originLenSelect"),
     "development length": readSelectedLengthNumber("devLenSelect"),
-    "average formulas": avgSelection.formulas,
-    "average index": avgSelection.matrix,
-    "summary rows": summaryRows,
-  };
-  if (Array.isArray(summaryOrder) && summaryOrder.length) {
-    data["summary order"] = summaryOrder;
-  }
+    "average formulas": buildDfmAverageFormulaObject(summaryRows, avgSelection.matrix),
+  });
 
   const project = sanitizeFileNamePart(getRatioSaveProjectName(), "UnknownProject");
   const rc = sanitizeFileNamePart(getResolvedReservingClass() || "ReservingClass", "ReservingClass");
@@ -785,6 +1037,8 @@ export async function loadDfmTemplate() {
   }
 
   const payload = fileResult.data;
+  const detailsTab = getDfmDetailsTab(payload);
+  const ratiosTab = getDfmRatiosTab(payload);
 
   /* Apply origin / development lengths */
   const originEl = document.getElementById("originLenSelect");
@@ -800,22 +1054,19 @@ export async function loadDfmTemplate() {
     sel.value = String(val);
     sel.dispatchEvent(new Event("change", { bubbles: true }));
   };
-  if (payload["origin length"]) ensureOption(originEl, payload["origin length"]);
-  if (payload["development length"]) ensureOption(devEl, payload["development length"]);
+  if (detailsTab["origin length"]) ensureOption(originEl, detailsTab["origin length"]);
+  if (detailsTab["development length"]) ensureOption(devEl, detailsTab["development length"]);
 
-  /* Apply summary rows */
+  /* Apply average formula rows */
   const cfgKey = getSummaryConfigKey();
-  const orderKey = getSummaryOrderKey();
-  const formulas = payload["average formulas"];
-  const matrix = payload["average index"];
-  const resolvedSummary = buildDfmSummaryRowsFromAverageFormulas(payload["summary rows"], formulas);
+  const averageFormulas = ratiosTab["average formulas"];
+  const formulas = getDfmAverageFormulaLabels(averageFormulas);
+  const matrix = getDfmAverageFormulaSelectedIndex(averageFormulas);
+  const averageFormulaRows = buildDfmSummaryRowsFromAverageFormulaObject(averageFormulas);
+  const resolvedSummary = buildDfmSummaryRowsFromAverageFormulas(averageFormulaRows, formulas);
   const summaryRows = resolvedSummary.rows;
-  const summaryOrder = resolvedSummary.inferred ? resolvedSummary.order : payload["summary order"];
   if (Array.isArray(summaryRows) && cfgKey) {
     saveCustomSummaryRows(cfgKey, summaryRows);
-  }
-  if (Array.isArray(summaryOrder) && orderKey) {
-    saveSummaryOrder(orderKey, summaryOrder);
   }
   buildSummaryRows();
 

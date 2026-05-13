@@ -525,7 +525,7 @@ function renderPatternLegend(versionAge, hasMissingInsideTriangle) {
 }
 
 function renderPatternPreview(pattern, otherPattern, versionAge, labelFallbacks = {}) {
-  if (!pattern?.exists) return `<div class="small">No ratio pattern in this JSON.</div>`;
+  if (!pattern?.exists) return `<div class="small">No excluded ratio triangle in this JSON.</div>`;
   const rows = getPatternPreviewRows(pattern);
   const style = getPatternPreviewStyle(pattern);
   const diagonalIndex = getPatternTriangleDiagonal(pattern);

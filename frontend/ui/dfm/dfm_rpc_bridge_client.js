@@ -4,11 +4,11 @@ import {
   getRatioHeaderLabels,
   state,
 } from "/ui/dfm/dfm_state.js";
-import { applyDfmMethodPayload, saveRatioSelectionPattern } from "/ui/dfm/dfm_persistence.js";
+import { applyDfmMethodPayload, saveRatioSelectionPattern } from "/ui/dfm/dfm_persistence.js?v=20260513c";
 import {
   createDfmRpcBridgeDialog,
   createDfmRpcBridgeMessageBox,
-} from "/ui/dfm/dfm_rpc_bridge_dialog.js";
+} from "/ui/dfm/dfm_rpc_bridge_dialog.js?v=20260513b";
 
 let syncInFlight = false;
 
@@ -64,13 +64,29 @@ function postStatus(text, tone = "") {
   window.parent.postMessage({ type: "arcrho:status", text, ...(tone ? { tone } : {}) }, "*");
 }
 
+function formatApplyResultMessage(data) {
+  const missing = Array.isArray(data?.sync_report?.missing_components)
+    ? data.sync_report.missing_components
+    : [];
+  if (!missing.length) return { text: "Local updated.", tone: "ok" };
+  const lines = [
+    "Local updated, but these RPC components were missing and could not be synced:",
+    ...missing.map((name) => `- ${name}`),
+  ];
+  return { text: lines.join("\n"), tone: "warn" };
+}
+
 function buildCurrentPatternLabelFallbacks() {
   const model = state?.model || {};
   const originLabels = Array.isArray(model.origin_labels)
     ? model.origin_labels.map((label) => String(label ?? ""))
     : [];
-  const developmentLabels = getRatioHeaderLabels(getEffectiveDevLabelsForModel(model))
-    .map((label) => String(label ?? ""));
+  const ratioLabels = getRatioHeaderLabels(getEffectiveDevLabelsForModel(model));
+  const developmentLabels = ratioLabels.map((label, index) => {
+    const text = String(label ?? "");
+    if (index === ratioLabels.length - 1) return text || "Ult";
+    return text ? `(${index + 1}) ${text}` : `(${index + 1})`;
+  });
   return {
     origin_labels: originLabels,
     development_labels: developmentLabels,
@@ -121,8 +137,14 @@ async function runPrimaryAction(dialog, payload, action) {
         postStatus("DFM sync: local JSON updated, but tab apply failed.", "warn");
         return;
       }
-      statusDialog.setMessage("Local updated.", "ok");
-      postStatus("DFM sync: local DFM JSON updated from remote.");
+      const resultMessage = formatApplyResultMessage(data);
+      statusDialog.setMessage(resultMessage.text, resultMessage.tone);
+      postStatus(
+        resultMessage.tone === "warn"
+          ? "DFM sync: local DFM JSON updated from remote with missing RPC components."
+          : "DFM sync: local DFM JSON updated from remote.",
+        resultMessage.tone === "warn" ? "warn" : "",
+      );
       return;
     }
     if (action === "keep-local") {

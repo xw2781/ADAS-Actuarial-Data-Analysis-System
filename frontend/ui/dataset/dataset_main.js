@@ -2530,12 +2530,12 @@ async function boot() {
   // Otherwise, fall back to loading the last dataset.
   const { project, path, tri } = getTriInputs();
   if (project && path && tri) {
-    await ensureHeadersForProject(project);
-    await ensureDevHeadersForProject(project);
+    await ensureHeadersForProject(project, { forceRefresh: true });
+    await ensureDevHeadersForProject(project, { forceRefresh: true });
     scheduleAutoRun(0);
   } else {
     await loadDataset();
   }
 }
 
-boot();
+window.ADA_DATASET_READY = boot();

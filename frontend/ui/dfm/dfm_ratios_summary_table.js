@@ -14,8 +14,7 @@ import {
   buildExcludedSetForColumn, parsePeriodsValue, parseExcludeValue, getDfmDecimalPlaces,
 } from "/ui/dfm/dfm_state.js";
 import {
-  getSummaryOrderKey, getSummaryConfigKey,
-  loadSummaryOrder, saveSummaryOrder,
+  getSummaryConfigKey,
   loadCustomSummaryRows, saveCustomSummaryRows,
 } from "/ui/dfm/dfm_storage.js";
 import {
@@ -135,6 +134,14 @@ export function resetSummaryFormulaEditState() {
 // =============================================================================
 // Ratio Selection Pattern + Average Selection
 // =============================================================================
+function trimTrailingMaskCells(row) {
+  const out = Array.isArray(row) ? row.slice() : [];
+  while (out.length && out[out.length - 1] === 2) {
+    out.pop();
+  }
+  return out;
+}
+
 export function buildRatioSelectionPattern() {
   const model = state.model;
   if (!model || !Array.isArray(model.values) || !Array.isArray(model.mask)) return [];
@@ -167,7 +174,7 @@ export function buildRatioSelectionPattern() {
       }
       row.push(ratioStrikeSet.has(strikeKey) ? 1 : 0);
     }
-    pattern.push(row);
+    pattern.push(trimTrailingMaskCells(row));
   }
   return pattern;
 }
@@ -271,34 +278,34 @@ function getCurrentSummaryOrder(summaryBody) {
     .filter(Boolean);
 }
 
-export function applySummaryOrder(summaryBody, order) {
-  if (!summaryBody || !Array.isArray(order) || !order.length) return;
-  const rows = Array.from(summaryBody.children);
-  const byId = new Map();
-  rows.forEach((row) => {
-    if (row.dataset?.rowId) byId.set(row.dataset.rowId, row);
-  });
-  const frag = document.createDocumentFragment();
+function saveSummaryRowsInCurrentOrder(summaryBody) {
+  const cfgKey = getSummaryConfigKey();
+  if (!cfgKey) return;
+  const order = getCurrentSummaryOrder(summaryBody);
+  if (!order.length) return;
+  const byId = new Map(summaryRowConfigs.map((row) => [String(row.id), row]));
+  const used = new Set();
+  const nextRows = [];
   order.forEach((id) => {
-    const row = byId.get(id);
-    if (row) {
-      frag.appendChild(row);
-      byId.delete(id);
-    }
+    const row = byId.get(String(id));
+    if (!row || used.has(String(id))) return;
+    nextRows.push({ ...row });
+    used.add(String(id));
   });
-  rows.forEach((row) => {
-    if (row.dataset?.rowId && byId.has(row.dataset.rowId)) {
-      frag.appendChild(row);
-      byId.delete(row.dataset.rowId);
-    }
+  summaryRowConfigs.forEach((row) => {
+    const id = String(row.id || "");
+    if (!id || used.has(id)) return;
+    nextRows.push({ ...row });
   });
-  summaryBody.appendChild(frag);
+  if (!nextRows.length) return;
+  saveCustomSummaryRows(cfgKey, nextRows);
+  buildSummaryRows();
 }
 
 // =============================================================================
 // Summary Interactions (Drag, Context Menu, Avg Modal)
 // =============================================================================
-export function wireSummaryRowDrag(summaryBody, orderKey) {
+export function wireSummaryRowDrag(summaryBody) {
   if (!summaryBody || summaryBody.dataset.dragWired === "1") return;
   summaryBody.dataset.dragWired = "1";
 
@@ -443,7 +450,7 @@ export function wireSummaryRowDrag(summaryBody, orderKey) {
         const insertBeforeNode = dropBefore ? dragOverRow : dragOverRow.nextSibling;
         summaryBody.insertBefore(dragRow, insertBeforeNode);
       });
-      saveSummaryOrder(orderKey, getCurrentSummaryOrder(summaryBody));
+      saveSummaryRowsInCurrentOrder(summaryBody);
     }
     clearDropTarget();
     dragRow = null;
@@ -1943,8 +1950,6 @@ export function wireSummaryContextMenu(summaryTable) {
           .map((row) => ({ ...row }));
         if (!nextRows.length) return;
         saveCustomSummaryRows(cfgKey, nextRows);
-        const orderKey = getSummaryOrderKey();
-        if (orderKey) saveSummaryOrder(orderKey, nextRows.map((row) => row.id).filter(Boolean));
         for (const [col, rowId] of selectedSummaryByCol.entries()) {
           if (String(rowId) === String(lastId)) selectedSummaryByCol.delete(col);
         }

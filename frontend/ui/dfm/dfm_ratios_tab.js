@@ -15,8 +15,6 @@ import {
   markDfmDirty, notifyDfmEditState,
 } from "/ui/dfm/dfm_state.js";
 import {
-  getSummaryOrderKey,
-  loadSummaryOrder,
   saveNaBorders,
 } from "/ui/dfm/dfm_storage.js";
 import { renderResultsTable } from "/ui/dfm/dfm_results_tab.js";
@@ -31,14 +29,13 @@ import {
   wireSummarySelection,
   initDefaultSummarySelection,
   applySummarySelection,
-  applySummaryOrder,
   recalculateUserEntryDependencies,
   updateRatioSummary,
   scheduleRatioSummaryUpdate,
   setSummaryTableCallbacks,
   resetSummaryFormulaEditState,
   refreshAllExcelLinks,
-} from "/ui/dfm/dfm_ratios_summary_table.js";
+} from "/ui/dfm/dfm_ratios_summary_table.js?v=20260513b";
 import {
   wireRatioChartModal,
   isRatioChartOpen,
@@ -56,7 +53,7 @@ export {
   applyAverageSelectionFromSaved,
   updateRatioSummary,
   scheduleRatioSummaryUpdate,
-} from "/ui/dfm/dfm_ratios_summary_table.js";
+} from "/ui/dfm/dfm_ratios_summary_table.js?v=20260513b";
 export {
   wireRatioChartModal,
   isRatioChartOpen,
@@ -463,10 +460,7 @@ export function renderRatioTable() {
   wrap.appendChild(selectedTable);
   applyNaBorderVisibility();
 
-  const orderKey = getSummaryOrderKey();
-  const savedOrder = loadSummaryOrder(orderKey);
-  if (savedOrder) applySummaryOrder(summaryBody, savedOrder);
-  wireSummaryRowDrag(summaryBody, orderKey);
+  wireSummaryRowDrag(summaryBody);
   wireSummaryContextMenu(summaryTable);
 
   requestAnimationFrame(() => {

@@ -29,7 +29,7 @@ import {
   isUserEntryConfig,
   getUserEntryValueForCol,
   scheduleRatioSummaryUpdate,
-} from "/ui/dfm/dfm_ratios_summary_table.js";
+} from "/ui/dfm/dfm_ratios_summary_table.js?v=20260513b";
 
 let _onRatioStateMutated = () => {};
 

@@ -28,6 +28,7 @@ const PRELOAD_PATH = path.join(__dirname, "preload.js");
 const MAIN_WINDOW_PREFS_FILE = "main_window_prefs.json";
 const SCRIPTING_SHORTCUTS_FILE = "scripting_shortcuts.json";
 const WORKSPACE_PATHS_FILE = "workspace_paths.json";
+const ARCBOT_CHAT_SESSIONS_DIR = "arcbot_chat_sessions";
 const CODEX_ASSISTANT_TIMEOUT_MS = Math.max(
   15000,
   parseInt(process.env.ARCRHO_CODEX_ASSISTANT_TIMEOUT_MS || "120000", 10) || 120000
@@ -85,6 +86,146 @@ function getScriptingShortcutsPath() {
 
 function getWorkspacePathsPath() {
   return path.join(app.getPath("appData"), "ArcRho", WORKSPACE_PATHS_FILE);
+}
+
+function getArcBotChatSessionsDir() {
+  return path.join(app.getPath("userData"), ARCBOT_CHAT_SESSIONS_DIR);
+}
+
+function sanitizeArcBotSessionId(value) {
+  return String(value || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80);
+}
+
+function createArcBotChatSessionId() {
+  return `chat-${new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14)}-${crypto.randomBytes(4).toString("hex")}`;
+}
+
+function getArcBotChatSessionPath(sessionId) {
+  const safeId = sanitizeArcBotSessionId(sessionId);
+  if (!safeId) return "";
+  return path.join(getArcBotChatSessionsDir(), `${safeId}.json`);
+}
+
+function normalizeArcBotMessages(messages) {
+  if (!Array.isArray(messages)) return [];
+  return messages.slice(-80).map((message) => ({
+    role: String(message?.role || "").toLowerCase() === "assistant" ? "assistant"
+      : String(message?.role || "").toLowerCase() === "system" ? "system"
+      : "user",
+    content: String(message?.content || ""),
+    timestamp: String(message?.timestamp || new Date().toISOString()),
+  })).filter((message) => message.content.trim());
+}
+
+function normalizeArcBotActivities(activities) {
+  if (!Array.isArray(activities)) return [];
+  return activities.slice(-120).map((activity) => ({
+    type: String(activity?.type || "info").slice(0, 32),
+    text: String(activity?.text || "").slice(0, 1000),
+    elapsedMs: Number.isFinite(activity?.elapsedMs) ? Math.max(0, Math.round(activity.elapsedMs)) : null,
+    timestamp: String(activity?.timestamp || new Date().toISOString()),
+  })).filter((activity) => activity.text.trim());
+}
+
+function normalizeArcBotDebugLogs(logs) {
+  if (!Array.isArray(logs)) return [];
+  return logs.slice(-300).map((entry) => ({
+    type: String(entry?.type || "debug").slice(0, 32),
+    text: String(entry?.text || "").slice(0, 8000),
+    timestamp: String(entry?.timestamp || new Date().toISOString()),
+  })).filter((entry) => entry.text.trim());
+}
+
+function deriveArcBotSessionTitle(messages, fallback = "New ArcBot Chat") {
+  const firstUser = normalizeArcBotMessages(messages).find((message) => message.role === "user");
+  const title = String(firstUser?.content || fallback).replace(/\s+/g, " ").trim();
+  return title.length > 42 ? `${title.slice(0, 39)}...` : title || fallback;
+}
+
+function readArcBotChatSession(sessionId) {
+  const filePath = getArcBotChatSessionPath(sessionId);
+  if (!filePath || !fs.existsSync(filePath)) return null;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    if (!parsed || sanitizeArcBotSessionId(parsed.id) !== sanitizeArcBotSessionId(sessionId)) return null;
+    return {
+      id: sanitizeArcBotSessionId(parsed.id),
+      title: String(parsed.title || "ArcBot Chat"),
+      createdAt: String(parsed.createdAt || new Date().toISOString()),
+      updatedAt: String(parsed.updatedAt || parsed.createdAt || new Date().toISOString()),
+      mode: String(parsed.mode || "edit"),
+      model: String(parsed.model || "codex"),
+      archived: parsed.archived === true,
+      messages: normalizeArcBotMessages(parsed.messages),
+      activities: normalizeArcBotActivities(parsed.activities),
+      debugLogs: normalizeArcBotDebugLogs(parsed.debugLogs),
+      context: parsed.context && typeof parsed.context === "object" ? parsed.context : null,
+      usage: parsed.usage && typeof parsed.usage === "object" ? parsed.usage : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeArcBotChatSession(sessionLike) {
+  const now = new Date().toISOString();
+  const existing = sessionLike?.id ? readArcBotChatSession(sessionLike.id) : null;
+  const id = sanitizeArcBotSessionId(sessionLike?.id) || createArcBotChatSessionId();
+  const messages = normalizeArcBotMessages(sessionLike?.messages || existing?.messages || []);
+  const session = {
+    id,
+    title: String(sessionLike?.title || existing?.title || deriveArcBotSessionTitle(messages)).slice(0, 80),
+    createdAt: String(existing?.createdAt || sessionLike?.createdAt || now),
+    updatedAt: now,
+    mode: String(sessionLike?.mode || existing?.mode || "edit"),
+    model: String(sessionLike?.model || existing?.model || "codex"),
+    archived: Object.prototype.hasOwnProperty.call(sessionLike || {}, "archived")
+      ? sessionLike?.archived === true
+      : existing?.archived === true,
+    messages,
+    activities: normalizeArcBotActivities(sessionLike?.activities || existing?.activities || []),
+    debugLogs: normalizeArcBotDebugLogs(sessionLike?.debugLogs || existing?.debugLogs || []),
+    context: sessionLike?.context && typeof sessionLike.context === "object" ? sessionLike.context : existing?.context || null,
+    usage: sessionLike?.usage && typeof sessionLike.usage === "object" ? sessionLike.usage : existing?.usage || null,
+  };
+  fs.mkdirSync(getArcBotChatSessionsDir(), { recursive: true });
+  const filePath = getArcBotChatSessionPath(id);
+  const tmpPath = `${filePath}.tmp`;
+  fs.writeFileSync(tmpPath, JSON.stringify(session, null, 2), "utf8");
+  fs.renameSync(tmpPath, filePath);
+  return session;
+}
+
+function listArcBotChatSessions(options = {}) {
+  const includeArchived = options?.includeArchived === true;
+  fs.mkdirSync(getArcBotChatSessionsDir(), { recursive: true });
+  return fs.readdirSync(getArcBotChatSessionsDir())
+    .filter((name) => /\.json$/i.test(name))
+    .map((name) => readArcBotChatSession(path.basename(name, ".json")))
+    .filter(Boolean)
+    .filter((session) => includeArchived || !session.archived)
+    .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
+    .map((session) => ({
+      id: session.id,
+      title: session.title,
+      updatedAt: session.updatedAt,
+      createdAt: session.createdAt,
+      messageCount: session.messages.length,
+      archived: session.archived === true,
+    }));
+}
+
+function archiveArcBotChatSession(sessionId, archived = true) {
+  const session = readArcBotChatSession(sessionId);
+  if (!session) return null;
+  return writeArcBotChatSession({ ...session, archived: !!archived });
+}
+
+function deleteArcBotChatSession(sessionId) {
+  const filePath = getArcBotChatSessionPath(sessionId);
+  if (!filePath || !fs.existsSync(filePath)) return false;
+  fs.unlinkSync(filePath);
+  return true;
 }
 
 function getConfiguredWorkspaceRoot() {
@@ -251,6 +392,8 @@ function runHostCommand(command, args = [], options = {}) {
     timeoutMs = 15000,
     windowsHide = true,
     shell: useShell = process.platform === "win32",
+    onStdout = null,
+    onStderr = null,
   } = options;
   return new Promise((resolve) => {
     let settled = false;
@@ -295,12 +438,16 @@ function runHostCommand(command, args = [], options = {}) {
     }, Math.max(1000, timeoutMs));
 
     proc.stdout?.on("data", (chunk) => {
-      stdout += String(chunk || "");
+      const text = String(chunk || "");
+      stdout += text;
       if (stdout.length > 200000) stdout = stdout.slice(-200000);
+      if (typeof onStdout === "function") onStdout(text);
     });
     proc.stderr?.on("data", (chunk) => {
-      stderr += String(chunk || "");
+      const text = String(chunk || "");
+      stderr += text;
       if (stderr.length > 200000) stderr = stderr.slice(-200000);
+      if (typeof onStderr === "function") onStderr(text);
     });
     proc.once("error", (err) => {
       clearTimeout(timer);
@@ -396,8 +543,53 @@ function sha256Text(text) {
   return crypto.createHash("sha256").update(String(text || ""), "utf8").digest("hex");
 }
 
+function formatJsonForSave(data) {
+  const text = formatJsonWithCompactRowArrays(data);
+  return text.endsWith("\n") ? text : `${text}\n`;
+}
+
+function isRowArray(value) {
+  return Array.isArray(value) && value.every((row) => Array.isArray(row));
+}
+
+function formatJsonWithCompactRowArrays(value, indent = "") {
+  if (isRowArray(value)) {
+    if (!value.length) return "[]";
+    return `[\n${formatRowArrayLines(value, `${indent}  `)}\n${indent}]`;
+  }
+  if (Array.isArray(value)) {
+    if (!value.length) return "[]";
+    const childIndent = `${indent}  `;
+    const lines = value.map((item, index) => {
+      const rendered = `${childIndent}${formatJsonWithCompactRowArrays(item, childIndent)}`;
+      return index < value.length - 1 ? `${rendered},` : rendered;
+    });
+    return `[\n${lines.join("\n")}\n${indent}]`;
+  }
+  if (value && typeof value === "object") {
+    const keys = Object.keys(value);
+    if (!keys.length) return "{}";
+    const childIndent = `${indent}  `;
+    const lines = keys.map((key, index) => {
+      const rendered = `${childIndent}${JSON.stringify(key)}: ${formatJsonWithCompactRowArrays(value[key], childIndent)}`;
+      return index < keys.length - 1 ? `${rendered},` : rendered;
+    });
+    return `{\n${lines.join("\n")}\n${indent}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function formatRowArrayLines(rows, indent) {
+  return rows
+    .map((row) => {
+      const vals = row.map((v) => JSON.stringify(v)).join(", ");
+      return `${indent}[${vals}]`;
+    })
+    .join(",\n");
+}
+
 function formatJsonForArcBot(data) {
-  return `${JSON.stringify(data, null, 2)}\n`;
+  return formatJsonForSave(data);
 }
 
 function extractJsonObject(text) {
@@ -426,6 +618,39 @@ function extractJsonObject(text) {
     }
   }
   return null;
+}
+
+function extractJsonText(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return "";
+  try {
+    JSON.parse(raw);
+    return raw;
+  } catch {
+    // Continue with fenced/object extraction.
+  }
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced) {
+    const candidate = fenced[1].trim();
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      // Continue with first object extraction.
+    }
+  }
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    const candidate = raw.slice(start, end + 1);
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      return "";
+    }
+  }
+  return "";
 }
 
 function getAssistantTargetJsonPath(activeContext) {
@@ -696,6 +921,7 @@ function buildAssistantPrompt(
         "ArcBot edits are host-applied only. Do not edit the true project/server file path directly.",
         "You may edit only the active JSON copy in the current working folder. Do not edit other files, install packages, commit code, or push code.",
         "If the user asks to modify the active DFM method, inspect and edit the active JSON copy directly.",
+        "DFM active JSON copies use the canonical GUI-tab grouped DFM method JSON format. Keep that grouped structure in the temp file.",
         "Preserve unrelated fields and JSON structure. Keep the file valid JSON.",
         "When finished, return a single JSON object only, with no Markdown.",
         "Allowed response shape:",
@@ -741,6 +967,41 @@ function clampCodexPrompt(prompt) {
     "",
     text.slice(-45000),
   ].join("\n");
+}
+
+function estimateArcBotContextUsage(prompt, messages, activeContext, activeJson, clampedPrompt) {
+  const promptText = String(prompt || "");
+  const clampedText = String(clampedPrompt || promptText);
+  const activeJsonText = activeJson ? JSON.stringify(activeJson) : "";
+  const contextText = activeContext ? JSON.stringify(activeContext) : "";
+  const chatText = Array.isArray(messages)
+    ? messages.map((message) => String(message?.content || "")).join("\n")
+    : "";
+  return {
+    promptChars: clampedText.length,
+    estimatedTokens: Math.ceil(clampedText.length / 4),
+    maxPromptChars: 200000,
+    truncated: clampedText.length < promptText.length,
+    includedMessages: Array.isArray(messages) ? Math.min(messages.length, 12) : 0,
+    chatChars: chatText.length,
+    activeContextChars: contextText.length,
+    activeJsonChars: activeJsonText.length,
+  };
+}
+
+function sendArcBotActivity(event, requestId, type, text, extra = {}) {
+  if (!event?.sender || !requestId) return;
+  try {
+    event.sender.send("codex-assistant-event", {
+      requestId,
+      type,
+      text: String(text || ""),
+      timestamp: new Date().toISOString(),
+      ...extra,
+    });
+  } catch {
+    // ignore stale renderer activity updates
+  }
 }
 
 function loadMainWindowPrefs() {
@@ -1335,180 +1596,6 @@ ipcMain.handle("save-text-file", async (_event, payload) => {
   }
 });
 
-  function formatJsonForSave(data) {
-    if (Array.isArray(data) && data.every((row) => Array.isArray(row))) {
-      return formatRowArrayJson(data);
-    }
-    if (data && typeof data === "object") {
-      const ratioPattern = data["ratio pattern"];
-      const originLabels = data["origin labels"];
-      const developmentLabels = data["development labels"];
-      const avgFormula = data["average formulas"];
-      const avgIndex = data["average index"];
-      const summaryRows = data["summary rows"];
-      const summaryOrder = data["summary order"];
-      const ultimateVector = data["ultimate vector"];
-      const notes = data.notes;
-      const methodName = data.name;
-      const outputType = data["output type"];
-      const inputTriangle = data["input triangle"];
-      const originLength = data["origin length"];
-      const developmentLength = data["development length"];
-      const decimalPlaces = data["decimal places"];
-      const ultimateRatioDecimalPlaces = data["ultimate ratio decimal places"];
-      const ratioBasisDataset = data["ratio basis dataset"];
-      const lastModified = data["last modified"];
-      const hasRatioPattern = Array.isArray(ratioPattern) && ratioPattern.every((row) => Array.isArray(row));
-      const hasOriginLabels = Array.isArray(originLabels);
-      const hasDevelopmentLabels = Array.isArray(developmentLabels);
-      const hasAvgIndex = Array.isArray(avgIndex) && avgIndex.every((row) => Array.isArray(row));
-      const hasAvgFormula = "average formulas" in data;
-      const hasSummaryRows = "summary rows" in data;
-      const hasSummaryOrder = "summary order" in data;
-      const hasUltimateVector = "ultimate vector" in data;
-      const hasNotes = "notes" in data;
-      const hasMethodName = "name" in data;
-      const hasOutputType = "output type" in data;
-      const hasInputTriangle = "input triangle" in data;
-      const hasOriginLength = "origin length" in data;
-      const hasDevelopmentLength = "development length" in data;
-      const hasDecimalPlaces = "decimal places" in data;
-      const hasUltimateRatioDecimalPlaces = "ultimate ratio decimal places" in data;
-      const hasRatioBasisDataset = "ratio basis dataset" in data;
-      const hasLastModified = "last modified" in data;
-      if (hasRatioPattern || hasOriginLabels || hasDevelopmentLabels || hasAvgIndex || hasAvgFormula || hasSummaryRows || hasSummaryOrder || hasUltimateVector || hasNotes || hasInputTriangle || hasOriginLength || hasDevelopmentLength || hasDecimalPlaces || hasUltimateRatioDecimalPlaces || hasRatioBasisDataset || hasLastModified) {
-        const lines = [];
-        lines.push("{");
-        let wroteSection = false;
-        if (hasRatioPattern) {
-          lines.push('  "ratio pattern": [');
-        lines.push(formatRowArrayLines(ratioPattern, "    "));
-        lines.push("  ]");
-        wroteSection = true;
-      }
-      if (hasOriginLabels) {
-        if (wroteSection) lines[lines.length - 1] += ",";
-        lines.push(`  "origin labels": ${JSON.stringify(originLabels)}`);
-        wroteSection = true;
-      }
-      if (hasDevelopmentLabels) {
-        if (wroteSection) lines[lines.length - 1] += ",";
-        lines.push(`  "development labels": ${JSON.stringify(developmentLabels)}`);
-        wroteSection = true;
-      }
-      if (hasAvgFormula) {
-        if (wroteSection) lines[lines.length - 1] += ",";
-        lines.push(`  "average formulas": ${JSON.stringify(avgFormula)}`);
-        wroteSection = true;
-      }
-      if (hasAvgIndex) {
-        if (wroteSection) lines[lines.length - 1] += ",";
-        lines.push('  "average index": [');
-          lines.push(formatRowArrayLines(avgIndex, "    "));
-          lines.push("  ]");
-          wroteSection = true;
-        }
-        if (hasSummaryRows) {
-          if (wroteSection) lines[lines.length - 1] += ",";
-          const rowsJson = JSON.stringify(summaryRows, null, 2).split("\n");
-          lines.push(`  "summary rows": ${rowsJson[0]}`);
-          for (let i = 1; i < rowsJson.length; i++) {
-            lines.push(`  ${rowsJson[i]}`);
-          }
-          wroteSection = true;
-        }
-        if (hasSummaryOrder) {
-          if (wroteSection) lines[lines.length - 1] += ",";
-          const orderJson = JSON.stringify(summaryOrder, null, 2).split("\n");
-          lines.push(`  "summary order": ${orderJson[0]}`);
-          for (let i = 1; i < orderJson.length; i++) {
-            lines.push(`  ${orderJson[i]}`);
-          }
-          wroteSection = true;
-        }
-        if (hasUltimateVector) {
-          if (wroteSection) lines[lines.length - 1] += ",";
-          const vectorJson = JSON.stringify(ultimateVector, null, 2).split("\n");
-          lines.push(`  "ultimate vector": ${vectorJson[0]}`);
-          for (let i = 1; i < vectorJson.length; i++) {
-            lines.push(`  ${vectorJson[i]}`);
-          }
-          wroteSection = true;
-        }
-        if (hasNotes) {
-          if (wroteSection) lines[lines.length - 1] += ",";
-          lines.push(`  "notes": ${JSON.stringify(typeof notes === "string" ? notes : "")}`);
-          wroteSection = true;
-        }
-        if (hasMethodName) {
-          if (wroteSection) lines[lines.length - 1] += ",";
-          lines.push(`  "name": ${JSON.stringify(typeof methodName === "string" ? methodName : "")}`);
-          wroteSection = true;
-        }
-        if (hasOutputType) {
-          if (wroteSection) lines[lines.length - 1] += ",";
-          lines.push(`  "output type": ${JSON.stringify(typeof outputType === "string" ? outputType : "")}`);
-          wroteSection = true;
-        }
-        if (hasInputTriangle) {
-          if (wroteSection) lines[lines.length - 1] += ",";
-          lines.push(`  "input triangle": ${JSON.stringify(typeof inputTriangle === "string" ? inputTriangle : "")}`);
-          wroteSection = true;
-        }
-        if (hasOriginLength) {
-          if (wroteSection) lines[lines.length - 1] += ",";
-          lines.push(`  "origin length": ${JSON.stringify(Number.isFinite(Number(originLength)) ? Number(originLength) : null)}`);
-          wroteSection = true;
-        }
-        if (hasDevelopmentLength) {
-          if (wroteSection) lines[lines.length - 1] += ",";
-          lines.push(`  "development length": ${JSON.stringify(Number.isFinite(Number(developmentLength)) ? Number(developmentLength) : null)}`);
-          wroteSection = true;
-        }
-        if (hasDecimalPlaces) {
-          if (wroteSection) lines[lines.length - 1] += ",";
-          lines.push(`  "decimal places": ${JSON.stringify(Number.isFinite(Number(decimalPlaces)) ? Number(decimalPlaces) : 4)}`);
-          wroteSection = true;
-        }
-        if (hasUltimateRatioDecimalPlaces) {
-          if (wroteSection) lines[lines.length - 1] += ",";
-          lines.push(`  "ultimate ratio decimal places": ${JSON.stringify(Number.isFinite(Number(ultimateRatioDecimalPlaces)) ? Number(ultimateRatioDecimalPlaces) : 2)}`);
-          wroteSection = true;
-        }
-        if (hasRatioBasisDataset) {
-          if (wroteSection) lines[lines.length - 1] += ",";
-          lines.push(`  "ratio basis dataset": ${JSON.stringify(typeof ratioBasisDataset === "string" ? ratioBasisDataset : "")}`);
-          wroteSection = true;
-        }
-        if (hasLastModified) {
-          if (wroteSection) lines[lines.length - 1] += ",";
-          lines.push(`  "last modified": ${JSON.stringify(typeof lastModified === "string" ? lastModified : "")}`);
-          wroteSection = true;
-        }
-      lines.push("}");
-      return `${lines.join("\n")}\n`;
-    }
-  }
-  return JSON.stringify(data, null, 2);
-}
-
-function formatRowArrayLines(rows, indent) {
-  return rows
-    .map((row) => {
-      const vals = row.map((v) => JSON.stringify(v)).join(", ");
-      return `${indent}[${vals}]`;
-    })
-    .join(",\n");
-}
-
-function formatRowArrayJson(rows) {
-  const lines = [];
-  lines.push("[");
-  lines.push(formatRowArrayLines(rows, "  "));
-  lines.push("]");
-  return `${lines.join("\n")}\n`;
-}
-
 ipcMain.handle("read-json-file", async (_event, payload) => {
   const filePath = String(payload?.path || "");
   if (!filePath) return { exists: false };
@@ -1680,7 +1767,67 @@ ipcMain.handle("codex-assistant-login", async () => {
   }
 });
 
-ipcMain.handle("codex-assistant-send", async (_event, payload) => {
+ipcMain.handle("codex-assistant-sessions-list", async (_event, payload) => {
+  try {
+    return { ok: true, sessions: listArcBotChatSessions({ includeArchived: payload?.includeArchived === true }) };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err || "Could not list ArcBot sessions.") };
+  }
+});
+
+ipcMain.handle("codex-assistant-session-create", async (_event, payload) => {
+  try {
+    const session = writeArcBotChatSession({
+      title: String(payload?.title || "New ArcBot Chat"),
+      mode: String(payload?.mode || "edit"),
+      model: String(payload?.model || "codex"),
+      messages: [],
+      activities: [],
+    });
+    return { ok: true, session };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err || "Could not create ArcBot session.") };
+  }
+});
+
+ipcMain.handle("codex-assistant-session-load", async (_event, payload) => {
+  try {
+    const session = readArcBotChatSession(payload?.sessionId);
+    return session ? { ok: true, session } : { ok: false, error: "ArcBot session was not found." };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err || "Could not load ArcBot session.") };
+  }
+});
+
+ipcMain.handle("codex-assistant-session-save", async (_event, payload) => {
+  try {
+    const session = writeArcBotChatSession(payload?.session || {});
+    return { ok: true, session };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err || "Could not save ArcBot session.") };
+  }
+});
+
+ipcMain.handle("codex-assistant-session-archive", async (_event, payload) => {
+  try {
+    const session = archiveArcBotChatSession(payload?.sessionId, payload?.archived !== false);
+    return session ? { ok: true, session } : { ok: false, error: "ArcBot session was not found." };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err || "Could not archive ArcBot session.") };
+  }
+});
+
+ipcMain.handle("codex-assistant-session-delete", async (_event, payload) => {
+  try {
+    const deleted = deleteArcBotChatSession(payload?.sessionId);
+    return deleted ? { ok: true } : { ok: false, error: "ArcBot session was not found." };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err || "Could not delete ArcBot session.") };
+  }
+});
+
+ipcMain.handle("codex-assistant-send", async (event, payload) => {
+  const requestId = String(payload?.requestId || "");
   const mode = String(payload?.mode || "edit").trim().toLowerCase();
   const model = String(payload?.model || "codex").trim().toLowerCase();
   if (mode !== "edit" && mode !== "review") {
@@ -1698,15 +1845,24 @@ ipcMain.handle("codex-assistant-send", async (_event, payload) => {
     };
   }
   if (mode === "edit" && isRevertLatestRequest(payload?.messages)) {
+    sendArcBotActivity(event, requestId, "activity", "Checking latest ArcBot edit history...");
     const reverted = await revertLatestArcBotEdit();
     return reverted.ok
       ? { ok: true, text: reverted.reply || "Reverted the latest ArcBot edit." }
       : { ok: false, needsAuth: false, error: reverted.error || "ArcBot revert failed." };
   }
+  sendArcBotActivity(event, requestId, "activity", "Resolving ArcBot project and working folders...");
   const roots = await getCodexAssistantProjectRoots({ ensureLocalRoot: true });
   const activeContext = payload?.activeContext && typeof payload.activeContext === "object"
     ? payload.activeContext
     : null;
+  sendArcBotActivity(event, requestId, "context", activeContext?.available ? "Loaded active tab context." : "No active tab context was provided.", {
+    context: {
+      tabType: activeContext?.tabType || "home",
+      title: activeContext?.title || "",
+      targetPath: activeContext?.targetPath || activeContext?.path || "",
+    },
+  });
   const targetPath = getAssistantTargetJsonPath(activeContext);
   let activeJson = null;
   const activeJsonFallback = activeContext?.activeJson != null &&
@@ -1715,6 +1871,7 @@ ipcMain.handle("codex-assistant-send", async (_event, payload) => {
     ? activeContext.activeJson
     : null;
   if (targetPath) {
+    sendArcBotActivity(event, requestId, "activity", "Checking active JSON access...");
     const validation = await validateArcBotJsonTarget(targetPath);
     if (validation.ok) {
       if (activeJsonFallback) {
@@ -1736,29 +1893,30 @@ ipcMain.handle("codex-assistant-send", async (_event, payload) => {
     activeJson = activeJsonFallback;
   }
   let editSession = null;
-  const activeJsonIsError = activeJson &&
-    typeof activeJson.error === "string" &&
-    !Object.prototype.hasOwnProperty.call(activeJson, "ratio pattern");
+  const activeJsonIsError = activeJson && typeof activeJson.error === "string";
   if (mode === "edit" && targetPath && activeJson && !activeJsonIsError) {
     const validation = await validateArcBotJsonTarget(targetPath);
     if (validation.ok) {
+      sendArcBotActivity(event, requestId, "activity", "Creating editable local JSON copy...");
       editSession = createArcBotEditSession({ targetPath: validation.targetPath, activeJson });
     }
   }
   const codexCwd = editSession?.sessionDir || roots.cliRoot;
   const codexSandbox = editSession ? "workspace-write" : "read-only";
-  const prompt = clampCodexPrompt(
-    buildAssistantPrompt(
-      payload?.messages,
-      mode,
-      roots.projectRoot,
-      codexCwd,
-      roots.networkRoot,
-      activeContext,
-      activeJson,
-      editSession
-    )
+  const rawPrompt = buildAssistantPrompt(
+    payload?.messages,
+    mode,
+    roots.projectRoot,
+    codexCwd,
+    roots.networkRoot,
+    activeContext,
+    activeJson,
+    editSession
   );
+  const prompt = clampCodexPrompt(rawPrompt);
+  const usage = estimateArcBotContextUsage(rawPrompt, payload?.messages, activeContext, activeJson, prompt);
+  sendArcBotActivity(event, requestId, "usage", `Context estimate: ~${usage.estimatedTokens.toLocaleString()} tokens from ${usage.promptChars.toLocaleString()} chars.`, { usage });
+  sendArcBotActivity(event, requestId, "activity", `Starting Codex CLI in ${mode === "edit" ? "Edit Mode" : "Review Mode"}...`);
   const result = await runCodexCommand([
     "exec",
     "--ephemeral",
@@ -1772,28 +1930,43 @@ ipcMain.handle("codex-assistant-send", async (_event, payload) => {
   ], {
     input: prompt,
     timeoutMs: CODEX_ASSISTANT_TIMEOUT_MS,
+    onStdout: (chunk) => sendArcBotActivity(event, requestId, "stdout", chunk),
+    onStderr: (chunk) => sendArcBotActivity(event, requestId, "stderr", chunk),
   });
 
   if (!result.ok) {
+    sendArcBotActivity(event, requestId, "error", normalizeHostError(result, "Codex CLI request failed."));
     return {
       ok: false,
       needsAuth: isAuthFailure(result),
       error: normalizeHostError(result, "Codex CLI request failed."),
+      usage,
     };
   }
   const rawText = String(result.stdout || "").trim();
+  sendArcBotActivity(event, requestId, "activity", "Codex response received.");
   if (mode === "edit") {
     if (editSession) {
       let editedJson = null;
       let editedText = "";
       try {
         editedText = fs.readFileSync(editSession.jsonPath, "utf8");
-        editedJson = JSON.parse(editedText);
+        try {
+          editedJson = JSON.parse(editedText);
+        } catch {
+          const extractedJsonText = extractJsonText(editedText);
+          if (!extractedJsonText) throw new Error("Edited JSON copy did not contain a valid JSON object.");
+          editedJson = JSON.parse(extractedJsonText);
+          editedText = formatJsonForArcBot(editedJson);
+          fs.writeFileSync(editSession.jsonPath, editedText, "utf8");
+          sendArcBotActivity(event, requestId, "activity", "Cleaned explanatory text from the edited JSON copy.");
+        }
       } catch (err) {
         const message = String(err?.message || err || "Edited JSON copy could not be read.");
         return { ok: false, needsAuth: false, error: `ArcBot could not apply the temp JSON copy. ${message}` };
       }
       if (sha256Text(editedText) !== editSession.beforeSha256) {
+        sendArcBotActivity(event, requestId, "activity", "Validating and applying edited JSON copy...");
         const structured = extractJsonObject(rawText);
         const applied = await applyArcBotJsonEdit({
           targetPath: editSession.targetPath,
@@ -1805,12 +1978,13 @@ ipcMain.handle("codex-assistant-send", async (_event, payload) => {
         return applied.ok
           ? {
               ok: true,
-              text: `${applied.reply || "Updated the active JSON file."}\n\nBackup: ${applied.backupPath}`,
+              text: applied.reply || "Updated the active JSON file.",
               editApplied: true,
               targetPath: applied.targetPath,
               backupPath: applied.backupPath,
+              usage,
             }
-          : { ok: false, needsAuth: false, error: applied.error || "ArcBot JSON edit failed." };
+          : { ok: false, needsAuth: false, error: applied.error || "ArcBot JSON edit failed.", usage };
       }
     }
     const structured = extractJsonObject(rawText);
@@ -1818,6 +1992,7 @@ ipcMain.handle("codex-assistant-send", async (_event, payload) => {
       return {
         ok: true,
         text: String(structured.reply || "").trim() || "No response.",
+        usage,
       };
     }
   }
@@ -1825,6 +2000,7 @@ ipcMain.handle("codex-assistant-send", async (_event, payload) => {
     ok: true,
     text: rawText,
     progress: String(result.stderr || "").trim(),
+    usage,
   };
 });
 

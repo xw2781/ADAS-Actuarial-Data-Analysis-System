@@ -327,6 +327,21 @@ export function getResultsCsvSuggestedName(options = {}) {
   return `${fullName}.csv`;
 }
 
+export function getInputTriangleCsvSuggestedName(options = {}) {
+  const triangleName = typeof options.datasetName === "string"
+    ? options.datasetName
+    : String(document.getElementById("triInput")?.value || "").trim();
+  return getResultsCsvSuggestedName({
+    ...options,
+    datasetName: triangleName,
+  });
+}
+
+export async function buildInputTriangleCsvPath(options = {}) {
+  const dataDir = await getRatioDataDir();
+  return `${dataDir}\\${getInputTriangleCsvSuggestedName(options)}`;
+}
+
 export function escapeCsvCell(value) {
   const text = value == null ? "" : String(value);
   if (/[",\r\n]/.test(text)) {

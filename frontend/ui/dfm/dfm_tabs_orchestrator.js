@@ -48,10 +48,10 @@ import {
   saveRatioSelectionPattern,
   saveDfmTemplate,
   loadDfmTemplate,
-  buildDfmMethodPayload,
-} from "/ui/dfm/dfm_persistence.js";
+  buildDfmAssistantContextPayload,
+} from "/ui/dfm/dfm_persistence.js?v=20260513c";
 import { wireRatioSyncChannel, requestRatioStateSync } from "/ui/dfm/dfm_sync.js";
-import { wireDfmRpcBridgePathBar } from "/ui/dfm/dfm_rpc_bridge_pathbar.js";
+import { wireDfmRpcBridgePathBar } from "/ui/dfm/dfm_rpc_bridge_pathbar.js?v=20260513d";
 
 function handleDatasetUpdated() {
   if (isRatiosTabVisible()) renderRatioTable();
@@ -74,7 +74,7 @@ async function buildAssistantContext() {
     pathError = String(err?.message || err || "Could not resolve DFM method path.");
   }
   try {
-    activeJson = buildDfmMethodPayload({ persistSummaryOrder: false });
+    activeJson = await buildDfmAssistantContextPayload({ persistSummaryOrder: false });
   } catch (err) {
     activeJsonError = String(err?.message || err || "Could not build active DFM method payload.");
   }

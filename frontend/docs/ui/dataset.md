@@ -11,7 +11,7 @@ Implementation details should stay in the generated entrypoint/key-file sections
 
 ## Entry Points
 <!-- AUTO-GEN:BEGIN frontend.dataset.entry_points -->
-- `ui/dataset/dataset_viewer.html`: external scripts _none_; inline imports `/ui/dataset/dataset_main.js?v=2026022002`, `/ui/dataset/dataset_shared.js`.
+- `ui/dataset/dataset_viewer.html`: external scripts _none_; inline imports `/ui/dataset/dataset_main.js?v=20260512a`, `/ui/dataset/dataset_shared.js`.
 
 Detected `fetch(...)` targets in key JS files:
 - `${config.API_BASE}/dataset/${dsId}/patch`
@@ -69,6 +69,7 @@ Detected `arcrho:*` message types in key JS files:
 - Persists last-viewed dataset inputs globally and restores them when opening a new Dataset tab.
 - Stores latest browsing history entries via `browsing_history.js` (project + reserving class + dataset).
 - Rejects invalid typed values on change/Enter and blocks ArcRhoTri requests until all 3 inputs are valid.
+- On Dataset page open, bypasses the browser-side header-label cache once and refreshes origin/development labels for the selected project and period lengths before the Data grid renders; normal dataset reloads also refresh labels before applying them to the model.
 <!-- MANUAL:END -->
 
 ## Common Change Tasks

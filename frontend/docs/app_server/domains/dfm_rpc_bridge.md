@@ -2,7 +2,7 @@
 
 ## Purpose
 <!-- MANUAL:BEGIN -->
-DFM RPC bridge routes create request files for remote data-engine DFM method sync, compare local and returned remote DFM JSON `last modified` timestamps, apply newer remote JSON locally, and finalize keeping local JSON without sending a `SyncDFM` request.
+DFM RPC bridge routes create request files for remote data-engine DFM method sync, compare local and returned remote DFM JSON `last modified` timestamps, apply newer remote JSON locally through an explicit component sync list, and finalize keeping local JSON without sending a `SyncDFM` request.
 <!-- MANUAL:END -->
 
 ## Entry Points
@@ -13,7 +13,7 @@ Routes:
 | --- | --- | --- |
 | `POST` | `/dfm/rpc-bridge/sync` | Write `Function = DFM` request, wait up to the requested timeout for remote DFM JSON, and return comparison metadata plus local/remote JSON snapshots. |
 | `POST` | `/dfm/rpc-bridge/compare` | Compare current local and remote DFM JSON file metadata without sending a request, returning the same snapshot fields. |
-| `POST` | `/dfm/rpc-bridge/apply` | Copy the remote DFM JSON over the local DFM JSON after `Update Local DFM`, return payload for frontend reload, and delete the remote RPC JSON. |
+| `POST` | `/dfm/rpc-bridge/apply` | Apply the remote DFM JSON over the local DFM JSON after `Update Local DFM` using the explicit component sync list, preserving local-only components such as labels and analysis snapshots, returning missing RPC component names for the UI result message, writing the merged method with the row-compact DFM method JSON formatter, return payload for frontend reload, and delete the remote RPC JSON. |
 | `POST` | `/dfm/rpc-bridge/keep-local` | Keep the local DFM JSON unchanged after `Keep Using Local` and delete the remote RPC JSON without writing a `SyncDFM` request. |
 | `POST` | `/dfm/rpc-bridge/update-remote` | Write `Function = SyncDFM` request, wait for the `SyncDFM...json` status response, return pass/fail message, and delete the stale remote RPC JSON. |
 <!-- MANUAL:END -->
@@ -33,7 +33,7 @@ Routes:
 - `Function = DFM` request files contain Details page fields plus `DataPath`, where `DataPath` points to the expected returned remote DFM method JSON under `projects/<project>/methods/RPC bridge`.
 - `Function = SyncDFM` request files contain the same Details page fields plus `DataPath`, where `DataPath` points to an expected `SyncDFM...json` status file.
 - `SyncDFM` status JSON must include fields that let the frontend report final result, for example `ok`, `status`, and `message`.
-- Compare responses include snapshots read from local and remote JSON files: `last modified`, ratio pattern dimensions/excluded count/full preview with `0`/`1`/`2` values preserved, preview `origin_labels` and `development_labels` for ratio-cell tooltips, average formula names, and notes preview.
+- Compare responses include snapshots read from canonical grouped local and remote DFM JSON files: `method metadata`.`last modified`, `ratio triangle`.`excluded` dimensions/excluded count/full preview with `0`/`1`/`2` values preserved, preview `origin_labels` and `development_labels` for ratio-cell tooltips, average formula names, and notes preview.
 <!-- MANUAL:END -->
 
 ## Data/State/Caches
@@ -41,6 +41,10 @@ Routes:
 - Local DFM method JSON path: `projects/<project>/methods/DFM@<ReservingClass>@<Name>.json`.
 - Remote DFM method JSON path: `projects/<project>/methods/RPC bridge/DFM@<ReservingClass>@<Name>@<OriginLength>@<DevelopmentLength>.json`.
 - Remote update status JSON path: `projects/<project>/methods/RPC bridge/SyncDFM@<ReservingClass>@<Name>@<OriginLength>@<DevelopmentLength>.json`.
+- Applying the remote version writes the canonical GUI-tab grouped DFM method JSON with the same row-compact layout used by normal DFM saves, so any 2D array remains one child row per JSON line, including `ratio triangle`.`excluded`, `average formulas`.`selected`, input data triangle values, `ratio triangle`.`ratio values`, `average formulas`.`values`, and extra or nested 2D arrays when present.
+- Applying the remote version is driven by an explicit component list matching the current grouped RPC JSON shape. Synced RPC components include Details fields, `ratio triangle`.`excluded`, average formula labels/settings/selected values, Results ratio-basis settings, notes, and `method metadata`.`last modified`.
+- Local-only or active-page-owned components are explicitly preserved when local values exist: Data-tab labels, Ratios-tab labels, input data triangle values, input data triangle CSV path, ratio values, and ultimate vector. `average formulas`.`values` merges by row so populated RPC rows update local values while empty RPC rows preserve local rows.
+- The apply response includes `sync_report.missing_components`; the frontend result dialog lists any required RPC component paths that were absent from the returned RPC JSON.
 - Request files are kept for audit/debug. Returned RPC bridge JSON files are deleted after the user completes the final action.
 <!-- MANUAL:END -->
 

@@ -1,0 +1,9 @@
+{
+  "type": "improvement",
+  "scope": "arcbot",
+  "audience": "user",
+  "summary": "Made grouped DFM method JSON the canonical format.",
+  "details": [
+    "DFM saves, loads, RPC bridge apply/compare, and ArcBot edit sessions now use the same GUI-tab grouped method JSON format, removing the temporary host flattening step before ArcBot edits are applied; average formula labels, custom average formula settings, selected, and values now live under one average formulas object, ratio triangle labels/excluded/values live under one ratio triangle object, Data-tab development labels use raw headers, and Ratios-tab development labels use GUI-display ratio headers with column indexes."
+  ]
+}

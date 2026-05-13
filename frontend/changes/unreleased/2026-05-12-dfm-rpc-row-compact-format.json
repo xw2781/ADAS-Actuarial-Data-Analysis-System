@@ -1,0 +1,9 @@
+{
+  "type": "fix",
+  "scope": "dfm",
+  "audience": "user",
+  "summary": "Kept DFM method JSON row-compact after applying the remote RPC bridge version.",
+  "details": [
+    "Selecting Use Remote Version now writes the canonical grouped DFM method JSON with the same row-compact formatter used by normal saves, so 2D arrays such as ratio triangle excluded, average formulas selected, analysis snapshots, and extra nested matrices do not expand to one value per line."
+  ]
+}

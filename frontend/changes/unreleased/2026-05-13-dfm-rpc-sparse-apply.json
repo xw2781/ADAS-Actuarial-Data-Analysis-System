@@ -1,0 +1,9 @@
+{
+  "type": "fix",
+  "scope": "dfm",
+  "audience": "user",
+  "summary": "Applied RPC bridge DFM JSON with an explicit component sync list.",
+  "details": [
+    "Selecting Use Remote Version now applies the returned RPC JSON using an explicit component list, preserves active-page/local-only components such as labels, triangle snapshots, CSV paths, ratio values, and ultimate vectors, merges average formula values by row, and shows missing RPC component names in the result dialog when expected components are absent."
+  ]
+}

@@ -43,11 +43,6 @@ export function getSummaryKeyBase() {
   return _storageInstanceId ? `${_storageInstanceId}::${base}` : base;
 }
 
-export function getSummaryOrderKey() {
-  const base = getSummaryKeyBase();
-  return base ? `arcrho_dfm_summary_order::${base}` : null;
-}
-
 export function getSummaryConfigKey() {
   const base = getSummaryKeyBase();
   return base ? `arcrho_dfm_summary_custom::${base}` : null;
@@ -63,18 +58,6 @@ export function getNaBorderKey() {
 }
 
 // --- Load functions ---
-
-export function loadSummaryOrder(key) {
-  if (!key) return null;
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
 
 export function loadCustomSummaryRows(key) {
   if (!key) return [];
@@ -97,13 +80,6 @@ export function loadNaBorders() {
 }
 
 // --- Save functions ---
-
-export function saveSummaryOrder(key, order) {
-  if (!key || !Array.isArray(order)) return;
-  try {
-    localStorage.setItem(key, JSON.stringify(order));
-  } catch {}
-}
 
 export function saveCustomSummaryRows(key, rows) {
   if (!key || !Array.isArray(rows)) return;

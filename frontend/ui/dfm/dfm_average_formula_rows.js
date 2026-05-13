@@ -14,12 +14,83 @@ function makeRowId(base, periods, exclude) {
   return `${base}_${periodPart}_ex_hi_lo${exclude > 1 ? `_x${exclude}` : ""}`;
 }
 
+const AVERAGE_FORMULA_SETTINGS_KEY = "custom average formula settings";
+
 function cloneSummaryRow(row) {
   const next = { ...(row || {}) };
   if (Array.isArray(row?.values)) next.values = row.values.slice();
   if (Array.isArray(row?.inputs)) next.inputs = row.inputs.slice();
   if (Array.isArray(row?.formulas)) next.formulas = row.formulas.slice();
   return next;
+}
+
+export function buildDfmAverageFormulaObject(summaryRows, matrix, values) {
+  const rows = Array.isArray(summaryRows) ? summaryRows : [];
+  const out = {
+    label: [],
+    [AVERAGE_FORMULA_SETTINGS_KEY]: {
+      averageType: [],
+      base: [],
+      periods: [],
+      exclude: [],
+    },
+  };
+  const settings = out[AVERAGE_FORMULA_SETTINGS_KEY];
+  rows.forEach((row) => {
+    out.label.push(normalizeLabel(row?.label || row?.id));
+    settings.averageType.push(row?.averageType ?? "");
+    settings.base.push(row?.base ?? "");
+    settings.periods.push(row?.periods ?? "");
+    settings.exclude.push(row?.exclude ?? 0);
+  });
+  if (Array.isArray(matrix)) out.selected = matrix;
+  if (Array.isArray(values)) out.values = values;
+  return out;
+}
+
+export function getDfmAverageFormulaLabels(averageFormulas) {
+  if (averageFormulas && typeof averageFormulas === "object" && Array.isArray(averageFormulas.label)) {
+    return averageFormulas.label;
+  }
+  return [];
+}
+
+export function getDfmAverageFormulaSelectedIndex(averageFormulas) {
+  if (averageFormulas && typeof averageFormulas === "object" && Array.isArray(averageFormulas.selected)) {
+    return averageFormulas.selected;
+  }
+  return [];
+}
+
+export function getDfmAverageFormulaValues(averageFormulas) {
+  if (averageFormulas && typeof averageFormulas === "object" && Array.isArray(averageFormulas.values)) {
+    return averageFormulas.values;
+  }
+  return [];
+}
+
+function getDfmAverageFormulaSettings(averageFormulas) {
+  const settings = averageFormulas?.[AVERAGE_FORMULA_SETTINGS_KEY];
+  return settings && typeof settings === "object" && !Array.isArray(settings) ? settings : {};
+}
+
+export function buildDfmSummaryRowsFromAverageFormulaObject(averageFormulas) {
+  if (!averageFormulas || typeof averageFormulas !== "object" || Array.isArray(averageFormulas)) return null;
+  const labels = getDfmAverageFormulaLabels(averageFormulas);
+  if (!labels.length) return null;
+  const settings = getDfmAverageFormulaSettings(averageFormulas);
+  return labels.map((label, index) => {
+    const normalized = normalizeLabel(label);
+    const inferred = resolveDfmAverageFormulaRowFromLabel(normalized) || {};
+    return {
+      ...inferred,
+      label: normalized,
+      averageType: settings.averageType?.[index] ?? inferred.averageType ?? "custom",
+      base: settings.base?.[index] ?? inferred.base ?? "",
+      periods: settings.periods?.[index] ?? inferred.periods ?? "all",
+      exclude: settings.exclude?.[index] ?? inferred.exclude ?? 0,
+    };
+  });
 }
 
 function indexRowsByLabel(rows) {
@@ -85,15 +156,6 @@ export function buildDfmSummaryRowsFromAverageFormulas(summaryRows, formulas) {
     usedLabels.add(labelKey);
     usedIds.add(rowId);
     if (!existing) inferred = true;
-  });
-
-  sourceRows.forEach((row) => {
-    const label = normalizeLabel(row?.label || row?.id);
-    const labelKey = label.toLowerCase();
-    const rowId = String(row?.id || "").trim();
-    if (!rowId || usedIds.has(rowId) || usedLabels.has(labelKey)) return;
-    rows.push(cloneSummaryRow(row));
-    usedIds.add(rowId);
   });
 
   return {

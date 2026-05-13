@@ -5,6 +5,7 @@ import getpass
 import json
 import os
 import re
+from copy import deepcopy
 from datetime import datetime
 from typing import Any, Dict, Iterable
 
@@ -17,10 +18,44 @@ from app_server.schemas.dfm_rpc_bridge import DfmRpcBridgeRequest
 RPC_BRIDGE_DIR_NAME = "RPC bridge"
 DFM_FUNCTION_NAME = "DFM"
 SYNC_DFM_FUNCTION_NAME = "SyncDFM"
+RPC_APPLY_COMPONENTS = [
+    ("sync", ("json format",)),
+    ("sync", ("details tab", "name")),
+    ("sync", ("details tab", "output type")),
+    ("sync", ("details tab", "input triangle")),
+    ("sync", ("details tab", "origin length")),
+    ("sync", ("details tab", "development length")),
+    ("sync", ("details tab", "decimal places")),
+    ("preserve-local", ("data tab", "origin labels")),
+    ("preserve-local", ("data tab", "development labels")),
+    ("preserve-local", ("data tab", "input data triangle values")),
+    ("preserve-local", ("data tab", "input data triangle csv path")),
+    ("preserve-local", ("ratios tab", "ratio triangle", "origin labels")),
+    ("preserve-local", ("ratios tab", "ratio triangle", "development labels")),
+    ("preserve-local", ("ratios tab", "ratio triangle", "ratio values")),
+    ("sync", ("ratios tab", "ratio triangle", "excluded")),
+    ("sync", ("ratios tab", "average formulas", "label")),
+    ("sync", ("ratios tab", "average formulas", "custom average formula settings", "averageType")),
+    ("sync", ("ratios tab", "average formulas", "custom average formula settings", "base")),
+    ("sync", ("ratios tab", "average formulas", "custom average formula settings", "periods")),
+    ("sync", ("ratios tab", "average formulas", "custom average formula settings", "exclude")),
+    ("sync", ("ratios tab", "average formulas", "selected")),
+    ("merge-row-values", ("ratios tab", "average formulas", "values")),
+    ("sync", ("results tab", "ratio basis dataset")),
+    ("sync", ("results tab", "ultimate ratio decimal places")),
+    ("preserve-local", ("results tab", "ultimate vector")),
+    ("sync", ("notes tab", "notes")),
+    ("sync", ("method metadata", "last modified")),
+]
 
 
 def _clean_text(value: Any) -> str:
     return str(value if value is not None else "").strip()
+
+
+def _json_tab(payload: Dict[str, Any], tab_name: str) -> Dict[str, Any]:
+    tab = payload.get(tab_name) if isinstance(payload, dict) else None
+    return tab if isinstance(tab, dict) else {}
 
 
 def _sanitize_project_dir_name(value: str) -> str:
@@ -174,7 +209,7 @@ def _json_last_modified_meta(path: str) -> Dict[str, Any]:
             "last_modified_timestamp": None,
             "last_modified_error": _clean_text(err.detail),
         }
-    raw = payload.get("last modified")
+    raw = _json_tab(payload, "method metadata").get("last modified")
     return {
         "last_modified": _clean_text(raw),
         "last_modified_timestamp": _parse_last_modified_timestamp(raw),
@@ -210,9 +245,16 @@ def _file_meta(path: str) -> Dict[str, Any]:
 
 
 def _extract_pattern_snapshot(payload: Dict[str, Any]) -> Dict[str, Any]:
-    pattern = payload.get("ratio pattern")
-    origin_labels = payload.get("origin labels")
-    development_labels = payload.get("development labels")
+    ratios_tab = _json_tab(payload, "ratios tab")
+    ratio_triangle = _json_tab(ratios_tab, "ratio triangle")
+    data_tab = _json_tab(payload, "data tab")
+    pattern = ratio_triangle.get("excluded")
+    origin_labels = ratio_triangle.get("origin labels")
+    if not isinstance(origin_labels, list):
+        origin_labels = data_tab.get("origin labels")
+    development_labels = ratio_triangle.get("development labels")
+    if not isinstance(development_labels, list):
+        development_labels = data_tab.get("development labels")
     preview_origin_labels = [
         _clean_text(label)
         for label in origin_labels
@@ -286,8 +328,9 @@ def _build_json_snapshot(path: str) -> Dict[str, Any]:
             "average_formulas": [],
             "last_modified": "",
         }
-    notes = _clean_text(payload.get("notes"))
-    formulas = payload.get("average formulas", [])
+    notes = _clean_text(_json_tab(payload, "notes tab").get("notes"))
+    formula_payload = _json_tab(payload, "ratios tab").get("average formulas", {})
+    formulas = formula_payload.get("label", []) if isinstance(formula_payload, dict) else []
     if not isinstance(formulas, list):
         formulas = []
     return {
@@ -297,7 +340,7 @@ def _build_json_snapshot(path: str) -> Dict[str, Any]:
         "notes": notes,
         "notes_preview": notes[:600],
         "average_formulas": [str(item) for item in formulas],
-        "last_modified": _clean_text(payload.get("last modified")),
+        "last_modified": _clean_text(_json_tab(payload, "method metadata").get("last modified")),
     }
 
 
@@ -369,13 +412,65 @@ def _read_json(path: str) -> Dict[str, Any]:
     return data
 
 
+def _format_json_value(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _format_row_array_lines(rows: list[Any], indent: str) -> str:
+    lines = []
+    for row in rows:
+        if not isinstance(row, list):
+            row = []
+        vals = ", ".join(_format_json_value(value) for value in row)
+        lines.append(f"{indent}[{vals}]")
+    return ",\n".join(lines)
+
+
+def _format_json_with_compact_row_arrays(value: Any, indent: str = "") -> str:
+    if _has_row_array(value):
+        if not value:
+            return "[]"
+        return "[\n" + _format_row_array_lines(value, f"{indent}  ") + f"\n{indent}]"
+    if isinstance(value, list):
+        if not value:
+            return "[]"
+        child_indent = f"{indent}  "
+        lines = []
+        for index, item in enumerate(value):
+            rendered = f"{child_indent}{_format_json_with_compact_row_arrays(item, child_indent)}"
+            lines.append(f"{rendered}," if index < len(value) - 1 else rendered)
+        return "[\n" + "\n".join(lines) + f"\n{indent}]"
+    if isinstance(value, dict):
+        if not value:
+            return "{}"
+        child_indent = f"{indent}  "
+        items = list(value.items())
+        lines = []
+        for index, (key, item) in enumerate(items):
+            rendered = (
+                f"{child_indent}{json.dumps(str(key), ensure_ascii=False)}: "
+                f"{_format_json_with_compact_row_arrays(item, child_indent)}"
+            )
+            lines.append(f"{rendered}," if index < len(items) - 1 else rendered)
+        return "{\n" + "\n".join(lines) + f"\n{indent}}}"
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _has_row_array(value: Any) -> bool:
+    return isinstance(value, list) and all(isinstance(row, list) for row in value)
+
+
+def _format_method_json_for_write(data: Dict[str, Any]) -> str:
+    text = _format_json_with_compact_row_arrays(data)
+    return text if text.endswith("\n") else f"{text}\n"
+
+
 def _atomic_write_json(path: str, data: Dict[str, Any]) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     temp_path = f"{path}.tmp"
     try:
         with open(temp_path, "w", encoding="utf-8", newline="\n") as fh:
-            json.dump(data, fh, indent=2, ensure_ascii=False)
-            fh.write("\n")
+            fh.write(_format_method_json_for_write(data))
         os.replace(temp_path, path)
     except PermissionError:
         _try_remove(temp_path)
@@ -385,11 +480,95 @@ def _atomic_write_json(path: str, data: Dict[str, Any]) -> None:
         raise HTTPException(500, f"Failed to write JSON file: {str(err)}")
 
 
+def _component_label(path: tuple[str, ...]) -> str:
+    return ".".join(path)
+
+
+def _has_component(payload: Dict[str, Any], path: tuple[str, ...]) -> bool:
+    current: Any = payload
+    for key in path:
+        if not isinstance(current, dict) or key not in current:
+            return False
+        current = current[key]
+    return True
+
+
+def _get_component(payload: Dict[str, Any], path: tuple[str, ...]) -> Any:
+    current: Any = payload
+    for key in path:
+        current = current[key]
+    return current
+
+
+def _set_component(payload: Dict[str, Any], path: tuple[str, ...], value: Any) -> None:
+    current: Any = payload
+    for key in path[:-1]:
+        child = current.get(key)
+        if not isinstance(child, dict):
+            child = {}
+            current[key] = child
+        current = child
+    current[path[-1]] = deepcopy(value)
+
+
+def _merge_row_values(local_value: Any, remote_value: Any) -> list[Any]:
+    if not isinstance(remote_value, list):
+        return []
+    if not isinstance(local_value, list):
+        return deepcopy(remote_value)
+    merged = []
+    length = max(len(local_value), len(remote_value))
+    for index in range(length):
+        remote_row = remote_value[index] if index < len(remote_value) else None
+        local_row = local_value[index] if index < len(local_value) else None
+        if remote_row in (None, [], {}):
+            if index < len(local_value):
+                merged.append(deepcopy(local_row))
+            else:
+                merged.append(deepcopy(remote_row))
+        else:
+            merged.append(deepcopy(remote_row))
+    return merged
+
+
+def _apply_explicit_rpc_components(local_payload: Dict[str, Any], remote_payload: Dict[str, Any]) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    payload: Dict[str, Any] = {}
+    missing_components = []
+
+    for action, path in RPC_APPLY_COMPONENTS:
+        remote_has_value = _has_component(remote_payload, path)
+        local_has_value = _has_component(local_payload, path)
+
+        if not remote_has_value:
+            missing_components.append(_component_label(path))
+            if local_has_value:
+                _set_component(payload, path, _get_component(local_payload, path))
+            continue
+
+        remote_value = _get_component(remote_payload, path)
+        if action == "preserve-local" and local_has_value:
+            _set_component(payload, path, _get_component(local_payload, path))
+            continue
+        if action == "merge-row-values":
+            local_value = _get_component(local_payload, path) if local_has_value else []
+            _set_component(payload, path, _merge_row_values(local_value, remote_value))
+            continue
+        _set_component(payload, path, remote_value)
+
+    report = {
+        "missing_components": missing_components,
+        "component_count": len(RPC_APPLY_COMPONENTS),
+    }
+    return payload, report
+
+
 def apply_remote_to_local(req: DfmRpcBridgeRequest) -> Dict[str, Any]:
     paths = build_paths(req)
     if not os.path.exists(paths["remote_path"]):
         raise HTTPException(404, "Remote DFM JSON is missing.")
-    payload = _read_json(paths["remote_path"])
+    remote_payload = _read_json(paths["remote_path"])
+    local_payload = _read_json(paths["local_path"]) if os.path.exists(paths["local_path"]) else {}
+    payload, sync_report = _apply_explicit_rpc_components(local_payload, remote_payload)
     _atomic_write_json(paths["local_path"], payload)
     deleted = _try_remove(paths["remote_path"])
     local_meta = _file_meta(paths["local_path"])
@@ -397,6 +576,7 @@ def apply_remote_to_local(req: DfmRpcBridgeRequest) -> Dict[str, Any]:
         "ok": True,
         "status": "applied",
         "payload": payload,
+        "sync_report": sync_report,
         "local": local_meta,
         "remote_deleted": deleted,
         "paths": paths,

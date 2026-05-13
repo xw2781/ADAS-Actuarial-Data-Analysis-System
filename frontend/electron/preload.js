@@ -44,7 +44,20 @@ contextBridge.exposeInMainWorld("ADAHost", {
   codexAssistantStatus: () => invoke("codex-assistant-status"),
   codexAssistantInstall: () => invoke("codex-assistant-install"),
   codexAssistantLogin: () => invoke("codex-assistant-login"),
+  codexAssistantListSessions: (payload) => invoke("codex-assistant-sessions-list", payload),
+  codexAssistantCreateSession: (payload) => invoke("codex-assistant-session-create", payload),
+  codexAssistantLoadSession: (sessionId) => invoke("codex-assistant-session-load", { sessionId }),
+  codexAssistantSaveSession: (session) => invoke("codex-assistant-session-save", { session }),
+  codexAssistantArchiveSession: (sessionId, archived = true) =>
+    invoke("codex-assistant-session-archive", { sessionId, archived }),
+  codexAssistantDeleteSession: (sessionId) => invoke("codex-assistant-session-delete", { sessionId }),
   codexAssistantSend: (payload) => invoke("codex-assistant-send", payload),
+  onCodexAssistantEvent: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("codex-assistant-event", listener);
+    return () => ipcRenderer.removeListener("codex-assistant-event", listener);
+  },
   clearCacheAndReload: () => invoke("app-clear-cache-reload"),
   focusWindow: () => invoke("focus-window"),
 });
