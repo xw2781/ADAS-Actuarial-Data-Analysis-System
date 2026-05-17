@@ -17,6 +17,8 @@ function updateNotebookTitleUI() {
   const title = getNotebookDisplayTitle();
   if (toolbarNotebookTitleEl) {
     toolbarNotebookTitleEl.textContent = title;
+    toolbarNotebookTitleEl.classList.toggle("dirty", notebookDirty);
+    toolbarNotebookTitleEl.title = notebookDirty ? `${title} has unsaved changes` : title;
   }
   try {
     window.parent?.postMessage({ type: "arcrho:update-active-tab-title", title }, "*");
@@ -78,8 +80,9 @@ function setNotebookDirty(nextDirty) {
   const dirty = !!nextDirty;
   if (notebookDirty === dirty) return;
   notebookDirty = dirty;
+  updateNotebookTitleUI();
   try {
-    window.parent?.postMessage({ type: "arcrho:scripting-dirty", dirty }, "*");
+    window.parent?.postMessage({ type: "arcrho:scripting-dirty", inst: scriptingTabInstanceId, dirty }, "*");
   } catch {}
 }
 
@@ -112,6 +115,78 @@ function buildIpynbSource(source) {
   return String(source || "").match(/[^\n]*\n|[^\n]+/g) || [];
 }
 
+function cloneJsonValue(value) {
+  if (value == null) return value;
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return null;
+  }
+}
+
+function normalizeIpynbOutputText(value) {
+  if (Array.isArray(value)) return value.map((part) => String(part ?? "")).join("");
+  if (value == null) return "";
+  return String(value);
+}
+
+function normalizeIpynbOutputData(data) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return {};
+  const normalized = {};
+  Object.entries(data).forEach(([key, value]) => {
+    const mimeKey = String(key || "").trim();
+    if (!mimeKey) return;
+    normalized[mimeKey] = cloneJsonValue(value);
+  });
+  return normalized;
+}
+
+function normalizeIpynbOutput(output) {
+  if (!output || typeof output !== "object" || Array.isArray(output)) return null;
+  const outputType = String(output.output_type || "").trim();
+  if (outputType === "stream") {
+    const name = String(output.name || "").toLowerCase() === "stderr" ? "stderr" : "stdout";
+    const text = normalizeIpynbOutputText(output.text);
+    return text ? { output_type: "stream", name, text } : null;
+  }
+  if (outputType === "error") {
+    const traceback = Array.isArray(output.traceback)
+      ? output.traceback.map((line) => String(line ?? ""))
+      : [];
+    return {
+      output_type: "error",
+      ename: String(output.ename || "Error"),
+      evalue: String(output.evalue || ""),
+      traceback,
+    };
+  }
+  if (outputType === "execute_result" || outputType === "display_data") {
+    const normalized = {
+      output_type: outputType,
+      data: normalizeIpynbOutputData(output.data),
+      metadata: (output.metadata && typeof output.metadata === "object" && !Array.isArray(output.metadata))
+        ? cloneJsonValue(output.metadata) || {}
+        : {},
+    };
+    if (outputType === "execute_result") {
+      normalized.execution_count = Number.isInteger(output.execution_count) ? output.execution_count : null;
+    }
+    return normalized;
+  }
+  return null;
+}
+
+function normalizeIpynbOutputs(outputs) {
+  if (!Array.isArray(outputs)) return [];
+  return outputs.map(normalizeIpynbOutput).filter(Boolean);
+}
+
+function buildStreamIpynbOutput(name, text) {
+  const value = normalizeIpynbOutputText(text);
+  if (!value) return null;
+  return { output_type: "stream", name: name === "stderr" ? "stderr" : "stdout", text: value };
+}
+
 function buildNotebookFileData() {
   const extension = getNotebookExtension(currentNotebookPath || currentNotebookFilename);
   const cellsPayload = getNotebookSavePayload();
@@ -127,8 +202,8 @@ function buildNotebookFileData() {
         source: buildIpynbSource(cell.source),
       };
       if (cellType === CELL_TYPES.CODE) {
-        entry.execution_count = null;
-        entry.outputs = [];
+        entry.execution_count = Number.isInteger(cell.execution_count) ? cell.execution_count : null;
+        entry.outputs = normalizeIpynbOutputs(cell.outputs);
       }
       return entry;
     }),
@@ -267,6 +342,10 @@ function getNotebookSavePayload() {
       type: normalizeCellType(c.type),
       source: c.editor ? c.editor.getValue() : "",
     };
+    if (normalizeCellType(c.type) === CELL_TYPES.CODE) {
+      entry.execution_count = Number.isInteger(c.executionCount) ? c.executionCount : null;
+      entry.outputs = normalizeIpynbOutputs(c.outputs);
+    }
     if (c.executionTimeMs != null) entry.execution_time_ms = Math.round(c.executionTimeMs);
     if (c.execStartTime) entry.exec_start_time = c.execStartTime instanceof Date ? c.execStartTime.toISOString() : c.execStartTime;
     if (c.execEndTime) entry.exec_end_time = c.execEndTime instanceof Date ? c.execEndTime.toISOString() : c.execEndTime;
@@ -457,6 +536,7 @@ function normalizeNotebookData(data, filename = "") {
       };
       if (entry.type === "code") {
         if (Number.isInteger(cell.execution_count)) entry.execution_count = cell.execution_count;
+        entry.outputs = normalizeIpynbOutputs(cell.outputs);
         const importOutput = convertImportedOutputs(cell.outputs);
         if (Object.keys(importOutput).length) entry.import_output = importOutput;
       }
@@ -714,10 +794,7 @@ async function ensureApiHelpLoaded() {
 
 function saveCellsToStorage() {
   try {
-    const payload = cells.map((c) => ({
-      type: normalizeCellType(c.type),
-      source: c.editor ? c.editor.getValue() : "",
-    }));
+    const payload = getNotebookSavePayload();
     localStorage.setItem(CELLS_STORAGE_KEY, JSON.stringify(payload));
   } catch {}
   updateNotebookDirtyState();
@@ -737,7 +814,20 @@ function parseStoredCells(raw) {
       const source = typeof entry.source === "string"
         ? entry.source
         : (typeof entry.code === "string" ? entry.code : "");
-      return { type: normalizeCellType(entry.type), source };
+      const normalized = { type: normalizeCellType(entry.type), source };
+      if (normalized.type === CELL_TYPES.CODE) {
+        if (Number.isInteger(entry.execution_count)) normalized.execution_count = entry.execution_count;
+        else if (Number.isInteger(entry.executionCount)) normalized.execution_count = entry.executionCount;
+        normalized.outputs = normalizeIpynbOutputs(entry.outputs);
+        const importOutput = entry.import_output && typeof entry.import_output === "object" && !Array.isArray(entry.import_output)
+          ? cloneJsonValue(entry.import_output)
+          : convertImportedOutputs(normalized.outputs);
+        if (importOutput && Object.keys(importOutput).length) normalized.import_output = importOutput;
+      }
+      if (typeof entry.execution_time_ms === "number") normalized.execution_time_ms = entry.execution_time_ms;
+      if (entry.exec_start_time) normalized.exec_start_time = entry.exec_start_time;
+      if (entry.exec_end_time) normalized.exec_end_time = entry.exec_end_time;
+      return normalized;
     }
     return { type: CELL_TYPES.CODE, source: "" };
   });

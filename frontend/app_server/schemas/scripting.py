@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from pydantic import BaseModel
 
@@ -15,7 +15,7 @@ class ScriptDeleteVarRequest(BaseModel):
 
 class ScriptNotebookSaveRequest(BaseModel):
     filename: str
-    cells: List[Dict[str, str]]
+    cells: List[Dict[str, Any]]
 
 
 class ScriptNotebookLoadRequest(BaseModel):

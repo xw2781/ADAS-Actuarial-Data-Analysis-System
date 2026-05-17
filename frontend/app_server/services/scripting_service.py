@@ -941,6 +941,78 @@ def _convert_outputs_for_import(outputs: Any) -> Dict[str, Any]:
     return result
 
 
+def _normalize_output_text(value: Any) -> str:
+    if isinstance(value, list):
+        return "".join(str(part) for part in value)
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _json_safe_value(value: Any) -> Any:
+    try:
+        json.dumps(value)
+        return value
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _normalize_output_data(data: Any) -> Dict[str, Any]:
+    if not isinstance(data, dict):
+        return {}
+    result: Dict[str, Any] = {}
+    for key, value in data.items():
+        mime_key = str(key or "").strip()
+        if not mime_key:
+            continue
+        result[mime_key] = _json_safe_value(value)
+    return result
+
+
+def _normalize_ipynb_output(output: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(output, dict):
+        return None
+    output_type = str(output.get("output_type", "")).strip()
+    if output_type == "stream":
+        name = "stderr" if str(output.get("name", "")).lower() == "stderr" else "stdout"
+        text = _normalize_output_text(output.get("text", ""))
+        if not text:
+            return None
+        return {"output_type": "stream", "name": name, "text": text}
+    if output_type == "error":
+        traceback = output.get("traceback")
+        if not isinstance(traceback, list):
+            traceback = []
+        return {
+            "output_type": "error",
+            "ename": str(output.get("ename", "Error")),
+            "evalue": str(output.get("evalue", "")),
+            "traceback": [str(line) for line in traceback],
+        }
+    if output_type in {"execute_result", "display_data"}:
+        result: Dict[str, Any] = {
+            "output_type": output_type,
+            "data": _normalize_output_data(output.get("data")),
+            "metadata": output.get("metadata") if isinstance(output.get("metadata"), dict) else {},
+        }
+        if output_type == "execute_result":
+            execution_count = output.get("execution_count")
+            result["execution_count"] = execution_count if isinstance(execution_count, int) else None
+        return result
+    return None
+
+
+def _normalize_ipynb_outputs(outputs: Any) -> List[Dict[str, Any]]:
+    if not isinstance(outputs, list):
+        return []
+    result: List[Dict[str, Any]] = []
+    for output in outputs:
+        normalized = _normalize_ipynb_output(output)
+        if normalized:
+            result.append(normalized)
+    return result
+
+
 def _to_ipynb_cell(cell: Dict[str, Any]) -> Dict[str, Any]:
     """Convert frontend cell payload to a v4 ipynb cell."""
     cell_type = _normalize_cell_type(cell.get("type"))
@@ -951,8 +1023,9 @@ def _to_ipynb_cell(cell: Dict[str, Any]) -> Dict[str, Any]:
         "source": _source_to_lines(source_text),
     }
     if cell_type == "code":
-        base["execution_count"] = None
-        base["outputs"] = []
+        execution_count = cell.get("execution_count")
+        base["execution_count"] = execution_count if isinstance(execution_count, int) else None
+        base["outputs"] = _normalize_ipynb_outputs(cell.get("outputs"))
     return base
 
 
@@ -968,7 +1041,9 @@ def _from_ipynb_cell(cell: Dict[str, Any]) -> Dict[str, Any]:
         execution_count = cell.get("execution_count")
         if isinstance(execution_count, int):
             frontend_cell["execution_count"] = execution_count
-        output_info = _convert_outputs_for_import(cell.get("outputs"))
+        outputs = _normalize_ipynb_outputs(cell.get("outputs"))
+        frontend_cell["outputs"] = outputs
+        output_info = _convert_outputs_for_import(outputs)
         if output_info:
             frontend_cell["import_output"] = output_info
     return frontend_cell
@@ -990,7 +1065,7 @@ def _load_arcnb_cells(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     return result
 
 
-def save_notebook(filename: str, cells: List[Dict[str, str]]) -> Dict[str, Any]:
+def save_notebook(filename: str, cells: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Save cells to a .ipynb notebook file."""
     try:
         filename = _normalize_save_filename(filename)

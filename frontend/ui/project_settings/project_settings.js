@@ -1258,8 +1258,21 @@ function createProjectNode(project, depth) {
   nameEl.textContent = project.name;
   nameEl.title = project.name;
 
+  const viewDatasetsBtn = document.createElement("button");
+  viewDatasetsBtn.type = "button";
+  viewDatasetsBtn.className = "tree-project-action";
+  viewDatasetsBtn.title = "View datasets";
+  viewDatasetsBtn.setAttribute("aria-label", `View datasets for ${project.name}`);
+  viewDatasetsBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M9 9v11"/><path d="M15 9v11"/></svg>`;
+  viewDatasetsBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openProjectInstanceTab(project);
+  });
+
   el.appendChild(iconEl);
   el.appendChild(nameEl);
+  el.appendChild(viewDatasetsBtn);
 
   el.addEventListener("click", () => {
     selectProject(project);
@@ -2229,6 +2242,19 @@ function openProjectInNewTab(project) {
   }, "*");
 
   setStatus(`Opening: ${project.name}`);
+}
+
+function openProjectInstanceTab(project) {
+  window.parent.postMessage({
+    type: "arcrho:open-project-instance",
+    project: {
+      name: project.name,
+      tablePath: project.tablePath,
+      folder: project.folder,
+    },
+  }, "*");
+
+  setStatus(`Opening datasets: ${project.name}`);
 }
 
 async function openProjectFolderInExplorer(project) {

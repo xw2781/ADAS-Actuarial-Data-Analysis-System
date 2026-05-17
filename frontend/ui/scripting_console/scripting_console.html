@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Scripting Console</title>
-  <link rel="stylesheet" href="/ui/shared/scrollbars.css?v=20260515a"/>
+  <link rel="stylesheet" href="/ui/shared/scrollbars.css?v=20260516a"/>
   <style>
     :root {
       --sc-cell-side-width: 49px;
@@ -45,6 +45,17 @@
       font-weight: 600;
       color: #333;
       margin-right: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .sc-toolbar-title.dirty::after {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #555;
+      flex: 0 0 auto;
     }
     .sc-btn {
       height: 26px;
@@ -1567,6 +1578,10 @@
             <tr>
               <td class="sc-shortcuts-action">Toggle code cell line numbers</td>
               <td><input class="sc-shortcuts-input" id="shortcutToggleLineNumbers" data-shortcut-id="toggleLineNumbers" readonly></td>
+            </tr>
+            <tr>
+              <td class="sc-shortcuts-action">Clear current cell output</td>
+              <td><input class="sc-shortcuts-input" id="shortcutClearCellOutput" data-shortcut-id="clearCellOutput" readonly></td>
             </tr>
             <tr>
               <td class="sc-shortcuts-action">Undo notebook change</td>

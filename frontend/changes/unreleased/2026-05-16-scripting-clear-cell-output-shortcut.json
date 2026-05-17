@@ -1,0 +1,6 @@
+{
+  "type": "improvement",
+  "scope": "scripting",
+  "audience": "user",
+  "summary": "Added a customizable scripting shortcut for clearing the current cell output, defaulting to Alt+C."
+}

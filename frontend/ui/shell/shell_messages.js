@@ -3,6 +3,11 @@ import { normalizeBrowsingHistoryEntry } from "/ui/shell/browsing_history.js";
 
 let shellMessagesWired = false;
 
+function refreshDirtyIndicators() {
+  shell.renderTabs?.();
+  shell.renderFloatingWindows?.();
+}
+
 export function initShellMessages() {
   if (shellMessagesWired) return;
   shellMessagesWired = true;
@@ -47,7 +52,7 @@ export function initShellMessages() {
         const tab = shell.state.tabs.find(t => t.type === "workflow" && t.wfInst === inst);
         if (!tab) return;
         tab.isDirty = false;
-        shell.renderTabs?.();
+        refreshDirtyIndicators();
       }
       const label = msg.source === "auto" ? "Auto-saved" : "Saved";
       shell.updateStatusBar?.(`${label}: ${path} (${shell.formatStatusTimestamp?.()})`);
@@ -63,7 +68,7 @@ export function initShellMessages() {
       if (tab.isDirty === dirty) return;
       tab.isDirty = dirty;
       if (dirty) shell.clearSavedStatusOnDirty?.();
-      shell.renderTabs?.();
+      refreshDirtyIndicators();
       shell.saveState?.();
       return;
     }
@@ -88,18 +93,21 @@ export function initShellMessages() {
       if (tab.isDirty === dirty) return;
       tab.isDirty = dirty;
       if (dirty) shell.clearSavedStatusOnDirty?.();
-      shell.renderTabs?.();
+      refreshDirtyIndicators();
       shell.saveState?.();
       return;
     }
     if (msg.type === "arcrho:scripting-dirty") {
-      const tab = shell.state.tabs.find(t => t.type === "scripting" && t.iframe?.contentWindow === e.source);
+      const inst = String(msg.inst || "").trim();
+      const tab = shell.state.tabs.find(t => t.type === "scripting" && (
+        (inst && t.scInst === inst) || t.iframe?.contentWindow === e.source
+      ));
       if (!tab) return;
       const dirty = !!msg.dirty;
       if (tab.isDirty === dirty) return;
       tab.isDirty = dirty;
       if (dirty) shell.clearSavedStatusOnDirty?.();
-      shell.renderTabs?.();
+      refreshDirtyIndicators();
       shell.saveState?.();
       return;
     }
@@ -138,6 +146,11 @@ export function initShellMessages() {
       return;
     }
     if (msg.type === "arcrho:open-dataset-from-history") { const entry = normalizeBrowsingHistoryEntry(msg?.entry || null); if (entry) shell.openDatasetTab?.({ datasetInputs: entry }); return; }
+    if (msg.type === "arcrho:open-project-instance") {
+      const project = msg?.project && typeof msg.project === "object" ? msg.project : {};
+      shell.openProjectInstanceTab?.(project);
+      return;
+    }
     if (msg.type === "arcrho:tooltip") {
       if (msg.show) {
         let x = Number(msg.x) || 0;
@@ -156,7 +169,7 @@ export function initShellMessages() {
     const title = String(msg.title || "").trim();
     if (!title) return;
     const tab = shell.state.tabs.find(t => t.id === shell.state.activeId);
-    if (!tab || tab.type === "home" || tab.type === "workflow" || tab.type === "project_settings" || tab.type === "browsing_history") return;
+    if (!tab || tab.type === "home" || tab.type === "workflow" || tab.type === "project_settings" || tab.type === "project_instance" || tab.type === "browsing_history") return;
     tab.title = title;
     shell.render?.();
     shell.saveState?.();

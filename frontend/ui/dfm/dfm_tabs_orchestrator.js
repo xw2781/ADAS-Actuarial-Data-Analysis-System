@@ -53,6 +53,25 @@ import {
 import { wireRatioSyncChannel, requestRatioStateSync } from "/ui/dfm/dfm_sync.js";
 import { wireDfmRpcBridgePathBar } from "/ui/dfm/dfm_rpc_bridge_pathbar.js?v=20260514a";
 
+const DEFAULT_TOKEN = "__DEFAULT__";
+
+function getDfmInputSnapshotSafe() {
+  try {
+    if (typeof window.ADA_GET_DFM_INPUTS === "function") {
+      return window.ADA_GET_DFM_INPUTS();
+    }
+  } catch {
+    // ignore
+  }
+  const project = document.getElementById("projectSelect")?.value?.trim() || "";
+  const reservingClass = document.getElementById("pathInput")?.value?.trim() || "";
+  return {
+    resolved: { project, reservingClass },
+    display: { project, reservingClass },
+    defaults: { projectDefault: false, reservingClassDefault: false },
+  };
+}
+
 function handleDatasetUpdated() {
   if (isRatiosTabVisible()) renderRatioTable();
   if (isResultsTabVisible()) renderResultsTable();
@@ -80,6 +99,7 @@ async function buildAssistantContext() {
   } catch (err) {
     activeJsonError = String(err?.message || err || "Could not build active DFM method payload.");
   }
+  const inputSnap = getDfmInputSnapshotSafe();
   return {
     available: true,
     pageType: "dfm",
@@ -91,8 +111,8 @@ async function buildAssistantContext() {
     activeJsonError,
     dirty: getDfmIsDirty(),
     fields: {
-      project: document.getElementById("projectSelect")?.value?.trim() || "",
-      reservingClass: document.getElementById("pathInput")?.value?.trim() || "",
+      project: inputSnap.resolved?.project || document.getElementById("projectSelect")?.value?.trim() || "",
+      reservingClass: inputSnap.resolved?.reservingClass || document.getElementById("pathInput")?.value?.trim() || "",
       methodName: document.getElementById("dfmMethodName")?.value?.trim() || "",
       outputVector: document.getElementById("dfmOutputVector")?.value?.trim() || "",
       inputTriangle: document.getElementById("triInput")?.value?.trim() || "",
@@ -195,11 +215,16 @@ export function initDfmRatios() {
   window.addEventListener("message", (e) => {
     /* Respond to workflow requesting DFM step settings for snapshot */
     if (e?.data?.type === "arcrho:get-dfm-settings") {
+      const inputSnap = getDfmInputSnapshotSafe();
       const settings = {
-        project: document.getElementById("projectSelect")?.value?.trim() || "",
-        reservingClass: document.getElementById("pathInput")?.value?.trim() || "",
+        project: inputSnap.defaults?.projectDefault
+          ? DEFAULT_TOKEN
+          : (inputSnap.resolved?.project || document.getElementById("projectSelect")?.value?.trim() || ""),
+        reservingClass: inputSnap.defaults?.reservingClassDefault
+          ? DEFAULT_TOKEN
+          : (inputSnap.resolved?.reservingClass || document.getElementById("pathInput")?.value?.trim() || ""),
         objectName: document.getElementById("dfmMethodName")?.value?.trim() || "",
-        outputType: document.getElementById("dfmOutputType")?.value?.trim() || "",
+        outputType: document.getElementById("dfmOutputVector")?.value?.trim() || "",
         originLen: document.getElementById("originLenSelect")?.value?.trim() || "",
         devLen: document.getElementById("devLenSelect")?.value?.trim() || "",
       };
@@ -208,13 +233,8 @@ export function initDfmRatios() {
     }
     /* Handle global control changes from workflow */
     if (e?.data?.type === "arcrho:workflow-global-changed") {
-      const vars = e.data.globalControl?.vars || [];
-      const proj = vars.find(v => v.key === "project")?.value || "";
-      const rc = vars.find(v => v.key === "reservingClass")?.value || "";
-      const projectInput = document.getElementById("projectSelect");
-      const pathInput = document.getElementById("pathInput");
-      if (proj && projectInput) projectInput.value = proj;
-      if (rc && pathInput) pathInput.value = rc;
+      const inputSnap = getDfmInputSnapshotSafe();
+      if (!inputSnap.defaults?.projectDefault && !inputSnap.defaults?.reservingClassDefault) return;
       syncMethodNameFromInputs();
       syncOutputTypeFromProject({ forceReload: true });
       updatePathBar();

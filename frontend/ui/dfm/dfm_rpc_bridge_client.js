@@ -1,6 +1,8 @@
 import {
   getDfmIsDirty,
   getEffectiveDevLabelsForModel,
+  getResolvedProjectName,
+  getResolvedReservingClass,
   markDfmDirty,
   getRatioHeaderLabels,
   state,
@@ -25,8 +27,8 @@ function numberValue(id, fallback) {
 
 function buildRequestPayload() {
   return {
-    project_name: textValue("projectSelect"),
-    reserving_class: textValue("pathInput"),
+    project_name: getResolvedProjectName() || textValue("projectSelect"),
+    reserving_class: getResolvedReservingClass() || textValue("pathInput"),
     method_name: textValue("dfmMethodName"),
     output_vector: textValue("dfmOutputVector"),
     input_triangle: textValue("triInput"),

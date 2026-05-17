@@ -1,4 +1,5 @@
 const STYLE_ID = "arcrho-path-tree-picker-style";
+const SHARED_SCROLLBAR_STYLE_ID = "arcrho-shared-scrollbar-style";
 const TREE_INDENT_PX = 10;
 const TREE_CHILDREN_INDENT_PX = 6;
 const TREE_LEAF_EXTRA_INDENT_PX = 12;
@@ -6,7 +7,21 @@ const WINDOW_FRAME_MARGIN_PX = 8;
 let activePicker = null;
 let activeFavoriteContextMenu = null;
 
+function ensureSharedScrollbarStyles(doc) {
+  if (!doc || doc.getElementById(SHARED_SCROLLBAR_STYLE_ID)) return;
+  const existing = Array.from(doc.querySelectorAll('link[rel="stylesheet"]')).some((link) =>
+    String(link.getAttribute("href") || "").includes("/ui/shared/scrollbars.css"),
+  );
+  if (existing) return;
+  const link = doc.createElement("link");
+  link.id = SHARED_SCROLLBAR_STYLE_ID;
+  link.rel = "stylesheet";
+  link.href = "/ui/shared/scrollbars.css?v=20260516a";
+  doc.head.appendChild(link);
+}
+
 function ensureStyles(doc) {
+  ensureSharedScrollbarStyles(doc);
   if (!doc || doc.getElementById(STYLE_ID)) return;
   const style = doc.createElement("style");
   style.id = STYLE_ID;
@@ -189,7 +204,6 @@ function ensureStyles(doc) {
       font-weight: 600;
       letter-spacing: 0;
       text-align: left;
-      text-transform: uppercase;
     }
     .ptree-section-title:hover {
       color: #555;
@@ -477,6 +491,14 @@ function ensureStyles(doc) {
       font-size: 13px;
       color: #222;
     }
+    .ptree-detail {
+      min-width: 0;
+      color: #8a8f98;
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .ptree-type-icon {
       width: 13px;
       height: 13px;
@@ -731,6 +753,21 @@ function normalizePickerNode(rawNode, options = {}, parentPath = "") {
     : children.length > 0;
   const valueTypeRaw = rawNode?.valueType ?? rawNode?.value_type ?? rawNode?.nodeType ?? rawNode?.node_type ?? "";
   const valueType = String(valueTypeRaw || "").trim().toLowerCase();
+  const displayDetail = String(
+    rawNode?.displayDetail
+    ?? rawNode?.display_detail
+    ?? rawNode?.detail
+    ?? rawNode?.subtitle
+    ?? "",
+  ).trim();
+  const selectValue = String(
+    rawNode?.selectValue
+    ?? rawNode?.select_value
+    ?? rawNode?.projectName
+    ?? rawNode?.project_name
+    ?? rawNode?.value
+    ?? "",
+  ).trim();
 
   return {
     name,
@@ -738,6 +775,8 @@ function normalizePickerNode(rawNode, options = {}, parentPath = "") {
     levelIndex,
     levelLabel,
     valueType,
+    displayDetail,
+    selectValue,
     hasChildren,
     children,
     _loaded: children.length > 0,
@@ -1122,6 +1161,12 @@ function renderNode(doc, node, depth, options, onSelect, context) {
     leafLabel.className = "ptree-label";
     leafLabel.textContent = String(currentNode?.name || "");
     leaf.appendChild(leafLabel);
+    if (currentNode?.displayDetail) {
+      const detail = doc.createElement("span");
+      detail.className = "ptree-detail";
+      detail.textContent = String(currentNode.displayDetail);
+      leaf.appendChild(detail);
+    }
     const tail = doc.createElement("span");
     tail.className = "ptree-leaf-tail";
     if (selectOnDoubleClick) {
@@ -1964,10 +2009,13 @@ export function openFloatingPathTreePicker(options = {}) {
   const renderFavoriteSection = () => {
     const favoriteItems = normalizeFavoriteItems(options, delimiter);
     const { folders, assignedPathKeys } = normalizeFavoriteFolders(options, favoriteItems, delimiter);
-    if (!favoriteItems.length && !options?.showFavoriteSection) return null;
+    const shortcutRootNodes = Array.isArray(options?.shortcutRootNodes)
+      ? options.shortcutRootNodes.map((node) => normalizePickerNode(node, options))
+      : [];
+    if (!favoriteItems.length && !shortcutRootNodes.length && !options?.showFavoriteSection) return null;
     const section = doc.createElement("div");
     section.className = "ptree-section ptree-section-favorites";
-    const favoriteHeader = appendCollapsibleSectionTitle(section, options?.favoriteSectionTitle || "Favorite", [{
+    const favoriteHeader = appendCollapsibleSectionTitle(section, options?.favoriteSectionTitle || "Shortcut", [{
       title: "Add Favorite Folder",
       onClick: () => {
         if (typeof options?.onCreateFavoriteFolder === "function") {
@@ -2086,11 +2134,56 @@ export function openFloatingPathTreePicker(options = {}) {
       }
       return row;
     };
+    const renderShortcutRootNode = (node) => {
+      const folderEl = doc.createElement("div");
+      folderEl.className = "ptree-favorite-folder collapsed";
+
+      const folderHeader = doc.createElement("div");
+      folderHeader.className = "ptree-favorite-folder-header";
+      const caret = doc.createElement("span");
+      caret.className = "ptree-favorite-folder-caret";
+      caret.setAttribute("aria-hidden", "true");
+      const icon = doc.createElement("span");
+      icon.className = "ptree-type-icon folder ptree-favorite-folder-icon";
+      icon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>';
+      const name = doc.createElement("span");
+      name.className = "ptree-favorite-folder-name";
+      name.textContent = node.name || "Current Workflow";
+      const count = doc.createElement("span");
+      count.className = "ptree-favorite-folder-count";
+      const children = Array.isArray(node.children) ? node.children : [];
+      count.textContent = String(children.length);
+
+      const folderList = doc.createElement("div");
+      folderList.className = "ptree-favorite-folder-list";
+      for (const child of children) {
+        folderList.appendChild(renderNode(doc, child, 0, options, onSelect, renderContext));
+      }
+      if (!folderList.childNodes.length) {
+        const empty = doc.createElement("div");
+        empty.className = "ptree-favorite-empty";
+        empty.textContent = "No workflow paths.";
+        folderList.appendChild(empty);
+      }
+
+      folderHeader.append(caret, icon, name, count);
+      folderHeader.addEventListener("click", (evt) => {
+        evt.preventDefault();
+        evt.stopPropagation();
+        folderEl.classList.toggle("collapsed");
+      });
+      folderEl.append(folderHeader, folderList);
+      return folderEl;
+    };
 
     setupDropTarget(list, null);
     setupDropTarget(favoriteHeader?.header, null);
 
-    if (!favoriteItems.length && !folders.length) {
+    for (const shortcutNode of shortcutRootNodes) {
+      list.appendChild(renderShortcutRootNode(shortcutNode));
+    }
+
+    if (!favoriteItems.length && !folders.length && !shortcutRootNodes.length) {
       const empty = doc.createElement("div");
       empty.className = "ptree-favorite-empty";
       empty.textContent = "Click the star beside a path in All Paths to add it here.";
@@ -2171,6 +2264,9 @@ export function openFloatingPathTreePicker(options = {}) {
       }
       if (Array.isArray(favoriteOptions.favoriteFolders)) {
         options.favoriteFolders = favoriteOptions.favoriteFolders;
+      }
+      if (Array.isArray(favoriteOptions.shortcutRootNodes)) {
+        options.shortcutRootNodes = favoriteOptions.shortcutRootNodes;
       }
       if (typeof favoriteOptions.showFavoriteSection === "boolean") {
         options.showFavoriteSection = favoriteOptions.showFavoriteSection;

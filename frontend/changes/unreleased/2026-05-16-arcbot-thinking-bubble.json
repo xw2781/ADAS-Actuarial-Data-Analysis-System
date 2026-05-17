@@ -1,0 +1,10 @@
+{
+  "type": "improvement",
+  "scope": "ui",
+  "audience": "user",
+  "summary": "Improve the ArcBot waiting message.",
+  "details": [
+    "Changed the temporary ArcBot response bubble from an ellipsis to `Thinking ...`.",
+    "Added subtle animated dots and a soft background sweep while ArcBot is waiting for the Codex response."
+  ]
+}

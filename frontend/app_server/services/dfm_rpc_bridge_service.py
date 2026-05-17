@@ -28,7 +28,6 @@ RPC_APPLY_COMPONENTS = [
     ("sync", ("details tab", "decimal places")),
     ("preserve-local", ("data tab", "origin labels")),
     ("preserve-local", ("data tab", "development labels")),
-    ("preserve-local", ("data tab", "input data triangle values")),
     ("preserve-local", ("data tab", "input data triangle csv path")),
     ("preserve-local", ("ratios tab", "ratio triangle", "origin labels")),
     ("preserve-local", ("ratios tab", "ratio triangle", "development labels")),
@@ -43,7 +42,7 @@ RPC_APPLY_COMPONENTS = [
     ("merge-row-values", ("ratios tab", "average formulas", "values")),
     ("sync", ("results tab", "ratio basis dataset")),
     ("sync", ("results tab", "ultimate ratio decimal places")),
-    ("preserve-local", ("results tab", "ultimate vector")),
+    ("preserve-local", ("results tab", "ultimate vector csv path")),
     ("sync", ("notes tab", "notes")),
     ("sync", ("method metadata", "last modified")),
 ]

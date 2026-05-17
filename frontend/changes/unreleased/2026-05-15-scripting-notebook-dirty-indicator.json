@@ -1,0 +1,10 @@
+{
+  "type": "fix",
+  "scope": "ui",
+  "audience": "user",
+  "summary": "Show notebook dirty state consistently on scripting tabs.",
+  "details": [
+    "Scripting notebooks now show an unsaved indicator beside the notebook title and update the shared shell tab dirty indicator using the scripting tab instance.",
+    "Dirty-state refresh now updates both docked tabs and floating tab titlebars."
+  ]
+}

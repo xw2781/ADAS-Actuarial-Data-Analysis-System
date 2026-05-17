@@ -1,0 +1,10 @@
+{
+  "type": "improvement",
+  "scope": "ui",
+  "audience": "user",
+  "summary": "Make ArcBot progress updates more descriptive.",
+  "details": [
+    "The ArcBot work card now shows user-facing live details about request reading, active app context, Codex work, validation, backup, and result handling instead of generic started/completed wording.",
+    "Raw host events and stdout/stderr remain available in the debug drawer."
+  ]
+}

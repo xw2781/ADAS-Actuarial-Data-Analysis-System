@@ -14,6 +14,7 @@ Frontend module map for page entrypoints, shell orchestration, and feature-speci
 | `ui/dfm/dfm.html` | - | 2 inline imports |
 | `ui/workflow/workflow.html` | 1 external script | - |
 | `ui/project_settings/project_settings.html` | 1 external script | - |
+| `ui/project_instance/project_instance.html` | 1 external script | - |
 | `ui/scripting_console/scripting_console.html` | 8 external scripts | - |
 <!-- AUTO-GEN:END -->
 

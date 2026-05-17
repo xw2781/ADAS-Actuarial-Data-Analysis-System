@@ -6,6 +6,8 @@ DFM Details Tab - method name, project selection, path bar, threshold reset
 import {
   getDfmInst,
   getDefaultMethodName,
+  getResolvedProjectName,
+  getResolvedReservingClass,
   markDfmDirty,
 } from "/ui/dfm/dfm_state.js";
 import { resetRatioChartThresholds } from "/ui/dfm/dfm_ratios_tab.js";
@@ -43,6 +45,25 @@ function sanitizeDfmMethodPathPart(value) {
     .replace(/[. ]+$/g, (match) => "^".repeat(match.length))
     .replace(/\s+/g, " ");
   return cleaned;
+}
+
+function getInputSnapshotSafe() {
+  try {
+    if (typeof window.ADA_GET_DFM_INPUTS === "function") {
+      return window.ADA_GET_DFM_INPUTS();
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function isProjectDefaultBound() {
+  return !!getInputSnapshotSafe()?.defaults?.projectDefault;
+}
+
+function isReservingClassDefaultBound() {
+  return !!getInputSnapshotSafe()?.defaults?.reservingClassDefault;
 }
 
 function parseCalculatedFlag(value) {
@@ -472,8 +493,9 @@ async function applyDfmProjectUserPreferences(projectName, options = {}) {
 }
 
 function saveLastReservingClassPathForCurrentProject() {
-  const project = toText(document.getElementById("projectSelect")?.value);
-  const path = toText(document.getElementById("pathInput")?.value);
+  if (isProjectDefaultBound() || isReservingClassDefaultBound()) return;
+  const project = toText(getResolvedProjectName());
+  const path = toText(getResolvedReservingClass());
   if (!project || !path) return;
   scheduleProjectUserPreferencesSave(project, {
     lastReservingClassPath: path,
@@ -481,7 +503,8 @@ function saveLastReservingClassPathForCurrentProject() {
 }
 
 function commitSelectedDfmProject(projectName, options = {}) {
-  const project = toText(projectName);
+  if (isProjectDefaultBound()) return;
+  const project = toText(projectName || getResolvedProjectName());
   if (!project) return;
   if (options?.applyPreferences !== false) {
     void applyDfmProjectUserPreferences(project, { replace: true });
@@ -580,7 +603,7 @@ function renderDfmMethodNameDropdown(names) {
 }
 
 async function syncOutputTypeForCurrentProject(options = {}) {
-  const projectName = toText(document.getElementById("projectSelect")?.value);
+  const projectName = toText(getResolvedProjectName());
   const input = document.getElementById("dfmOutputVector");
   if (!input) return;
   const wasFocusedAtStart = document.activeElement === input;
@@ -734,8 +757,8 @@ function wireDfmMethodNamePicker() {
   button.dataset.wired = "1";
 
   const openPicker = async (options = {}) => {
-    const projectName = toText(document.getElementById("projectSelect")?.value);
-    const pathValue = toText(document.getElementById("pathInput")?.value);
+    const projectName = toText(getResolvedProjectName());
+    const pathValue = toText(getResolvedReservingClass());
     if (!projectName) {
       closeDfmMethodNameDropdown();
       postDfmStatus("Select a project first.", { tone: "warn" });
@@ -809,10 +832,10 @@ function wireReservingClassPicker() {
     e.preventDefault();
     e.stopPropagation();
 
-    const projectName = document.getElementById("projectSelect")?.value?.trim() || "";
+    const projectName = toText(getResolvedProjectName());
     await openLazyReservingClassPicker({
       projectName,
-      initialPath: pathInput.value || "",
+      initialPath: toText(getResolvedReservingClass()) || pathInput.value || "",
       anchorElement: pathInput || null,
       onProjectMissing: (name) => {
         alert(`Project "${name}" does not exist.`);
@@ -855,7 +878,7 @@ function wireOutputTypePicker() {
   };
 
   const ensurePickerNames = async (options = {}) => {
-    const projectName = toText(document.getElementById("projectSelect")?.value);
+    const projectName = toText(getResolvedProjectName());
     if (!projectName) {
       resetPickerCache();
       return { projectName: "", names: [] };
@@ -877,7 +900,7 @@ function wireOutputTypePicker() {
   };
 
   const openPicker = async (options = {}) => {
-    const projectName = toText(document.getElementById("projectSelect")?.value);
+    const projectName = toText(getResolvedProjectName());
     if (!projectName) {
       closeOutputTypeDropdown();
       if (options?.alertOnProjectMissing) alert("Select a project first.");
@@ -919,7 +942,7 @@ function wireOutputTypePicker() {
   };
 
   const openWindowPicker = async () => {
-    const projectName = toText(document.getElementById("projectSelect")?.value);
+    const projectName = toText(getResolvedProjectName());
     closeOutputTypeDropdown();
     const out = await openDatasetNamePicker({
       projectName,
@@ -1038,7 +1061,7 @@ function wireTriangleTypePicker() {
   button.dataset.wired = "1";
 
   const openPicker = async () => {
-    const projectName = toText(document.getElementById("projectSelect")?.value);
+    const projectName = toText(getResolvedProjectName());
     closeTriangleTypeDropdown();
     const nativeDatasetDropdown = document.getElementById("datasetDropdown");
     nativeDatasetDropdown?.classList.remove("open");

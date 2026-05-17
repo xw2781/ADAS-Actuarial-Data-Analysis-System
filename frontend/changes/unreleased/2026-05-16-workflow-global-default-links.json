@@ -1,0 +1,16 @@
+{
+  "type": "improvement",
+  "scope": "workflow",
+  "audience": "user",
+  "summary": "Workflow Global Control defaults now link new Dataset and DFM objects to the workflow's default project and path.",
+  "details": [
+    "New workflows prefill Global Control from the user's last project and that project's saved path preference, with the built-in project variable labeled <Default Project>.",
+    "Global Control rows auto-save on edit and use a table right-click menu for row add/delete actions.",
+    "Global Control table type dropdowns now use in-cell styling and label miscellaneous values as Other.",
+    "Workflow Dataset and DFM pages show linked defaults as Default Project and Default Path while using the resolved values for loads and saves.",
+    "Project and path pickers opened inside a workflow now include Current Workflow shortcuts sourced from Global Control values.",
+    "Shared project and path picker windows now use ArcRho's app-wide scrollbar styling.",
+    "The workflow sidebar title now includes a pencil button for renaming the workflow.",
+    "Workflow steps can now be grouped into draggable folders with up to three nested folder levels."
+  ]
+}

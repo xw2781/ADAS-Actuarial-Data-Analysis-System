@@ -553,8 +553,38 @@ function renderToc() {
 function scrollToCell(cellId) {
   const cell = getCellById(cellId);
   if (!cell) return;
-  cell.cellEl.scrollIntoView({ behavior: "smooth", block: "center" });
+  scrollCellsAreaToCell(cell.cellEl, { behavior: "smooth", block: "center" });
   focusCell(cellId);
+}
+
+function scrollCellsAreaToCell(cellEl, options = {}) {
+  if (!cellsArea || !cellEl) return;
+
+  const areaRect = cellsArea.getBoundingClientRect();
+  const cellRect = cellEl.getBoundingClientRect();
+  const block = options.block || "nearest";
+  let targetTop = cellsArea.scrollTop + cellRect.top - areaRect.top;
+
+  if (block === "center") {
+    targetTop -= Math.max(0, (cellsArea.clientHeight - cellRect.height) / 2);
+  } else if (block === "end") {
+    targetTop -= Math.max(0, cellsArea.clientHeight - cellRect.height);
+  } else if (block === "nearest") {
+    const currentTop = cellsArea.scrollTop;
+    const currentBottom = currentTop + cellsArea.clientHeight;
+    const cellTop = cellsArea.scrollTop + cellRect.top - areaRect.top;
+    const cellBottom = cellTop + cellRect.height;
+    if (cellTop >= currentTop && cellBottom <= currentBottom) return;
+    targetTop = cellTop < currentTop
+      ? cellTop
+      : cellBottom - cellsArea.clientHeight;
+  }
+
+  const maxTop = Math.max(0, cellsArea.scrollHeight - cellsArea.clientHeight);
+  cellsArea.scrollTo({
+    top: clampNumber(targetTop, 0, maxTop),
+    behavior: options.behavior || "auto",
+  });
 }
 
 function refreshToc() {

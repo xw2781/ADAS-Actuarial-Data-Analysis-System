@@ -5,10 +5,11 @@
   "main": "electron/main.js",
   "scripts": {
     "electron": "electron .",
+    "build:python-api": "node-portable\\node.exe build/build_python_api_wheel.js",
     "build:python": "pyinstaller build/server.spec --distpath python_dist --workpath python_build --noconfirm",
     "build:electron": "node-portable\\node.exe build/patch_nsis_installer_progress.js && node-portable\\node.exe node_modules/electron-builder/cli.js --win",
-    "clean:python-artifacts": "node -e \"const fs=require('fs'); ['python_dist','python_build'].forEach((p)=>fs.rmSync(p,{recursive:true,force:true}));\"",
-    "build": "npm run build:python && npm run build:electron && npm run clean:python-artifacts"
+    "clean:python-artifacts": "node -e \"const fs=require('fs'); ['python_dist','python_build','build/python_packages'].forEach((p)=>fs.rmSync(p,{recursive:true,force:true}));\"",
+    "build": "npm run build:python-api && npm run build:python && npm run build:electron && npm run clean:python-artifacts"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
@@ -40,6 +41,10 @@
       {
         "from": "python_dist/arcrho_server",
         "to": "arcrho_server"
+      },
+      {
+        "from": "build/python_packages",
+        "to": "python_packages"
       }
     ],
     "win": {

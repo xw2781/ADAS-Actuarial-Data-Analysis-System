@@ -51,7 +51,7 @@ Detected `arcrho:*` message types in key JS files:
 - Uses `/project-user-preferences` to persist and restore the shared project-specific last Reserving Class path plus the Dataset Viewer Dataset Name in `projects/<project>/users/<windows-login>/preferences.json`.
 - Sends status/hotkey/close signals to parent shell.
 - Publishes dataset input updates and browsing-history updates to shell via `arcrho:dataset-settings-changed` and `arcrho:browsing-history-updated`.
-- Dataset/DFM shared styles import the reusable `ui/shared/scrollbars.css` WebKit scrollbar treatment that is also used by shell and scripting pages.
+- Dataset/DFM shared styles import the reusable 20px `ui/shared/scrollbars.css` WebKit scrollbar treatment that is also used by shell and scripting pages.
 <!-- MANUAL:END -->
 
 ## Data/State/Caches
@@ -72,6 +72,7 @@ Detected `arcrho:*` message types in key JS files:
 - When Origin Length changes, Development Length is automatically adjusted only if the current pair breaks the required relationship (`Origin Length >= Development Length` and `Origin Length = Development Length * integer`). Editing Development Length directly does not trigger this automatic rewrite.
 - New standalone Dataset tabs read the last selected Project Name from `%APPDATA%\ArcRho\local_project_prefs.json` first, then load that project's `lastReservingClassPath` and `datasetViewer.datasetName` from `projects/<project>/users/<windows-login>/preferences.json` to restore the last Reserving Class and Dataset Name for that project. The project tree picker also reads the same local preference file and shows a blue virtual `Recent Projects` folder above the real project folders with the last three picker-selected project names.
 - Stores the project-specific last Reserving Class under shared `lastReservingClassPath` and Dataset Name under `datasetViewer.datasetName`, then reuses them after a project is selected when no query/workflow values override the inputs.
+- Workflow-embedded Dataset pages can bind Project and Reserving Class inputs to Global Control defaults, displaying `Default Project (<project>)` and `Default Path (<path>)` while resolving backend requests to the current default values.
 - Persists last-viewed dataset inputs globally and restores them when opening a new Dataset tab.
 - Stores latest browsing history entries via `browsing_history.js` (project + reserving class + dataset).
 - Rejects invalid typed values on change/Enter and blocks ArcRhoTri requests until all 3 inputs are valid.

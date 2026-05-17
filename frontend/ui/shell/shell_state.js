@@ -63,6 +63,9 @@ export function loadState() {
       wfFresh: t.wfFresh,
       scInst: t.scInst || (t.type === "scripting" ? `sc_${t.id}` : undefined),
       scFresh: !!t.scFresh,
+      projectName: t.type === "project_instance" ? String(t.projectName || t.title || "").trim() : undefined,
+      projectFolder: t.type === "project_instance" ? String(t.projectFolder || "").trim() : undefined,
+      projectTablePath: t.type === "project_instance" ? String(t.projectTablePath || "").trim() : undefined,
       projectSettingsRibbon: t.type === "project_settings"
         ? (String(t.projectSettingsRibbon || "").trim().toLowerCase() || "summary")
         : undefined,
@@ -122,6 +125,9 @@ export function saveState() {
           wfFresh: t.wfFresh,
           scInst: t.scInst,
           scFresh: t.scFresh,
+          projectName: t.type === "project_instance" ? String(t.projectName || t.title || "").trim() : undefined,
+          projectFolder: t.type === "project_instance" ? String(t.projectFolder || "").trim() : undefined,
+          projectTablePath: t.type === "project_instance" ? String(t.projectTablePath || "").trim() : undefined,
           projectSettingsRibbon: t.type === "project_settings"
             ? String(t.projectSettingsRibbon || "").trim().toLowerCase()
             : undefined,

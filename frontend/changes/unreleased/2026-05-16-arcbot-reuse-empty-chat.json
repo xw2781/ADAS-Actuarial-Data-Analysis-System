@@ -1,0 +1,9 @@
+{
+  "type": "fix",
+  "scope": "ui",
+  "audience": "user",
+  "summary": "Reuse empty ArcBot chat sessions.",
+  "details": [
+    "Clicking New Chat now opens an existing empty non-archived ArcBot session instead of creating another blank chat."
+  ]
+}

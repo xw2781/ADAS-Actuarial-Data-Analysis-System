@@ -1,4 +1,5 @@
 import { closeFloatingPathTreePicker, openFloatingPathTreePicker } from "/ui/shared/path_tree_picker.js";
+import { buildWorkflowPathRootNode } from "/ui/shared/workflow_global_picker_options.js";
 
 const LOOKUP_MODEL_CACHE = new Map();
 const HIDDEN_PATHS_CACHE = new Map();
@@ -3118,8 +3119,54 @@ export async function openLazyReservingClassPicker(options = {}) {
   const hiddenAllMessage =
     toText(options?.hiddenAllMessage) || "All reserving class paths are hidden. Use right-click menu: Unhide All.";
   const anchorElement = options?.anchorElement || null;
+  const pickerTitle = toText(options?.title) || "Reserving Class";
+
+  const openWorkflowOnlyPathPicker = () => {
+    const workflowRootNode = buildWorkflowPathRootNode(options);
+    if (!workflowRootNode) return null;
+
+    closeReservingClassTreeNodeMenu("reopen");
+    closeHiddenPathsWindow("reopen");
+    closeReservingClassFilterWindow("reopen");
+    closeReservingClassPreferencesWindow("reopen");
+    closeFloatingPathTreePicker("reopen");
+
+    const picker = openFloatingPathTreePicker({
+      title: pickerTitle,
+      titleIcon: "hierarchy",
+      rootNodes: [],
+      shortcutRootNodes: [workflowRootNode],
+      delimiter: "\\",
+      initialPath: toText(options?.initialPath),
+      defaultExpandedDepth: Number.isInteger(options?.defaultExpandedDepth)
+        ? Number(options.defaultExpandedDepth)
+        : 1,
+      autoCloseOnSelect: true,
+      allowBranchSelect: false,
+      onSelect: (path, node) => {
+        closeReservingClassTreeNodeMenu("selected");
+        closeHiddenPathsWindow("selected");
+        closeReservingClassFilterWindow("selected");
+        closeReservingClassPreferencesWindow("selected");
+        if (onSelect) onSelect(toText(path), node);
+      },
+      onClose: (reason) => {
+        closeReservingClassTreeNodeMenu(reason || "tree_closed");
+        closeHiddenPathsWindow(reason || "tree_closed");
+        closeReservingClassFilterWindow(reason || "tree_closed");
+        closeReservingClassPreferencesWindow(reason || "tree_closed");
+        if (onClose) onClose(reason);
+      },
+    });
+    if (picker?.element && anchorElement) {
+      positionWindowBelowAnchor(window.document, picker.element, anchorElement, 8);
+    }
+    return picker || null;
+  };
 
   if (!projectName) {
+    const picker = openWorkflowOnlyPathPicker();
+    if (picker) return { ok: true, picker };
     setStatus(missingSelectionMessage);
     return { ok: false, reason: "missing_project" };
   }
@@ -3216,7 +3263,6 @@ export async function openLazyReservingClassPicker(options = {}) {
       model.setFavoriteFolders(treeFilterPreferences?.favoriteFolders || []);
     }
     const levelLabels = Array.isArray(model.levelLabels) ? model.levelLabels : [];
-    const pickerTitle = toText(options?.title) || "Reserving Class";
     const filterEmptyMessage =
       toText(options?.filterEmptyMessage) || "No reserving class paths match the selected filters.";
     let activePath = toText(options?.initialPath);
@@ -3526,8 +3572,9 @@ export async function openLazyReservingClassPicker(options = {}) {
 
     const openTreeWindow = (refreshOptions = {}) => {
       const rootChildrenRaw = model.getRootNodes();
+      const workflowRootNode = buildWorkflowPathRootNode(options);
       const rootChildren = filterHiddenNodes(rootChildrenRaw);
-      if (!rootChildren.length) {
+      if (!rootChildren.length && !workflowRootNode) {
         treeWindowElement = null;
         if (rootChildrenRaw.length && hiddenPathMap.size) {
           setStatus(hiddenAllMessage);
@@ -3559,9 +3606,10 @@ export async function openLazyReservingClassPicker(options = {}) {
         autoCloseOnSelect: !!treeFilterPreferences.autoCloseOnSelect,
         selectOnDoubleClick: !!treeFilterPreferences.selectOnDoubleClick,
         showFavoriteSection: true,
-        favoriteSectionTitle: "Favorite",
+        favoriteSectionTitle: "Shortcut",
         sourceSectionTitle: "All Paths",
         showSourceSectionTitle: true,
+        shortcutRootNodes: workflowRootNode ? [workflowRootNode] : [],
         ...getFavoriteRenderState(),
         getFavoriteState: (path) => {
           if (typeof model.isFavoritePath === "function" && model.isFavoritePath(path)) {

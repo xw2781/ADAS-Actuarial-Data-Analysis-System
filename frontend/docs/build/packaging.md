@@ -9,10 +9,11 @@ Document Electron + Python packaging inputs and scripts.
 <!-- AUTO-GEN:BEGIN build.packaging.entry_points -->
 | Script | Command |
 | --- | --- |
-| `npm run build` | `npm run build:python && npm run build:electron && npm run clean:python-artifacts` |
+| `npm run build` | `npm run build:python-api && npm run build:python && npm run build:electron && npm run clean:python-artifacts` |
 | `npm run build:electron` | `node-portable\node.exe build/patch_nsis_installer_progress.js && node-portable\node.exe node_modules/electron-builder/cli.js --win` |
 | `npm run build:python` | `pyinstaller build/server.spec --distpath python_dist --workpath python_build --noconfirm` |
-| `npm run clean:python-artifacts` | `node -e "const fs=require('fs'); ['python_dist','python_build'].forEach((p)=>fs.rmSync(p,{recursive:true,force:true}));"` |
+| `npm run build:python-api` | `node-portable\node.exe build/build_python_api_wheel.js` |
+| `npm run clean:python-artifacts` | `node -e "const fs=require('fs'); ['python_dist','python_build','build/python_packages'].forEach((p)=>fs.rmSync(p,{recursive:true,force:true}));"` |
 | `npm run electron` | `electron .` |
 
 Electron main entry: `electron/main.js`

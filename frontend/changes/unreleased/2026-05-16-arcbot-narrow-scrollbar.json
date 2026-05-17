@@ -1,0 +1,9 @@
+{
+  "type": "improvement",
+  "scope": "ui",
+  "audience": "user",
+  "summary": "Make ArcBot chat scrollbars narrower.",
+  "details": [
+    "The ArcBot panel now uses a 16px scrollbar, about 30% narrower than the shared app scrollbar, without changing Dataset, DFM, or scripting scrollbars."
+  ]
+}

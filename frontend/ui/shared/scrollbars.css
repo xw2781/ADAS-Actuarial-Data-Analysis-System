@@ -1,7 +1,7 @@
 /* Shared ArcRho scrollbar styling. Import this stylesheet in pages that should use the app scrollbar. */
 ::-webkit-scrollbar {
-  width: 23px;
-  height: 23px;
+  width: 20px;
+  height: 20px;
 }
 
 ::-webkit-scrollbar-track {

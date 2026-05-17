@@ -157,6 +157,7 @@ function updateCellIdleState(cell) {
   }
 
   if (!isRunnableCellType(cell.type)) {
+    cell.outputs = [];
     cell.outputEl.innerHTML = "";
     setCellOutputVisible(cell, false);
   }
@@ -241,6 +242,7 @@ function setCellType(cellId, cellType, options = {}) {
   cell.type = nextType;
   applyCellLayoutStructure(cell, nextType);
   cell.executionCount = null;
+  cell.outputs = [];
   setMarkdownRenderedState(cell, false);
   cell.outputEl.innerHTML = "";
   setCellOutputVisible(cell, false);
@@ -732,6 +734,7 @@ function addCell(
     sectionToggleBtn,
     sectionCodeCountBadge,
     executionCount: null,
+    outputs: [],
     executionTimeMs: null,
     execStartTime: null,
     execEndTime: null,

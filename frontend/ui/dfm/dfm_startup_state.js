@@ -2,6 +2,10 @@ import {
   loadProjectUserPreferences,
   scheduleProjectUserPreferencesSave,
 } from "/ui/shared/project_user_preferences.js";
+import {
+  getResolvedProjectName,
+  getResolvedReservingClass,
+} from "/ui/dfm/dfm_state.js";
 
 function textValue(id) {
   return String(document.getElementById(id)?.value || "").trim();
@@ -14,8 +18,8 @@ function numberValue(id, fallback) {
 
 export function getCurrentDfmObjectSnapshot() {
   return {
-    project: textValue("projectSelect"),
-    reservingClass: textValue("pathInput"),
+    project: getResolvedProjectName() || textValue("projectSelect"),
+    reservingClass: getResolvedReservingClass() || textValue("pathInput"),
     methodName: textValue("dfmMethodName"),
     outputVector: textValue("dfmOutputVector"),
     inputTriangle: textValue("triInput"),

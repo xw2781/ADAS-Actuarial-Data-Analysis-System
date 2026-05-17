@@ -531,6 +531,14 @@ function deleteFocusedCellWithGuard() {
   return true;
 }
 
+function clearFocusedCellOutput() {
+  const cell = getCommandTargetCell();
+  if (!cell) return false;
+  if (!clearCellOutput(cell)) return false;
+  setStatus("Cell output cleared");
+  return true;
+}
+
 function tryHandleDeleteCellDoubleTap(pressedShortcut) {
   if (pressedShortcut !== shortcutBindings.deleteCellDoubleTap) {
     resetPendingDeleteTap();
@@ -571,6 +579,10 @@ function handleGlobalShortcutKeydown(event) {
   if (pressed === shortcutBindings.toggleLineNumbers) {
     resetPendingDeleteTap();
     return toggleCodeCellLineNumbers();
+  }
+  if (pressed === shortcutBindings.clearCellOutput) {
+    resetPendingDeleteTap();
+    return clearFocusedCellOutput();
   }
 
   const targetCell = getCommandTargetCell();

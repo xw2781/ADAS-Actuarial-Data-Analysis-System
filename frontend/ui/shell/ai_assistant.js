@@ -13,10 +13,13 @@ let currentPendingMessageEl = null;
 let currentRunStartedAt = 0;
 let currentStepStartedAt = 0;
 let currentWorkCardEl = null;
+let assistantWorkCardExpanded = false;
 let assistantProgressSteps = [];
 let assistantProgressTicker = null;
 let latestSessionList = [];
 let assistantMode = "edit";
+let assistantModel = "codex";
+let assistantReasoningEffort = "high";
 const ASSISTANT_LAUNCHER_VISIBLE_KEY = "arcrho_ai_assistant_launcher_visible";
 const ASSISTANT_LAUNCHER_POSITION_KEY = "arcrho_ai_assistant_launcher_position";
 const ASSISTANT_PANEL_SIZE_KEY = "arcrho_ai_assistant_panel_size";
@@ -28,10 +31,27 @@ const ASSISTANT_ATTACHMENT_EXTENSIONS = [
   "js", "ts", "html", "css", "xml", "yaml", "yml", "toml", "ini", "log",
 ];
 const ASSISTANT_WORK_STEP_DEFS = [
-  { id: "understanding", label: "Understanding request" },
-  { id: "scanning", label: "Scanning app contents" },
-  { id: "executing", label: "Executing / modifying" },
-  { id: "finalizing", label: "Finalizing" },
+  { id: "understanding", label: "Request" },
+  { id: "scanning", label: "App context" },
+  { id: "executing", label: "Codex work" },
+  { id: "finalizing", label: "Result" },
+];
+const ASSISTANT_VISIBLE_WORK_STEP_IDS = new Set(["executing", "finalizing"]);
+const ASSISTANT_TYPING_FRAME_MS = 18;
+const ASSISTANT_TYPING_MAX_FRAMES = 220;
+const ASSISTANT_WORK_TYPING_FRAME_MS = 16;
+const ASSISTANT_WORK_TYPING_CHARS_PER_FRAME = 4;
+const ASSISTANT_MODEL_OPTIONS = [
+  { value: "codex", label: "Codex default" },
+  { value: "gpt-5.5", label: "GPT-5.5" },
+  { value: "gpt-5.4", label: "GPT-5.4" },
+  { value: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
+];
+const ASSISTANT_REASONING_OPTIONS = [
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+  { value: "xhigh", label: "Extra high" },
 ];
 let assistantReady = false;
 let assistantBusy = false;
@@ -41,6 +61,9 @@ let assistantAppContextEnabled = true;
 let assistantStatusChecked = false;
 let suppressLauncherClick = false;
 let assistantUserAvatarName = "ArcRho";
+let assistantAuthStatus = "";
+const assistantActivityTypingStates = new Map();
+let assistantActivityTypingTimer = null;
 
 function getAssistantBrandInitial(name) {
   const text = String(name || "").trim();
@@ -69,10 +92,36 @@ function setAssistantConnectionStatus(online, detail = "") {
   el.textContent = online ? "Online" : "Offline";
   el.setAttribute("aria-label", online ? "ArcBot online" : "ArcBot offline");
   el.title = detail || (online ? "ArcBot is online" : "ArcBot is offline");
+  updateAssistantSettingsPanel();
 }
 
 function setStatus(text, _tone = "") {
   setAssistantConnectionStatus(assistantReady, text);
+}
+
+function normalizeAssistantModel(model) {
+  const value = String(model || "codex").trim().toLowerCase();
+  return ASSISTANT_MODEL_OPTIONS.some((option) => option.value === value) ? value : "codex";
+}
+
+function normalizeAssistantReasoningEffort(effort) {
+  const value = String(effort || "high").trim().toLowerCase();
+  return ASSISTANT_REASONING_OPTIONS.some((option) => option.value === value) ? value : "high";
+}
+
+function getAssistantModelLabel(model = assistantModel) {
+  return ASSISTANT_MODEL_OPTIONS.find((option) => option.value === normalizeAssistantModel(model))?.label || "Codex default";
+}
+
+function getAssistantReasoningLabel(effort = assistantReasoningEffort) {
+  return ASSISTANT_REASONING_OPTIONS.find((option) => option.value === normalizeAssistantReasoningEffort(effort))?.label || "High";
+}
+
+function formatAssistantLoginDetail() {
+  const user = assistantUserAvatarName && assistantUserAvatarName !== "ArcRho" ? assistantUserAvatarName : "Unknown";
+  const auth = String(assistantAuthStatus || "").replace(/\s+/g, " ").trim();
+  if (!auth) return user;
+  return user === "Unknown" ? auth : `${user} - ${auth}`;
 }
 
 function setSetup({ open = false, text = "", install = false, login = false } = {}) {
@@ -92,13 +141,15 @@ function nowIso() {
 
 function normalizeMessages(messages) {
   if (!Array.isArray(messages)) return [];
-  return messages.map((message) => ({
-    role: String(message?.role || "").toLowerCase() === "assistant" ? "assistant"
-      : String(message?.role || "").toLowerCase() === "system" ? "system"
-      : "user",
-    content: String(message?.content || ""),
-    timestamp: String(message?.timestamp || nowIso()),
-  })).filter((message) => message.content.trim());
+  return messages.map((message) => {
+    const rawRole = String(message?.role || "").toLowerCase();
+    if (rawRole === "system") return null;
+    return {
+      role: rawRole === "assistant" ? "assistant" : "user",
+      content: String(message?.content || ""),
+      timestamp: String(message?.timestamp || nowIso()),
+    };
+  }).filter((message) => message?.content.trim());
 }
 
 function normalizeActivities(activities) {
@@ -106,6 +157,7 @@ function normalizeActivities(activities) {
   return activities.map((activity) => ({
     type: String(activity?.type || "info"),
     text: String(activity?.text || ""),
+    rawText: String(activity?.rawText || ""),
     elapsedMs: Number.isFinite(activity?.elapsedMs) ? Math.max(0, Math.round(activity.elapsedMs)) : null,
     timestamp: String(activity?.timestamp || nowIso()),
   })).filter((activity) => activity.text.trim()).slice(-120);
@@ -125,6 +177,8 @@ function getSessionPayload() {
     id: currentSessionId,
     title: currentSessionTitle,
     mode: assistantMode,
+    model: assistantModel,
+    reasoningEffort: assistantReasoningEffort,
     messages: assistantMessages,
     activities: assistantActivities,
     debugLogs: assistantDebugLogs,
@@ -153,11 +207,11 @@ function renderMessages() {
   if (!container) return;
   container.textContent = "";
   currentWorkCardEl = null;
+  assistantWorkCardExpanded = false;
   for (const message of assistantMessages) {
     appendMessage(message.role, message.content, { save: false });
   }
   renderActivities();
-  renderEmptyHint();
 }
 
 function formatElapsed(ms) {
@@ -166,11 +220,162 @@ function formatElapsed(ms) {
   return `${(value / 1000).toFixed(value < 10000 ? 1 : 0)}s`;
 }
 
+function formatWorkDuration(ms) {
+  const totalSeconds = Math.max(0, Math.round(Number(ms || 0) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
+function getAssistantContextTitle(context = currentContext) {
+  const title = String(context?.title || "").trim();
+  if (title) return title;
+  const tabType = String(context?.tabType || "").trim();
+  if (tabType && tabType !== "home") return tabType;
+  return "active app tab";
+}
+
+function getAssistantContextKind(context = currentContext) {
+  const tabType = String(context?.tabType || "").trim().toLowerCase();
+  if (tabType === "dfm") return "DFM page";
+  if (tabType === "dataset") return "Dataset Viewer";
+  if (tabType === "scripting") return "notebook";
+  if (tabType === "workflow") return "workflow";
+  if (tabType === "project_settings") return "Project Explorer";
+  if (tabType === "off") return "app context";
+  return tabType || "active app tab";
+}
+
+function getAssistantTargetKind(context = currentContext) {
+  const target = String(context?.targetPath || context?.path || "").trim().toLowerCase();
+  if (target.endsWith(".ipynb") || target.endsWith(".arcnb")) return "notebook file";
+  if (target.endsWith(".json")) return "JSON-backed app file";
+  if (context?.tabType === "dfm") return "DFM method data";
+  if (context?.tabType === "scripting") return "notebook data";
+  return "active app data";
+}
+
+function isAssistantDfmWork(context = currentContext) {
+  const tabType = String(context?.tabType || context?.pageType || "").trim().toLowerCase();
+  const title = String(context?.title || "").trim().toLowerCase();
+  const target = String(context?.targetPath || context?.path || "").trim().toLowerCase();
+  return tabType === "dfm" || title.includes("dfm") || /(^|[\\/])dfm@/i.test(target);
+}
+
+function formatAssistantContextScanStatus(context, fallback = "") {
+  if (context?.disabled) return "App Context is off, so Codex will use only the chat and attachments.";
+  if (!context?.available) return fallback || "No active app tab data was available for this request.";
+  return `Reading ${getAssistantContextKind(context)} context from "${getAssistantContextTitle(context)}".`;
+}
+
+function formatAssistantUsageStatus(usage) {
+  const tokens = Number(usage?.estimatedTokens || 0);
+  const percent = Number(usage?.contextPercentUsed || 0);
+  const parts = [];
+  if (tokens) parts.push(`about ${tokens.toLocaleString()} tokens${percent ? ` (${formatContextPercent(percent)} of window)` : ""}`);
+  if (Number(usage?.attachmentCount || 0)) parts.push(`${Number(usage.attachmentCount).toLocaleString()} attachment(s)`);
+  if (Number(usage?.activeJsonChars || 0)) parts.push("active page JSON");
+  if (usage?.truncated) parts.push("trimmed to fit");
+  return parts.length
+    ? `Packed ${parts.join(", ")} for Codex.`
+    : "Packed the chat request for Codex.";
+}
+
+function formatContextPercent(value) {
+  const percent = Math.max(0, Math.min(100, Number(value || 0)));
+  if (!Number.isFinite(percent)) return "0%";
+  if (percent > 0 && percent < 0.1) return "<0.1%";
+  return `${percent.toFixed(percent < 10 ? 1 : 0)}%`;
+}
+
+function formatTokenCount(value) {
+  const tokens = Math.max(0, Math.round(Number(value || 0)));
+  return tokens ? tokens.toLocaleString() : "0";
+}
+
+function getUsagePercent(usage) {
+  const explicit = Number(usage?.contextPercentUsed);
+  if (Number.isFinite(explicit) && explicit >= 0) return Math.min(100, explicit);
+  const used = Number(usage?.estimatedTokens || 0);
+  const windowTokens = Number(usage?.contextWindowTokens || 0);
+  if (!used || !windowTokens) return 0;
+  return Math.min(100, Math.max(0, (used / windowTokens) * 100));
+}
+
+function formatContextWindowUsage(usage) {
+  const used = Number(usage?.estimatedTokens || 0);
+  const windowTokens = Number(usage?.contextWindowTokens || 0);
+  if (!used || !windowTokens) return "Not measured yet";
+  return `${formatTokenCount(used)} / ${formatTokenCount(windowTokens)} tokens (${formatContextPercent(getUsagePercent(usage))})`;
+}
+
+function updateTokenUsageRing() {
+  const usageEl = $("aiAssistantTokenUsage");
+  const textEl = $("aiAssistantTokenUsageText");
+  const fillEl = usageEl?.querySelector?.(".aiAssistantTokenRingFill");
+  if (!usageEl || !textEl || !fillEl) return;
+  const usage = currentUsage || {};
+  const used = Math.max(0, Math.round(Number(usage.estimatedTokens || 0)));
+  const windowTokens = Math.max(0, Math.round(Number(usage.contextWindowTokens || 0)));
+  const percent = windowTokens ? getUsagePercent(usage) : 0;
+  const measured = !!windowTokens;
+  const tooltip = measured
+    ? `Context window\n${formatTokenCount(used)} / ${formatTokenCount(windowTokens)} tokens\n${formatContextPercent(percent)} used before auto compacting`
+    : "Context window usage\nNot measured yet.";
+  const ariaLabel = measured
+    ? `Context window usage: ${formatTokenCount(used)} / ${formatTokenCount(windowTokens)} tokens before auto compacting (${formatContextPercent(percent)}).`
+    : "Context window usage has not been measured yet.";
+  textEl.textContent = tooltip;
+  fillEl.setAttribute("stroke-dasharray", `${Math.min(100, Math.max(0, percent))} 100`);
+  usageEl.classList.toggle("not-measured", !measured);
+  usageEl.classList.toggle("high", measured && percent >= 75 && percent < 90);
+  usageEl.classList.toggle("critical", measured && percent >= 90);
+  usageEl.removeAttribute("title");
+  usageEl.setAttribute("aria-label", ariaLabel);
+}
+
+function formatAssistantActivityForCard(text, event = {}) {
+  const raw = String(text || "").trim();
+  const lower = raw.toLowerCase();
+  const modeLabel = getModeLabel();
+  const contextTitle = getAssistantContextTitle();
+  const contextKind = getAssistantContextKind();
+  const targetKind = getAssistantTargetKind();
+  if (!raw) return "";
+  const apiMatch = raw.match(/ArcBot is using the ArcRho Python API:\s*([^.\n]+)\.?/i) ||
+    raw.match(/"api method"\s*:\s*"([^"]+)"/i);
+  if (apiMatch) return `Using ArcRho Python API: ${apiMatch[1].trim()}.`;
+  if (lower.includes("checking latest arcbot edit history")) return "Looking up the latest ArcBot edit so it can be reverted safely.";
+  if (lower.includes("resolving arcbot project")) return "Preparing the local ArcBot workspace and checking the configured server root.";
+  if (lower.includes("checking active json")) return `Checking read/write access for the active ${targetKind}.`;
+  if (lower.includes("creating editable local json")) return `Creating a temporary editable copy of the active ${targetKind}.`;
+  if (lower.includes("context estimate")) return formatAssistantUsageStatus(event.usage || currentUsage);
+  if (lower.includes("starting warm codex session")) return `Sending the request to Codex in ${modeLabel} for "${contextTitle}".`;
+  if (lower.includes("warm codex session accepted")) return "Codex accepted the request and is starting the turn.";
+  if (lower.includes("warm codex session unavailable")) return "The warm Codex session was unavailable, so ArcBot is falling back to a one-shot CLI request.";
+  if (lower.includes("starting codex cli")) return "Starting Codex CLI with the prepared request context.";
+  if (lower.includes("codex is drafting")) return "Codex is writing the response.";
+  if (lower.includes("codex is running a command")) return `Codex is running a local check in the ArcBot workspace for the active ${contextKind}.`;
+  if (lower.includes("codex is searching")) return "Codex is searching for supporting context.";
+  if (lower.includes("codex is using a tool")) return `Codex is using a tool to inspect or validate the active ${targetKind}.`;
+  if (lower.includes("codex is preparing file changes")) return `Codex is preparing changes against the temporary ${targetKind} copy.`;
+  if (lower.includes("codex updated the task plan")) return "Codex updated its task plan before continuing.";
+  if (lower.includes("codex response received")) return "Codex finished drafting; ArcBot is checking whether a validated update needs to be applied.";
+  if (lower.includes("cleaned explanatory text")) return "ArcBot extracted the edited JSON from Codex's response and normalized the temp copy.";
+  if (lower.includes("validating and applying")) return "ArcBot is validating the temp copy, backing up the original, and applying the update.";
+  if (lower.includes("request canceled")) return "The request was canceled before completion.";
+  if (lower.includes("cancel requested")) return "Stopping the current Codex request.";
+  if (lower.includes("failed") || lower.includes("could not") || lower.includes("error:")) return raw;
+  return raw;
+}
+
 function createAssistantProgressSteps() {
   return ASSISTANT_WORK_STEP_DEFS.map((step) => ({
     ...step,
     state: "pending",
     status: "",
+    details: [],
     elapsedMs: 0,
     startedAt: 0,
   }));
@@ -178,6 +383,34 @@ function createAssistantProgressSteps() {
 
 function getAssistantProgressStepIndex(stepId) {
   return ASSISTANT_WORK_STEP_DEFS.findIndex((step) => step.id === stepId);
+}
+
+function normalizeAssistantProgressStatus(status) {
+  const text = String(status || "").trim();
+  if (!text) return "";
+  const lower = text.toLowerCase();
+  if (lower.includes("checking read/write access")) return "Checking whether the active page can be read and updated.";
+  if (lower.includes("creating a temporary editable copy")) return "Preparing a safe app-data working copy before changing anything.";
+  if (lower.includes("codex is preparing changes")) return "Preparing the requested app change.";
+  if (lower.includes("codex finished drafting")) return "Checking whether the response includes an app update.";
+  if (lower.includes("extracted the edited json")) return "Reading the proposed app-data update from the response.";
+  if (lower.includes("validating the temp copy")) return "Validating the update, saving a backup, and applying the change.";
+  if (lower.includes("applied json-backed edit")) return "Applied the requested app data change after validation.";
+  if (lower.includes("response completed")) return "Finished the response.";
+  if (lower.includes("request canceled")) return "Request canceled.";
+  return "";
+}
+
+function appendAssistantProgressDetail(step, status) {
+  if (!step) return "";
+  if (!isAssistantDfmWork()) return "";
+  const detail = normalizeAssistantProgressStatus(status);
+  if (!detail) return "";
+  if (!Array.isArray(step.details)) step.details = [];
+  if (step.details.at(-1) !== detail && !step.details.includes(detail)) {
+    step.details.push(detail);
+  }
+  return detail;
 }
 
 function finishAssistantProgressStep(step, state = "completed", status = "") {
@@ -188,7 +421,11 @@ function finishAssistantProgressStep(step, state = "completed", status = "") {
     step.startedAt = 0;
   }
   step.state = state;
-  if (status) step.status = status;
+  if (status) {
+    step.status = isAssistantDfmWork()
+      ? (appendAssistantProgressDetail(step, status) || normalizeAssistantProgressStatus(status) || step.status)
+      : String(status).trim();
+  }
 }
 
 function updateAssistantProgressStep(stepId, state = "active", status = "", options = {}) {
@@ -204,12 +441,15 @@ function updateAssistantProgressStep(stepId, state = "active", status = "", opti
     }
   });
   const step = assistantProgressSteps[index];
+  const displayStatus = isAssistantDfmWork()
+    ? appendAssistantProgressDetail(step, status)
+    : String(status || "").trim();
   if (state === "active") {
     if (step.state !== "active") step.startedAt = now;
     step.state = "active";
-    if (status) step.status = status;
+    if (displayStatus) step.status = displayStatus;
   } else {
-    finishAssistantProgressStep(step, state, status);
+    finishAssistantProgressStep(step, state, displayStatus || status);
   }
   if (options.render !== false) renderActivities();
 }
@@ -228,6 +468,7 @@ function completeAssistantProgress(status = "Completed") {
     const finalStatus = index === assistantProgressSteps.length - 1 ? status : "";
     if (step.state !== "failed") finishAssistantProgressStep(step, "completed", finalStatus);
   });
+  assistantWorkCardExpanded = false;
   renderActivities();
 }
 
@@ -237,12 +478,14 @@ function failAssistantProgress(status = "Request failed") {
     assistantProgressSteps.find((step) => step.state === "pending") ||
     assistantProgressSteps.at(-1);
   finishAssistantProgressStep(activeStep, "failed", status);
+  assistantWorkCardExpanded = false;
   renderActivities();
 }
 
 function classifyAssistantActivity(activity) {
-  const text = String(activity?.text || "");
-  const lower = text.toLowerCase();
+  const text = formatAssistantActivityForCard(activity?.rawText || activity?.text, activity) || String(activity?.text || "");
+  const raw = String(activity?.rawText || activity?.text || "");
+  const lower = `${text}\n${raw}`.toLowerCase();
   const type = String(activity?.type || "").toLowerCase();
   if (type === "error" || lower.includes("failed") || lower.includes("could not") || lower.includes("error:")) {
     return { stepId: "finalizing", state: "failed", status: text || "Request failed" };
@@ -250,7 +493,7 @@ function classifyAssistantActivity(activity) {
   if (lower.includes("request canceled") || lower.includes("cancel requested")) {
     return { stepId: "finalizing", state: "failed", status: text || "Request canceled" };
   }
-  if (lower.includes("request received") || lower.includes("understanding")) {
+  if (lower.includes("request received") || lower.includes("understanding") || lower.includes("reading your request")) {
     return { stepId: "understanding", state: "active", status: text || "Reading the request" };
   }
   if (
@@ -329,6 +572,17 @@ function stopAssistantProgressTicker() {
   assistantProgressTicker = null;
 }
 
+function stopAssistantActivityTypingTimer() {
+  if (!assistantActivityTypingTimer) return;
+  window.clearTimeout(assistantActivityTypingTimer);
+  assistantActivityTypingTimer = null;
+}
+
+function resetAssistantActivityTyping() {
+  assistantActivityTypingStates.clear();
+  stopAssistantActivityTypingTimer();
+}
+
 function appendDebugLog(text, type = "debug") {
   const raw = String(text || "").trim();
   if (!raw) return;
@@ -354,7 +608,8 @@ function appendActivity(text, type = "activity", options = {}) {
   if (currentRunStartedAt) currentStepStartedAt = now;
   const activity = {
     type,
-    text: String(text || "").trim(),
+    text: String(options.displayText || text || "").trim(),
+    rawText: String(text || "").trim(),
     elapsedMs: Math.round(Math.max(0, elapsedMs)),
     timestamp: nowIso(),
   };
@@ -366,24 +621,56 @@ function appendActivity(text, type = "activity", options = {}) {
   if (options.save !== false) saveCurrentSession();
 }
 
-function renderActivities() {
-  const legacyPanel = $("aiAssistantActivity");
-  if (legacyPanel) legacyPanel.classList.remove("open");
-  const container = $("aiAssistantMessages");
-  if (!container) return;
-  if (!assistantActivities.length && !currentRunStartedAt) {
-    currentWorkCardEl?.remove();
-    currentWorkCardEl = null;
-    return;
-  }
-  const steps = currentRunStartedAt
-    ? (assistantProgressSteps.length ? assistantProgressSteps : createAssistantProgressSteps())
-    : inferAssistantProgressSteps(assistantActivities);
+function shouldShowAssistantActivity(activity, text) {
+  const visible = String(text || "").trim();
+  if (!visible) return false;
+  const raw = String(activity?.rawText || activity?.text || "").trim();
+  const lower = `${visible}\n${raw}`.toLowerCase();
+  if (String(activity?.type || "").toLowerCase() === "error") return true;
+  if (lower.includes("using arcrho python api")) return true;
+  if (lower.includes("running command:") || lower.includes("codex is running a command")) return true;
+  if (lower.includes("reading file:") || lower.includes("editing file:")) return true;
+  if (lower.includes("checking read/write access")) return true;
+  if (lower.includes("temporary editable copy")) return true;
+  if (lower.includes("validating the temp copy")) return true;
+  if (lower.includes("extracted the edited json")) return true;
+  if (lower.includes("codex is using a tool")) return true;
+  if (lower.includes("codex is searching")) return true;
+  if (lower.includes("codex is drafting")) return true;
+  if (lower.includes("active dfm") || lower.includes("active notebook") || lower.includes("active dataset")) return true;
+  if (lower.includes("request canceled") || lower.includes("failed") || lower.includes("could not") || lower.includes("error:")) return true;
+  return false;
+}
 
-  if (!currentWorkCardEl || !currentWorkCardEl.isConnected) {
-    currentWorkCardEl = document.createElement("details");
-    currentWorkCardEl.className = "aiAssistantWorkCard";
-    currentWorkCardEl.open = !!currentRunStartedAt;
+function getAssistantActivityItems() {
+  const items = [];
+  for (const activity of assistantActivities) {
+    const text = formatAssistantActivityForCard(activity.rawText || activity.text, activity) || String(activity.text || "").trim();
+    if (!shouldShowAssistantActivity(activity, text)) continue;
+    const previous = items.at(-1);
+    if (previous?.text === text) continue;
+    items.push({
+      text,
+      type: activity.type || "activity",
+      elapsedMs: Number.isFinite(activity.elapsedMs) ? Math.max(0, activity.elapsedMs) : 0,
+      timestamp: activity.timestamp || "",
+    });
+  }
+  return items.slice(-18);
+}
+
+function getAssistantActivityElapsedMs() {
+  if (currentRunStartedAt) return Math.max(0, performance.now() - currentRunStartedAt);
+  return assistantActivities.reduce((sum, item) => (
+    sum + (Number.isFinite(item.elapsedMs) ? Math.max(0, item.elapsedMs) : 0)
+  ), 0);
+}
+
+function ensureAssistantWorkElement(container, isRunning) {
+  const desiredTag = isRunning ? "DIV" : "DETAILS";
+  if (!currentWorkCardEl || !currentWorkCardEl.isConnected || currentWorkCardEl.tagName !== desiredTag) {
+    currentWorkCardEl?.remove();
+    currentWorkCardEl = document.createElement(isRunning ? "div" : "details");
   }
   const pendingRow = currentPendingMessageEl?.closest?.(".aiAssistantMessageRow") || null;
   const assistantRows = [...container.querySelectorAll(".aiAssistantMessageRow.assistant")];
@@ -393,69 +680,137 @@ function renderActivities() {
   } else if (!currentWorkCardEl.parentNode) {
     container.appendChild(currentWorkCardEl);
   }
+  return currentWorkCardEl;
+}
 
-  const isRunning = !!currentRunStartedAt;
-  const totalMs = isRunning
-    ? performance.now() - currentRunStartedAt
-    : assistantActivities.reduce((sum, item) => (
-        sum + (Number.isFinite(item.elapsedMs) ? Math.max(0, item.elapsedMs) : 0)
-      ), 0);
-  const activeStep = steps.find((step) => step.state === "active");
-  const failedStep = steps.find((step) => step.state === "failed");
-  const completedSteps = steps.filter((step) => step.state === "completed").length;
-  currentWorkCardEl.classList.toggle("running", isRunning);
-  currentWorkCardEl.classList.toggle("failed", !!failedStep);
-  currentWorkCardEl.classList.toggle("complete", !isRunning);
-  if (isRunning) currentWorkCardEl.open = true;
-  else currentWorkCardEl.open = false;
+function getAssistantActivityTypingKey(item, index) {
+  return `${item.timestamp || index}:${item.type || "activity"}:${item.text}`;
+}
 
-  currentWorkCardEl.textContent = "";
-  const summary = document.createElement("summary");
-  const titleWrap = document.createElement("span");
-  titleWrap.className = "aiAssistantWorkTitleWrap";
-  const pulse = document.createElement("span");
-  pulse.className = "aiAssistantWorkPulse";
-  const title = document.createElement("span");
-  title.className = "aiAssistantWorkTitle";
-  title.textContent = failedStep ? "Needs attention" : isRunning ? "Working" : "Worked";
-  const subtitle = document.createElement("span");
-  subtitle.className = "aiAssistantWorkSubtitle";
-  subtitle.textContent = failedStep?.status || activeStep?.status || (isRunning ? "Waiting for the next update..." : "Task details collapsed.");
-  titleWrap.append(pulse, title, subtitle);
-  const meta = document.createElement("span");
-  meta.className = "aiAssistantWorkMeta";
-  meta.textContent = `${formatElapsed(totalMs)} - ${completedSteps}/${steps.length}`;
-  summary.append(titleWrap, meta);
-  currentWorkCardEl.appendChild(summary);
-
-  const list = document.createElement("div");
-  list.className = "aiAssistantWorkSteps";
-  for (const step of steps) {
-    const row = document.createElement("div");
-    row.className = `aiAssistantWorkStep ${step.state || "pending"}`;
-    const marker = document.createElement("span");
-    marker.className = "aiAssistantWorkStepMarker";
-    const body = document.createElement("span");
-    body.className = "aiAssistantWorkStepBody";
-    const label = document.createElement("span");
-    label.className = "aiAssistantWorkStepLabel";
-    label.textContent = step.label;
-    const status = document.createElement("span");
-    status.className = "aiAssistantWorkStepStatus";
-    status.textContent = step.status || (step.state === "active" ? "In progress..." : "");
-    const time = document.createElement("span");
-    time.className = "aiAssistantWorkStepTime";
-    const stepElapsed = getAssistantProgressElapsed(step);
-    time.textContent = stepElapsed ? formatElapsed(stepElapsed) : "";
-    body.append(label, status);
-    row.append(marker, body, time);
-    list.appendChild(row);
+function getAssistantActivityTypingState(item, index, enableTyping) {
+  if (!enableTyping) return { text: item.text, isTyping: false };
+  const key = getAssistantActivityTypingKey(item, index);
+  let state = assistantActivityTypingStates.get(key);
+  if (!state) {
+    state = { text: item.text, visibleChars: 0 };
+    assistantActivityTypingStates.set(key, state);
+  } else if (state.text !== item.text) {
+    state.text = item.text;
+    state.visibleChars = Math.min(state.visibleChars, item.text.length);
   }
-  currentWorkCardEl.appendChild(list);
+  const visibleChars = Math.min(state.visibleChars, state.text.length);
+  return {
+    text: state.text.slice(0, visibleChars),
+    isTyping: visibleChars < state.text.length,
+    key,
+  };
+}
+
+function scheduleAssistantActivityTyping(keysInUse) {
+  if (!currentRunStartedAt) {
+    resetAssistantActivityTyping();
+    return;
+  }
+  for (const key of assistantActivityTypingStates.keys()) {
+    if (!keysInUse.has(key)) assistantActivityTypingStates.delete(key);
+  }
+  const hasPending = [...assistantActivityTypingStates.values()].some((state) => (
+    state.visibleChars < state.text.length
+  ));
+  if (!hasPending || assistantActivityTypingTimer) return;
+  assistantActivityTypingTimer = window.setTimeout(() => {
+    assistantActivityTypingTimer = null;
+    for (const state of assistantActivityTypingStates.values()) {
+      if (state.visibleChars < state.text.length) {
+        state.visibleChars = Math.min(
+          state.text.length,
+          state.visibleChars + ASSISTANT_WORK_TYPING_CHARS_PER_FRAME,
+        );
+      }
+    }
+    renderActivities();
+  }, ASSISTANT_WORK_TYPING_FRAME_MS);
+}
+
+function createAssistantActivityList(items, options = {}) {
+  const list = document.createElement("ul");
+  list.className = "aiAssistantWorkList";
+  const typingKeys = new Set();
+  const enableTyping = !!options.typing;
+  items.forEach((item, index) => {
+    const typingState = getAssistantActivityTypingState(item, index, enableTyping);
+    if (typingState.key) typingKeys.add(typingState.key);
+    const bullet = document.createElement("li");
+    bullet.className = [
+      item.type === "error" ? "error" : "",
+      typingState.isTyping ? "typing" : "",
+    ].filter(Boolean).join(" ");
+    bullet.setAttribute("aria-label", item.text);
+    if (typingState.isTyping && !typingState.text) {
+      bullet.appendChild(document.createTextNode("\u00a0"));
+    } else if (typingState.isTyping) {
+      bullet.appendChild(document.createTextNode(typingState.text));
+    } else {
+      appendAssistantInlineMarkdown(bullet, item.text);
+    }
+    list.appendChild(bullet);
+  });
+  if (enableTyping) scheduleAssistantActivityTyping(typingKeys);
+  return list;
+}
+
+function renderActivities() {
+  const legacyPanel = $("aiAssistantActivity");
+  if (legacyPanel) legacyPanel.classList.remove("open");
+  const container = $("aiAssistantMessages");
+  if (!container) return;
+  const isRunning = !!currentRunStartedAt;
+  const activityItems = getAssistantActivityItems();
+  if (!activityItems.length && !isRunning) {
+    currentWorkCardEl?.remove();
+    currentWorkCardEl = null;
+    resetAssistantActivityTyping();
+    return;
+  }
+  if (!isRunning) resetAssistantActivityTyping();
+  const totalMs = getAssistantActivityElapsedMs();
+  const workEl = ensureAssistantWorkElement(container, isRunning);
+  workEl.textContent = "";
+  if (isRunning) {
+    workEl.className = "aiAssistantWorkLog running";
+    workEl.appendChild(createAssistantActivityList(activityItems, { typing: true }));
+  } else {
+    const hasError = activityItems.some((item) => item.type === "error" || /failed|could not|error|canceled/i.test(item.text));
+    workEl.className = `aiAssistantWorkArchive${hasError ? " failed" : ""}`;
+    workEl.open = assistantWorkCardExpanded;
+    const summary = document.createElement("summary");
+    workEl.ontoggle = () => {
+      assistantWorkCardExpanded = workEl.open;
+      if (workEl.open) {
+        window.requestAnimationFrame(() => {
+          scrollMessagesToBottom();
+        });
+      }
+    };
+    const title = document.createElement("span");
+    title.className = "aiAssistantWorkArchiveTitle";
+    title.textContent = hasError ? `Stopped after ${formatWorkDuration(totalMs)}` : `Worked for ${formatWorkDuration(totalMs)}`;
+    const meta = document.createElement("span");
+    meta.className = "aiAssistantWorkArchiveMeta";
+    meta.textContent = `${activityItems.length} update${activityItems.length === 1 ? "" : "s"}`;
+    summary.append(title, meta);
+    workEl.appendChild(summary);
+    const body = document.createElement("div");
+    body.className = "aiAssistantWorkArchiveBody";
+    body.appendChild(createAssistantActivityList(activityItems));
+    workEl.appendChild(body);
+  }
   scrollMessagesToBottom();
 }
 
 function updateContextPanel() {
+  updateTokenUsageRing();
+  updateAssistantSettingsPanel();
   const panel = $("aiAssistantContextPanel");
   if (!panel) return;
   const context = currentContext || {};
@@ -465,10 +820,23 @@ function updateContextPanel() {
     ["Tab", context.title || context.tabType || "No active tab context"],
     ["Type", context.tabType || "home"],
     ["File", context.targetPath || context.path || "No active JSON-backed file"],
-    ["Context", usage.promptChars ? `${Number(usage.promptChars).toLocaleString()} chars, ~${Number(usage.estimatedTokens || 0).toLocaleString()} tokens` : "Not measured yet"],
+    ["Context Window", formatContextWindowUsage(usage)],
+    ["Prompt Size", usage.promptChars ? `${Number(usage.promptChars).toLocaleString()} chars, ~${formatTokenCount(usage.estimatedTokens)} tokens` : "Not measured yet"],
     ["Included", usage.includedMessages != null ? `${usage.includedMessages} messages${usage.truncated ? ", truncated" : ""}` : "Not measured yet"],
   ];
   panel.textContent = "";
+  if (usage.contextWindowTokens && usage.estimatedTokens) {
+    const meter = document.createElement("div");
+    meter.className = "aiAssistantContextMeter";
+    const meterFill = document.createElement("div");
+    meterFill.className = "aiAssistantContextMeterFill";
+    meterFill.style.width = `${Math.min(100, Math.max(0, getUsagePercent(usage)))}%`;
+    meter.appendChild(meterFill);
+    const meterText = document.createElement("div");
+    meterText.className = "aiAssistantContextMeterText";
+    meterText.textContent = `Estimated context used: ${formatContextPercent(getUsagePercent(usage))}`;
+    panel.append(meter, meterText);
+  }
   const grid = document.createElement("div");
   grid.className = "aiAssistantContextGrid";
   for (const [label, value] of rows) {
@@ -482,6 +850,71 @@ function updateContextPanel() {
     grid.append(labelEl, valueEl);
   }
   panel.appendChild(grid);
+}
+
+function setAssistantModel(model, options = {}) {
+  assistantModel = normalizeAssistantModel(model);
+  const select = $("aiAssistantSettingsModelSelect");
+  if (select) select.value = assistantModel;
+  updateAssistantSettingsPanel();
+  if (options.save !== false) saveCurrentSession();
+}
+
+function setAssistantReasoningEffort(effort, options = {}) {
+  assistantReasoningEffort = normalizeAssistantReasoningEffort(effort);
+  const select = $("aiAssistantSettingsReasoningSelect");
+  if (select) select.value = assistantReasoningEffort;
+  updateAssistantSettingsPanel();
+  if (options.save !== false) saveCurrentSession();
+}
+
+function updateAssistantSettingsPanel() {
+  const panel = $("aiAssistantSettingsPanel");
+  if (!panel) return;
+  const modelSelect = $("aiAssistantSettingsModelSelect");
+  const reasoningSelect = $("aiAssistantSettingsReasoningSelect");
+  if (modelSelect) {
+    modelSelect.value = assistantModel;
+    modelSelect.disabled = assistantBusy;
+  }
+  if (reasoningSelect) {
+    reasoningSelect.value = assistantReasoningEffort;
+    reasoningSelect.disabled = assistantBusy;
+  }
+  const rows = [
+    ["session", currentSessionTitle || currentSessionId || "New ArcBot Chat"],
+    ["model", getAssistantModelLabel()],
+    ["reasoning", getAssistantReasoningLabel()],
+    ["tokens", formatContextWindowUsage(currentUsage || {})],
+    ["status", assistantReady ? "Online" : "Offline"],
+    ["login", formatAssistantLoginDetail()],
+  ];
+  for (const [key, value] of rows) {
+    const node = panel.querySelector(`[data-ai-settings-detail="${key}"]`);
+    if (node) {
+      node.textContent = String(value);
+      node.title = String(value);
+    }
+  }
+}
+
+function closeAssistantSettingsPanel() {
+  $("aiAssistantSettingsPanel")?.classList.remove("open");
+  $("aiAssistantSettingsBtn")?.setAttribute("aria-expanded", "false");
+}
+
+function toggleAssistantSettingsPanel(forceOpen) {
+  const panel = $("aiAssistantSettingsPanel");
+  const button = $("aiAssistantSettingsBtn");
+  if (!panel || !button) return;
+  const open = forceOpen == null ? !panel.classList.contains("open") : !!forceOpen;
+  panel.classList.toggle("open", open);
+  button.setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) {
+    $("aiAssistantDebugPanel")?.classList.remove("open");
+    $("aiAssistantDebugBtn")?.setAttribute("aria-expanded", "false");
+    updateAssistantSettingsPanel();
+  }
 }
 
 function renderAssistantAttachments() {
@@ -709,14 +1142,18 @@ async function loadAssistantSession(sessionId) {
   currentSessionId = session.id || "";
   currentSessionTitle = session.title || "ArcBot Chat";
   assistantMode = session.mode === "review" ? "review" : "edit";
+  assistantModel = normalizeAssistantModel(session.model);
+  assistantReasoningEffort = normalizeAssistantReasoningEffort(session.reasoningEffort);
   assistantMessages = normalizeMessages(session.messages);
   assistantActivities = normalizeActivities(session.activities);
+  resetAssistantActivityTyping();
   assistantDebugLogs = normalizeDebugLogs(session.debugLogs);
   currentContext = session.context || null;
   currentUsage = session.usage || null;
   setAssistantMode(assistantMode, { save: false });
   renderMessages();
   renderActivities();
+  updateAssistantSettingsPanel();
   renderDebugLog();
   await refreshSessionList(currentSessionId);
   updateSessionSelectLabel();
@@ -726,22 +1163,55 @@ async function loadAssistantSession(sessionId) {
 async function createAssistantSession() {
   const host = getHostApi();
   if (!host?.codexAssistantCreateSession) return false;
-  const result = await host.codexAssistantCreateSession({ mode: assistantMode });
+  const result = await host.codexAssistantCreateSession({
+    mode: assistantMode,
+    model: assistantModel,
+    reasoningEffort: assistantReasoningEffort,
+  });
   if (!result?.ok || !result.session) return false;
   currentSessionId = result.session.id;
   currentSessionTitle = result.session.title || "New ArcBot Chat";
+  assistantModel = normalizeAssistantModel(result.session.model);
+  assistantReasoningEffort = normalizeAssistantReasoningEffort(result.session.reasoningEffort);
   assistantMessages = [];
   assistantActivities = [];
+  resetAssistantActivityTyping();
   assistantDebugLogs = [];
   currentContext = null;
   currentUsage = null;
   refreshAppContextTooltip();
   renderMessages();
   renderActivities();
+  updateAssistantSettingsPanel();
   renderDebugLog();
   await refreshSessionList(currentSessionId);
   updateSessionSelectLabel();
   return true;
+}
+
+function findEmptyAssistantSession(sessions) {
+  return (Array.isArray(sessions) ? sessions : []).find((session) => (
+    session?.id &&
+    session.archived !== true &&
+    Number(session.messageCount || 0) === 0
+  )) || null;
+}
+
+async function openOrCreateEmptyAssistantSession() {
+  const sessions = await refreshSessionList(currentSessionId);
+  const emptySession = findEmptyAssistantSession(sessions);
+  if (emptySession) {
+    if (emptySession.id !== currentSessionId) {
+      await loadAssistantSession(emptySession.id);
+      return { ok: true, created: false, alreadyCurrent: false };
+    }
+    renderMessages();
+    renderActivities();
+    updateSessionSelectLabel();
+    return { ok: true, created: false, alreadyCurrent: true };
+  }
+  const created = await createAssistantSession();
+  return { ok: created, created: true, alreadyCurrent: false };
 }
 
 async function ensureAssistantSession() {
@@ -759,6 +1229,30 @@ function formatSessionDate(value) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function getAssistantHistoryIcon(action) {
+  if (action === "archive") {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M6 7v12h12V7"></path><path d="M9 11h6"></path></svg>';
+  }
+  if (action === "restore") {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M6 7v12h12V7"></path><path d="M12 16V10"></path><path d="M9 13l3-3 3 3"></path></svg>';
+  }
+  if (action === "delete") {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14"></path><path d="M9 7V5h6v2"></path><path d="M8 10l1 9h6l1-9"></path><path d="M10.5 12.5v4"></path><path d="M13.5 12.5v4"></path></svg>';
+  }
+  return "";
+}
+
+function createAssistantHistoryIconButton(action, label, onClick) {
+  const button = document.createElement("button");
+  button.className = `aiAssistantHistoryIconBtn${action === "delete" ? " danger" : ""}`;
+  button.type = "button";
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  button.innerHTML = getAssistantHistoryIcon(action);
+  button.addEventListener("click", onClick);
+  return button;
 }
 
 async function refreshHistoryPage() {
@@ -779,33 +1273,36 @@ async function refreshHistoryPage() {
     const row = document.createElement("div");
     row.className = `aiAssistantHistoryRow${session.archived ? " archived" : ""}`;
     const info = document.createElement("div");
+    info.className = "aiAssistantHistoryInfo";
+    info.tabIndex = 0;
+    info.setAttribute("role", "button");
+    info.setAttribute("aria-label", `Open ${session.title || "ArcBot Chat"}`);
     const name = document.createElement("div");
     name.className = "aiAssistantHistoryName";
     name.textContent = session.title || "ArcBot Chat";
+    name.title = session.title || "ArcBot Chat";
     const meta = document.createElement("div");
     meta.className = "aiAssistantHistoryMeta";
     const updated = formatSessionDate(session.updatedAt);
-    meta.textContent = `${session.messageCount || 0} messages${updated ? ` · ${updated}` : ""}${session.archived ? " · Archived" : ""}`;
+    meta.textContent = `${session.messageCount || 0} messages${updated ? ` - ${updated}` : ""}${session.archived ? " - Archived" : ""}`;
     info.append(name, meta);
-
-    const actions = document.createElement("div");
-    actions.className = "aiAssistantHistoryActions";
-    const openBtn = document.createElement("button");
-    openBtn.className = "aiAssistantMiniBtn";
-    openBtn.type = "button";
-    openBtn.textContent = "Open";
-    openBtn.addEventListener("click", async () => {
+    const openSession = async () => {
       if (session.archived && host.codexAssistantArchiveSession) {
         await host.codexAssistantArchiveSession(session.id, false);
       }
       await loadAssistantSession(session.id);
       await closeHistoryPage();
+    };
+    info.addEventListener("click", openSession);
+    info.addEventListener("keydown", async (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      await openSession();
     });
-    const archiveBtn = document.createElement("button");
-    archiveBtn.className = "aiAssistantMiniBtn";
-    archiveBtn.type = "button";
-    archiveBtn.textContent = session.archived ? "Restore" : "Archive";
-    archiveBtn.addEventListener("click", async () => {
+
+    const actions = document.createElement("div");
+    actions.className = "aiAssistantHistoryActions";
+    const archiveBtn = createAssistantHistoryIconButton(session.archived ? "restore" : "archive", session.archived ? "Restore chat" : "Archive chat", async () => {
       if (!host.codexAssistantArchiveSession) return;
       await host.codexAssistantArchiveSession(session.id, !session.archived);
       if (session.id === currentSessionId && !session.archived) {
@@ -814,11 +1311,7 @@ async function refreshHistoryPage() {
       await refreshSessionList(currentSessionId);
       await refreshHistoryPage();
     });
-    const deleteBtn = document.createElement("button");
-    deleteBtn.className = "aiAssistantMiniBtn";
-    deleteBtn.type = "button";
-    deleteBtn.textContent = "Delete";
-    deleteBtn.addEventListener("click", async () => {
+    const deleteBtn = createAssistantHistoryIconButton("delete", "Delete chat", async () => {
       if (!host.codexAssistantDeleteSession) return;
       const confirmed = window.confirm(`Delete this ArcBot chat session?\n\n${session.title || "ArcBot Chat"}`);
       if (!confirmed) return;
@@ -829,7 +1322,7 @@ async function refreshHistoryPage() {
       await refreshSessionList(currentSessionId);
       await refreshHistoryPage();
     });
-    actions.append(openBtn, archiveBtn, deleteBtn);
+    actions.append(archiveBtn, deleteBtn);
     row.append(info, actions);
     list.appendChild(row);
   }
@@ -837,6 +1330,7 @@ async function refreshHistoryPage() {
 
 async function openHistoryPage() {
   const panel = $("aiAssistantPanel");
+  closeAssistantSettingsPanel();
   panel?.classList.add("history-open");
   $("aiAssistantHistoryPage")?.classList.add("open");
   $("aiAssistantHistoryBtn")?.setAttribute("aria-expanded", "true");
@@ -901,6 +1395,7 @@ function setAssistantMode(mode, options = {}) {
   $("aiAssistantReviewModeOption")?.classList.toggle("active", assistantMode === "review");
   $("aiAssistantEditModeOption")?.classList.toggle("active", assistantMode === "edit");
   setStatus(assistantReady ? `Codex ready. ${getModeLabel()}.` : `${getModeLabel()} selected.`);
+  updateAssistantSettingsPanel();
   if (!assistantMessages.length) renderMessages();
   if (options.save !== false) saveCurrentSession();
 }
@@ -917,6 +1412,7 @@ function setComposerEnabled(enabled) {
     sendBtn.setAttribute("aria-label", isCancel ? "Cancel request" : "Send");
     sendBtn.title = isCancel ? "Cancel request" : "Send";
   }
+  updateAssistantSettingsPanel();
 }
 
 function autoGrowAssistantInput() {
@@ -938,6 +1434,7 @@ async function loadAssistantUserAvatarName() {
     document.querySelectorAll(".aiAssistantAvatarUser").forEach((avatar) => {
       avatar.innerHTML = createAssistantUserAvatarSvg(assistantUserAvatarName);
     });
+    updateAssistantSettingsPanel();
   } catch {
     // Keep the default initial avatar if the host name is unavailable.
   }
@@ -963,26 +1460,144 @@ function getMessageAvatar(role) {
   return avatar;
 }
 
+function appendAssistantInlineMarkdown(parent, text) {
+  const raw = String(text || "");
+  const pattern = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+  let lastIndex = 0;
+  for (const match of raw.matchAll(pattern)) {
+    if (match.index > lastIndex) parent.appendChild(document.createTextNode(raw.slice(lastIndex, match.index)));
+    const token = match[0];
+    const el = token.startsWith("**") ? document.createElement("strong") : document.createElement("code");
+    el.textContent = token.startsWith("**") ? token.slice(2, -2) : token.slice(1, -1);
+    parent.appendChild(el);
+    lastIndex = match.index + token.length;
+  }
+  if (lastIndex < raw.length) parent.appendChild(document.createTextNode(raw.slice(lastIndex)));
+}
+
+function flushAssistantMarkdownList(container, listState) {
+  if (!listState.items.length) return;
+  const list = document.createElement(listState.ordered ? "ol" : "ul");
+  for (const itemText of listState.items) {
+    const item = document.createElement("li");
+    appendAssistantInlineMarkdown(item, itemText);
+    list.appendChild(item);
+  }
+  container.appendChild(list);
+  listState.items = [];
+  listState.ordered = false;
+}
+
+function renderAssistantMarkdown(el, text) {
+  if (!el) return;
+  const raw = String(text || "");
+  el.textContent = "";
+  el.classList.toggle("rich", true);
+  const lines = raw.split(/\r?\n/);
+  const listState = { items: [], ordered: false };
+  let inCodeBlock = false;
+  let codeLines = [];
+  const flushCodeBlock = () => {
+    if (!codeLines.length) return;
+    const pre = document.createElement("pre");
+    const code = document.createElement("code");
+    code.textContent = codeLines.join("\n");
+    pre.appendChild(code);
+    el.appendChild(pre);
+    codeLines = [];
+  };
+  for (const line of lines) {
+    if (/^\s*```/.test(line)) {
+      flushAssistantMarkdownList(el, listState);
+      if (inCodeBlock) flushCodeBlock();
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+    if (inCodeBlock) {
+      codeLines.push(line);
+      continue;
+    }
+    if (!line.trim()) {
+      flushAssistantMarkdownList(el, listState);
+      continue;
+    }
+    const bullet = line.match(/^\s*[-*]\s+(.+)$/);
+    const ordered = line.match(/^\s*\d+[.)]\s+(.+)$/);
+    if (bullet || ordered) {
+      const isOrdered = !!ordered;
+      if (listState.items.length && listState.ordered !== isOrdered) flushAssistantMarkdownList(el, listState);
+      listState.ordered = isOrdered;
+      listState.items.push((bullet || ordered)[1]);
+      continue;
+    }
+    flushAssistantMarkdownList(el, listState);
+    const paragraph = document.createElement("p");
+    appendAssistantInlineMarkdown(paragraph, line);
+    el.appendChild(paragraph);
+  }
+  flushAssistantMarkdownList(el, listState);
+  if (inCodeBlock || codeLines.length) flushCodeBlock();
+  if (!el.childNodes.length) el.textContent = raw;
+}
+
+function renderAssistantMessageContent(el, role, text) {
+  if (!el) return;
+  if (role === "assistant") {
+    renderAssistantMarkdown(el, text);
+    return;
+  }
+  el.classList.remove("rich");
+  el.textContent = text || "";
+}
+
+function prefersReducedAssistantMotion() {
+  return !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+}
+
+async function typeAssistantMessage(el, text) {
+  if (!el) return;
+  const fullText = String(text || "");
+  el.classList.remove("thinking");
+  el.classList.add("typing");
+  if (prefersReducedAssistantMotion() || fullText.length < 48) {
+    renderAssistantMarkdown(el, fullText);
+    el.classList.remove("typing");
+    return;
+  }
+  const step = Math.max(2, Math.ceil(fullText.length / ASSISTANT_TYPING_MAX_FRAMES));
+  for (let index = step; index < fullText.length; index += step) {
+    renderAssistantMarkdown(el, fullText.slice(0, index));
+    scrollMessagesToBottom();
+    await new Promise((resolve) => window.setTimeout(resolve, ASSISTANT_TYPING_FRAME_MS));
+  }
+  renderAssistantMarkdown(el, fullText);
+  el.classList.remove("typing");
+}
+
 function appendMessage(role, text) {
   const container = $("aiAssistantMessages");
   if (!container) return null;
-  const normalizedRole = role === "assistant" ? "assistant" : role === "system" ? "system" : "user";
+  const normalizedRole = role === "assistant" ? "assistant" : "user";
   const el = document.createElement("div");
   el.className = `aiAssistantMessage ${normalizedRole}`;
-  el.textContent = text || "";
-  if (normalizedRole === "system") {
-    const row = document.createElement("div");
-    row.className = "aiAssistantMessageRow system";
-    row.appendChild(el);
-    container.appendChild(row);
-  } else {
-    const row = document.createElement("div");
-    row.className = `aiAssistantMessageRow ${normalizedRole}`;
-    row.append(getMessageAvatar(normalizedRole), el);
-    container.appendChild(row);
-  }
+  renderAssistantMessageContent(el, normalizedRole, text);
+  const row = document.createElement("div");
+  row.className = `aiAssistantMessageRow ${normalizedRole}`;
+  row.append(getMessageAvatar(normalizedRole), el);
+  container.appendChild(row);
   container.scrollTop = container.scrollHeight;
   return el;
+}
+
+async function resolveAssistantPendingMessage(el, text, { animate = false } = {}) {
+  if (!el) return;
+  el.classList.remove("thinking");
+  if (animate) {
+    await typeAssistantMessage(el, text);
+  } else {
+    renderAssistantMessageContent(el, "assistant", text);
+    el.classList.remove("typing");
+  }
 }
 
 function scrollMessagesToBottom() {
@@ -990,16 +1605,9 @@ function scrollMessagesToBottom() {
   if (container) container.scrollTop = container.scrollHeight;
 }
 
-function renderEmptyHint() {
-  const container = $("aiAssistantMessages");
-  if (!container || container.children.length) return;
-  appendMessage("system", assistantMode === "edit"
-    ? "ArcBot can edit JSON-backed app context files automatically."
-    : "ArcBot is in Read Only mode and cannot edit files.");
-}
-
 function applyStatus(status) {
   assistantReady = !!status?.installed && !!status?.authenticated;
+  assistantAuthStatus = String(status?.authStatus || status?.error || "").trim();
   if (!status?.installed) {
     setStatus("Codex CLI is not installed.", "error");
     setSetup({
@@ -1025,6 +1633,7 @@ function applyStatus(status) {
   setStatus(`Codex ready (${status.version || "installed"}). ${getModeLabel()}.`);
   setSetup({ open: false });
   setComposerEnabled(!assistantBusy);
+  updateAssistantSettingsPanel();
 }
 
 function requestActivePageContext() {
@@ -1104,7 +1713,7 @@ function openAssistant() {
   applyFirstSessionOpenPanelSize(panel);
   $("aiAssistantLauncher")?.classList.add("assistant-open");
   panel?.classList.add("open");
-  renderEmptyHint();
+  closeAssistantSettingsPanel();
   refreshAppContextTooltip();
   if (!assistantStatusChecked) refreshAssistantStatus();
   setTimeout(() => $("aiAssistantInput")?.focus(), 0);
@@ -1113,6 +1722,7 @@ function openAssistant() {
 function closeAssistant() {
   if (isAiAssistantLauncherVisible()) $("aiAssistantLauncher")?.classList.remove("assistant-open");
   $("aiAssistantPanel")?.classList.remove("open");
+  closeAssistantSettingsPanel();
 }
 
 function closeModeMenu() {
@@ -1594,6 +2204,7 @@ async function sendAssistantMessage() {
   assistantMessages.push({ role: "user", content: visibleText, timestamp: nowIso() });
   appendMessage("user", visibleText);
   currentSessionTitle = assistantMessages.find((message) => message.role === "user")?.content?.slice(0, 42) || currentSessionTitle;
+  updateAssistantSettingsPanel();
   if (input) input.value = "";
   assistantAttachments = [];
   renderAssistantAttachments();
@@ -1602,15 +2213,18 @@ async function sendAssistantMessage() {
   currentRunStartedAt = performance.now();
   currentStepStartedAt = currentRunStartedAt;
   assistantProgressSteps = createAssistantProgressSteps();
+  assistantWorkCardExpanded = true;
   startAssistantProgressTicker();
   assistantCancelRequested = false;
   assistantHostRequestSubmitted = false;
   assistantActivities = [];
+  resetAssistantActivityTyping();
   assistantDebugLogs = [];
   renderActivities();
   renderDebugLog();
-  appendActivity("Understanding request", "activity", { elapsedMs: 0 });
-  const pending = appendMessage("assistant", "...");
+  appendActivity(`Reading your request: "${userText.slice(0, 90)}${userText.length > 90 ? "..." : ""}"`, "activity", { elapsedMs: 0 });
+  const pending = appendMessage("assistant", "Thinking ...");
+  pending?.classList.add("thinking");
   currentPendingMessageEl = pending;
   await saveCurrentSession();
 
@@ -1618,7 +2232,7 @@ async function sendAssistantMessage() {
   setComposerEnabled(false);
   setStatus(assistantAppContextEnabled ? "ArcBot is checking the active page context..." : "ArcBot is responding without app context...");
   appendActivity(
-    assistantAppContextEnabled ? "Scanning active app contents" : "App context disabled",
+    assistantAppContextEnabled ? "Looking for usable data in the active app tab." : "App Context is off, so Codex will not receive active app contents.",
     "activity",
     { save: false },
   );
@@ -1642,14 +2256,14 @@ async function sendAssistantMessage() {
     updateContextPanel();
     appendActivity(
       activeContext?.available
-        ? `Scanned ${activeContext.title || activeContext.tabType || "active tab"} context`
-        : "No active app context available",
+        ? formatAssistantContextScanStatus(activeContext)
+        : formatAssistantContextScanStatus(activeContext, "No active app tab data was available for this request."),
       "activity",
       { save: false },
     );
     if (assistantCancelRequested) {
       const message = "Request canceled.";
-      if (pending) pending.textContent = message;
+      resolveAssistantPendingMessage(pending, message);
       assistantMessages.push({ role: "assistant", content: message, timestamp: nowIso() });
       appendActivity("Request canceled", "activity");
       failAssistantProgress("Request canceled");
@@ -1662,6 +2276,8 @@ async function sendAssistantMessage() {
       requestId: currentRequestId,
       sessionId: currentSessionId,
       mode: assistantMode,
+      model: assistantModel,
+      reasoningEffort: assistantReasoningEffort,
       messages: assistantMessages,
       activeContext,
       attachments: requestAttachments,
@@ -1670,7 +2286,7 @@ async function sendAssistantMessage() {
     updateContextPanel();
     if (assistantCancelRequested && result?.ok) {
       const message = "Request canceled.";
-      if (pending) pending.textContent = message;
+      resolveAssistantPendingMessage(pending, message);
       assistantMessages.push({ role: "assistant", content: message, timestamp: nowIso() });
       appendActivity("Request canceled", "activity");
       failAssistantProgress("Request canceled");
@@ -1680,7 +2296,7 @@ async function sendAssistantMessage() {
     if (!result?.ok) {
       const wasCanceled = !!result?.canceled || assistantCancelRequested;
       const message = wasCanceled ? "Request canceled." : (result?.error || "Codex request failed.");
-      if (pending) pending.textContent = message;
+      resolveAssistantPendingMessage(pending, message);
       assistantMessages.push({ role: "assistant", content: message, timestamp: nowIso() });
       if (wasCanceled) {
         setStatus("ArcBot request canceled.");
@@ -1703,7 +2319,7 @@ async function sendAssistantMessage() {
       return;
     }
     const reply = String(result?.text || "").trim() || "No response.";
-    if (pending) pending.textContent = reply;
+    await resolveAssistantPendingMessage(pending, reply, { animate: true });
     assistantMessages.push({ role: "assistant", content: reply, timestamp: nowIso() });
     if (result?.editApplied) notifyActivePageJsonUpdated(result);
     appendActivity(result?.editApplied ? "Applied JSON-backed edit with host validation." : "Response completed.", "activity");
@@ -1711,7 +2327,7 @@ async function sendAssistantMessage() {
     setStatus(result?.editApplied ? "ArcBot applied a JSON-backed edit." : `Codex ready. ${getModeLabel()}.`);
   } catch (err) {
     const message = assistantCancelRequested ? "Request canceled." : String(err?.message || err || "Codex request failed.");
-    if (pending) pending.textContent = message;
+    resolveAssistantPendingMessage(pending, message);
     assistantMessages.push({ role: "assistant", content: message, timestamp: nowIso() });
     appendActivity(assistantCancelRequested ? "Request canceled" : "Request failed", assistantCancelRequested ? "activity" : "error");
     failAssistantProgress(message);
@@ -1736,40 +2352,34 @@ function handleAssistantEvent(event) {
   if (!event || event.requestId !== currentRequestId) return;
   if (event.type === "stdout") {
     appendDebugLog(event.text, "stdout");
-    updateAssistantProgressStep("executing", "active", "Codex is streaming a response.");
+    const apiStatus = formatAssistantActivityForCard(event.text, event);
+    if (apiStatus && apiStatus.includes("ArcRho Python API")) {
+      appendActivity(event.text, "activity", { displayText: apiStatus, save: false });
+    }
     return;
   }
   if (event.type === "stderr") {
     appendDebugLog(event.text, "stderr");
-    updateAssistantProgressStep("executing", "active", "Codex reported command output.");
     return;
   }
   if (event.type === "usage") {
     currentUsage = event.usage || currentUsage;
     updateContextPanel();
-    updateAssistantProgressStep("scanning", "active", "Estimated context window usage.");
     appendDebugLog(event.text, "usage");
     return;
   }
   if (event.type === "context" && event.context) {
     currentContext = { ...(currentContext || {}), ...event.context };
     updateContextPanel();
-    appendActivity(`Read ${event.context.title || event.context.tabType || "active tab"} context`, "activity");
+    appendActivity(formatAssistantContextScanStatus(event.context), "activity");
     appendDebugLog(`${event.text}\n${JSON.stringify(event.context, null, 2)}`, "context");
     return;
   }
   const text = String(event.text || "").trim();
   if (!text) return;
   appendDebugLog(text, event.type || "activity");
-  const lower = text.toLowerCase();
-  if (lower.includes("checking active json")) appendActivity("Read active file", "activity");
-  else if (lower.includes("creating editable local json")) appendActivity("Edit started", "activity");
-  else if (lower.includes("cleaned explanatory text")) appendActivity("Cleaned edited JSON", "activity");
-  else if (lower.includes("validating and applying")) appendActivity("Edit completed", "activity");
-  else if (lower.includes("codex response received")) appendActivity("Response received", "activity");
-  else if (lower.includes("checking latest arcbot edit history")) appendActivity("Revert started", "activity");
-  else if (lower.includes("starting codex cli") || lower.includes("starting warm codex session")) appendActivity("Codex started", "activity");
-  else if (lower.includes("resolving arcbot project")) appendActivity("Session prepared", "activity");
+  const displayText = formatAssistantActivityForCard(text, event);
+  if (displayText) appendActivity(text, event.type || "activity", { displayText });
 }
 
 export function initAiAssistant() {
@@ -1804,9 +2414,13 @@ export function initAiAssistant() {
   });
   $("aiAssistantAttachFileOption")?.addEventListener("click", attachAssistantContextFile);
   $("aiAssistantNewChatBtn")?.addEventListener("click", async () => {
-    await createAssistantSession();
+    const result = await openOrCreateEmptyAssistantSession();
     closeHistoryPage();
-    setStatus("New ArcBot chat started.");
+    setStatus(result?.created
+      ? "New ArcBot chat started."
+      : result?.alreadyCurrent
+        ? "ArcBot is already on an empty chat."
+        : "Opened existing empty ArcBot chat.");
   });
   $("aiAssistantHistoryBtn")?.addEventListener("click", () => {
     const page = $("aiAssistantHistoryPage");
@@ -1845,9 +2459,20 @@ export function initAiAssistant() {
   $("aiAssistantDebugBtn")?.addEventListener("click", () => {
     const panel = $("aiAssistantDebugPanel");
     const open = !panel?.classList.contains("open");
+    closeAssistantSettingsPanel();
     panel?.classList.toggle("open", open);
     $("aiAssistantDebugBtn")?.setAttribute("aria-expanded", open ? "true" : "false");
     renderDebugLog();
+  });
+  $("aiAssistantSettingsBtn")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleAssistantSettingsPanel();
+  });
+  $("aiAssistantSettingsModelSelect")?.addEventListener("change", (event) => {
+    setAssistantModel(event.target?.value);
+  });
+  $("aiAssistantSettingsReasoningSelect")?.addEventListener("change", (event) => {
+    setAssistantReasoningEffort(event.target?.value);
   });
   $("aiAssistantCopyDebugBtn")?.addEventListener("click", async () => {
     const text = $("aiAssistantDebugLog")?.textContent || "";
@@ -1890,6 +2515,10 @@ export function initAiAssistant() {
   autoGrowAssistantInput();
 
   document.addEventListener("pointerdown", (event) => {
+    if (!event.target?.closest?.("#aiAssistantSettingsPanel") &&
+        !event.target?.closest?.("#aiAssistantSettingsBtn")) {
+      closeAssistantSettingsPanel();
+    }
     if (event.target?.closest?.(".aiAssistantSelectWrap")) return;
     if (event.target?.closest?.("#aiAssistantAttachMenu") || event.target?.closest?.("#aiAssistantAttachBtn")) return;
     closeSelectMenus();
@@ -1897,6 +2526,7 @@ export function initAiAssistant() {
   }, true);
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
+      closeAssistantSettingsPanel();
       closeSelectMenus();
       closeAttachMenu();
     }
@@ -1905,6 +2535,8 @@ export function initAiAssistant() {
   initAssistantResize(panel);
   initAssistantLauncherDrag(launcher);
   setAssistantAppContextEnabled(true);
+  setAssistantModel(assistantModel, { save: false });
+  setAssistantReasoningEffort(assistantReasoningEffort, { save: false });
   renderAssistantAttachments();
   loadAssistantUserAvatarName();
   setComposerEnabled(false);

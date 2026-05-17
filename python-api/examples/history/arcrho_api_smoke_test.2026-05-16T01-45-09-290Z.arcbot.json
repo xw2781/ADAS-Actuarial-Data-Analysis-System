@@ -1,0 +1,14 @@
+{
+  "type": "arcbot-json-edit",
+  "timestamp": "2026-05-16T01:45:09.299Z",
+  "targetPath": "C:\\Users\\xwei\\Documents\\Repos\\ArcRho\\python-api\\examples\\arcrho_api_smoke_test.ipynb",
+  "backupPath": "C:\\Users\\xwei\\Documents\\Repos\\ArcRho\\python-api\\examples\\history\\arcrho_api_smoke_test.2026-05-16T01-45-09-290Z.bak.json",
+  "manifestPath": "C:\\Users\\xwei\\Documents\\Repos\\ArcRho\\python-api\\examples\\history\\arcrho_api_smoke_test.2026-05-16T01-45-09-290Z.arcbot.json",
+  "requestText": "Traceback (most recent call last):\n  File \"C:\\Users\\xwei\\Documents\\Repos\\ArcRho\\frontend\\app_server\\services\\scripting_service.py\", line 592, in _worker\n    exec(compile(tree, \"<cell>\", \"exec\"), session.namespace)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<cell>\", line 2, in <module>\nAssertionError: NJ_Annual_Prod_2026 Q1-Feb Test",
+  "reply": "Fixed the notebook configuration by setting PROJECT_NAME to NJ_Annual_Prod_2026 Q1-Feb Test, switched SERVER_ROOT to the active UNC ArcRho Server path, and restored the project assertion to its normal guidance message. The JSON remains valid.",
+  "beforeSha256": "1c2a0ddaf8ad2db0db803c3c57e2795e4eae4f4f35f5574d1045074ce1330a18",
+  "afterSha256": "5e7cb19bdee652af4530ffaf4f7aae59633e846927d9c823287801e20048a910",
+  "backupSource": "file",
+  "allowedRoot": "active-page-context",
+  "resolvedAllowedRoot": ""
+}

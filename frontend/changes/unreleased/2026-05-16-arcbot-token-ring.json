@@ -1,0 +1,10 @@
+{
+  "type": "improvement",
+  "scope": "ui",
+  "audience": "user",
+  "summary": "Show ArcBot context-window usage in the composer.",
+  "details": [
+    "Added a compact ring-only meter beside the ArcBot attach button for estimated context-window usage.",
+    "The token counts are shown in a styled hover/focus tooltip with tokens used, the total allowed before auto compacting, and percent used."
+  ]
+}

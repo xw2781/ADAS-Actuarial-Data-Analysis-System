@@ -1,4 +1,4 @@
-@import url("/ui/shared/scrollbars.css?v=20260515a");
+@import url("/ui/shared/scrollbars.css?v=20260516a");
 
 #titlebar {
       height: 36px;
@@ -24,7 +24,7 @@
       --cell-max-w: 120px;
       --cell-min-w: 90px;
       --cell-h: 20px;
-      --table-scrollbar-size: 23px;
+      --table-scrollbar-size: 20px;
       --table-arrow-btn-size: 19px;
 
       --panel-w: 1000px;

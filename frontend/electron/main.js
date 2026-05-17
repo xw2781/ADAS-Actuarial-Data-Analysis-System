@@ -24,6 +24,12 @@ const URL = `http://${HOST}:${PORT}/ui/?v=${encodeURIComponent(UI_VERSION)}`;
 const START_BACKEND = process.env.ARCRHO_START_BACKEND !== "0";
 const PYTHON_EXE = process.env.PYTHON_EXE || process.env.PYTHON || "python";
 const APP_ROOT = path.resolve(__dirname, "..");
+const REPO_ROOT = path.resolve(APP_ROOT, "..");
+const PYTHON_API_SRC = path.join(REPO_ROOT, "python-api", "src");
+const PYTHON_API_WHEEL_DIR = app.isPackaged
+  ? path.join(process.resourcesPath, "python_packages")
+  : path.join(APP_ROOT, "build", "python_packages");
+const ARCBOT_PROMPT_TEMPLATE_PATH = path.join(__dirname, "prompts", "arcbot_prompt.md");
 const PRELOAD_PATH = path.join(__dirname, "preload.js");
 const MAIN_WINDOW_PREFS_FILE = "main_window_prefs.json";
 const SCRIPTING_SHORTCUTS_FILE = "scripting_shortcuts.json";
@@ -32,6 +38,10 @@ const ARCBOT_CHAT_SESSIONS_DIR = "arcbot_chat_sessions";
 const CODEX_ASSISTANT_TIMEOUT_MS = Math.max(
   15000,
   parseInt(process.env.ARCRHO_CODEX_ASSISTANT_TIMEOUT_MS || "120000", 10) || 120000
+);
+const CODEX_ASSISTANT_CONTEXT_WINDOW_TOKENS = Math.max(
+  1000,
+  parseInt(process.env.ARCRHO_CODEX_ASSISTANT_CONTEXT_WINDOW_TOKENS || "200000", 10) || 200000
 );
 const CODEX_APP_SERVER_ENABLED = process.env.ARCRHO_CODEX_APP_SERVER !== "0";
 const BACKEND_CONTROL_FLAGS = [
@@ -92,6 +102,17 @@ function getWorkspacePathsPath() {
   return path.join(app.getPath("appData"), "ArcRho", WORKSPACE_PATHS_FILE);
 }
 
+function getPythonApiWheelPath() {
+  try {
+    const wheels = fs.readdirSync(PYTHON_API_WHEEL_DIR)
+      .filter((name) => /^arcrho_api-.*\.whl$/iu.test(name))
+      .sort();
+    return wheels.length ? path.join(PYTHON_API_WHEEL_DIR, wheels[wheels.length - 1]) : "";
+  } catch {
+    return "";
+  }
+}
+
 function getArcBotChatSessionsDir() {
   return path.join(app.getPath("userData"), ARCBOT_CHAT_SESSIONS_DIR);
 }
@@ -140,6 +161,23 @@ function normalizeArcBotDebugLogs(logs) {
   })).filter((entry) => entry.text.trim());
 }
 
+function normalizeArcBotModel(model) {
+  const value = String(model || "codex").trim().toLowerCase();
+  const supported = new Set(["codex", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini"]);
+  return supported.has(value) ? value : "codex";
+}
+
+function normalizeArcBotReasoningEffort(effort) {
+  const value = String(effort || "high").trim().toLowerCase();
+  const supported = new Set(["none", "minimal", "low", "medium", "high", "xhigh"]);
+  return supported.has(value) ? value : "high";
+}
+
+function getArcBotRuntimeModel(model) {
+  const normalized = normalizeArcBotModel(model);
+  return normalized === "codex" ? null : normalized;
+}
+
 function deriveArcBotSessionTitle(messages, fallback = "New ArcBot Chat") {
   const firstUser = normalizeArcBotMessages(messages).find((message) => message.role === "user");
   const title = String(firstUser?.content || fallback).replace(/\s+/g, " ").trim();
@@ -158,7 +196,8 @@ function readArcBotChatSession(sessionId) {
       createdAt: String(parsed.createdAt || new Date().toISOString()),
       updatedAt: String(parsed.updatedAt || parsed.createdAt || new Date().toISOString()),
       mode: String(parsed.mode || "edit"),
-      model: String(parsed.model || "codex"),
+      model: normalizeArcBotModel(parsed.model),
+      reasoningEffort: normalizeArcBotReasoningEffort(parsed.reasoningEffort),
       archived: parsed.archived === true,
       messages: normalizeArcBotMessages(parsed.messages),
       activities: normalizeArcBotActivities(parsed.activities),
@@ -182,7 +221,8 @@ function writeArcBotChatSession(sessionLike) {
     createdAt: String(existing?.createdAt || sessionLike?.createdAt || now),
     updatedAt: now,
     mode: String(sessionLike?.mode || existing?.mode || "edit"),
-    model: String(sessionLike?.model || existing?.model || "codex"),
+    model: normalizeArcBotModel(sessionLike?.model || existing?.model),
+    reasoningEffort: normalizeArcBotReasoningEffort(sessionLike?.reasoningEffort || existing?.reasoningEffort),
     archived: Object.prototype.hasOwnProperty.call(sessionLike || {}, "archived")
       ? sessionLike?.archived === true
       : existing?.archived === true,
@@ -510,6 +550,21 @@ function runHostCommand(command, args = [], options = {}) {
   });
 }
 
+function getArcBotCodexEnv(env = process.env) {
+  const nextEnv = { ...env };
+  if (fs.existsSync(PYTHON_API_SRC)) {
+    const existing = String(nextEnv.PYTHONPATH || nextEnv.PythonPath || "");
+    nextEnv.PYTHONPATH = existing
+      ? `${PYTHON_API_SRC}${path.delimiter}${existing}`
+      : PYTHON_API_SRC;
+    nextEnv.ARCRHO_PYTHON_API_SRC = PYTHON_API_SRC;
+  }
+  nextEnv.ARCRHO_PYTHON_API_WHEEL_DIR = PYTHON_API_WHEEL_DIR;
+  const wheelPath = getPythonApiWheelPath();
+  if (wheelPath) nextEnv.ARCRHO_PYTHON_API_WHEEL = wheelPath;
+  return nextEnv;
+}
+
 function quoteWindowsCmdArg(value) {
   const text = String(value ?? "");
   if (!text) return '""';
@@ -546,20 +601,26 @@ function runCodexCommand(args = [], options = {}) {
       if (fs.existsSync(bundledNode) && fs.existsSync(bundledCodexJs)) {
         return runHostCommand(bundledNode, [bundledCodexJs, ...args], {
           ...options,
+          env: getArcBotCodexEnv(options.env || process.env),
           shell: false,
         });
       }
     }
     if (/\.(cmd|bat)$/iu.test(command)) {
-      return runWindowsCmdCommand(command, args, options);
+      return runWindowsCmdCommand(command, args, {
+        ...options,
+        env: getArcBotCodexEnv(options.env || process.env),
+      });
     }
     return runHostCommand(command, args, {
       ...options,
+      env: getArcBotCodexEnv(options.env || process.env),
       shell: false,
     });
   }
   return runHostCommand(command, args, {
     ...options,
+    env: getArcBotCodexEnv(options.env || process.env),
     shell: false,
   });
 }
@@ -587,7 +648,9 @@ function getCodexSpawnSpec(args = []) {
 
 function getArcBotCodexThreadKey(payload, mode) {
   const sessionId = sanitizeArcBotSessionId(payload?.sessionId || "");
-  return sessionId ? `${mode}:${sessionId}` : "";
+  const model = normalizeArcBotModel(payload?.model);
+  const effort = normalizeArcBotReasoningEffort(payload?.reasoningEffort);
+  return sessionId ? `${mode}:${model}:${effort}:${sessionId}` : "";
 }
 
 function getCodexSandboxPolicy(sandboxMode, codexCwd) {
@@ -649,7 +712,7 @@ class CodexAppServerClient {
     if (!spec) throw new Error("Codex CLI was not found. Install Codex CLI before using ArcBot.");
     this.proc = spawn(spec.command, spec.args, {
       cwd: APP_ROOT,
-      env: process.env,
+      env: getArcBotCodexEnv(process.env),
       shell: spec.shell,
       windowsHide: true,
       stdio: ["pipe", "pipe", "pipe"],
@@ -801,12 +864,12 @@ class CodexAppServerClient {
     return () => this.notificationHandlers.delete(handler);
   }
 
-  async ensureThread(threadKey, mode, codexCwd) {
+  async ensureThread(threadKey, mode, codexCwd, model) {
     if (threadKey && arcBotCodexThreads.has(threadKey)) {
       return arcBotCodexThreads.get(threadKey);
     }
     const result = await this.request("thread/start", {
-      model: null,
+      model: getArcBotRuntimeModel(model),
       cwd: codexCwd,
       approvalPolicy: "never",
       sandbox: mode === "edit" ? "workspace-write" : "read-only",
@@ -827,10 +890,10 @@ async function ensureCodexAppServerStarted() {
   return codexAppServerClient.start();
 }
 
-async function runCodexWarmTurn({ event, requestId, requestState, payload, mode, codexCwd, codexSandbox, prompt }) {
+async function runCodexWarmTurn({ event, requestId, requestState, payload, mode, model, reasoningEffort, codexCwd, codexSandbox, prompt }) {
   const client = await ensureCodexAppServerStarted();
   const threadKey = getArcBotCodexThreadKey(payload, mode);
-  const threadId = await client.ensureThread(threadKey, mode, codexCwd);
+  const threadId = await client.ensureThread(threadKey, mode, codexCwd, model);
   let turnId = "";
   let agentText = "";
   let canceled = false;
@@ -887,6 +950,8 @@ async function runCodexWarmTurn({ event, requestId, requestState, payload, mode,
     threadId,
     input: [{ type: "text", text: prompt, text_elements: [] }],
     cwd: codexCwd,
+    model: getArcBotRuntimeModel(model),
+    effort: normalizeArcBotReasoningEffort(reasoningEffort),
     approvalPolicy: "never",
     sandboxPolicy: getCodexSandboxPolicy(codexSandbox, codexCwd),
   });
@@ -1298,6 +1363,29 @@ function writeCodexInstallScript() {
   return scriptPath;
 }
 
+function readArcBotPromptTemplate() {
+  try {
+    return fs.readFileSync(ARCBOT_PROMPT_TEMPLATE_PATH, "utf8");
+  } catch (err) {
+    throw new Error(`ArcBot prompt template could not be read: ${ARCBOT_PROMPT_TEMPLATE_PATH}: ${err?.message || err}`);
+  }
+}
+
+function extractArcBotPromptSection(template, sectionName) {
+  const name = String(sectionName || "").trim().toUpperCase();
+  const pattern = new RegExp(`<!--\\s*ARCBOT:${name}\\s*-->([\\s\\S]*?)<!--\\s*ARCBOT:END_${name}\\s*-->`, "u");
+  const match = String(template || "").match(pattern);
+  if (!match) throw new Error(`ArcBot prompt template is missing section ${name}.`);
+  return match[1].trim();
+}
+
+function renderArcBotPromptTemplate(template, values) {
+  return String(template || "").replace(/\{\{([A-Z0-9_]+)\}\}/gu, (_match, key) => {
+    const value = values?.[key];
+    return value == null ? "" : String(value);
+  });
+}
+
 function buildAssistantPrompt(
   messages,
   mode = "edit",
@@ -1339,50 +1427,36 @@ function buildAssistantPrompt(
         item.text,
       ].filter(Boolean).join("\n")).join("\n\n---\n\n")
     : "No additional files were attached.";
-  const modeInstructions = mode === "edit"
-    ? [
-        editSession?.jsonPath
-          ? `Editable active JSON-backed copy: ${path.basename(editSession.jsonPath)}.`
-          : "No editable active JSON-backed copy is available for this request.",
-        "ArcBot edits are host-applied only. Do not edit the true project/server file path directly.",
-        "You may edit only the active JSON-backed copy in the current working folder. Do not edit other files, install packages, commit code, or push code.",
-        "If the user asks to modify the active DFM method or scripting notebook, inspect and edit the active JSON-backed copy directly.",
-        "DFM active JSON copies use the canonical GUI-tab grouped DFM method JSON format. Keep that grouped structure in the temp file.",
-        "Preserve unrelated fields and JSON structure. Keep the file valid JSON.",
-        "When finished, return a single JSON object only, with no Markdown.",
-        "Allowed response shape:",
-        '{"action":"edited","reply":"short summary"}',
-        '{"action":"answer","reply":"short answer"}',
-        "Use answer if the request is informational, ambiguous, outside the active JSON-backed file, or cannot be completed safely.",
-      ]
-    : [
-        "Review Mode is read-only. Do not edit files, change settings, install packages, run destructive commands, commit code, or push code.",
-        "Return a concise answer for the user.",
-      ];
-  return [
-    "You are ArcBot, the ArcRho in-app AI assistant.",
-    `Current mode: ${mode === "edit" ? "Edit Mode" : "Review Mode"}.`,
-    `Current project folder: ${projectRoot || APP_ROOT}.`,
-    `CLI working folder: ${cliRoot || projectRoot || APP_ROOT}.`,
-    networkRoot
+  const template = readArcBotPromptTemplate();
+  const baseSection = extractArcBotPromptSection(template, "BASE");
+  const modeSection = extractArcBotPromptSection(template, mode === "edit" ? "EDIT_MODE" : "REVIEW_MODE");
+  const activeJsonName = editSession?.jsonPath ? path.basename(editSession.jsonPath) : "active-method.json";
+  const pythonApiWheelPath = getPythonApiWheelPath();
+  return renderArcBotPromptTemplate(baseSection, {
+    MODE_LABEL: mode === "edit" ? "Edit Mode" : "Review Mode",
+    PROJECT_ROOT: projectRoot || APP_ROOT,
+    CLI_ROOT: cliRoot || projectRoot || APP_ROOT,
+    NETWORK_ROOT_NOTE: networkRoot
       ? "The project folder is a network path, so the CLI process starts from the local Documents\\ArcRho folder to avoid Windows/Codex startup failures with UNC working directories."
       : "",
-    ...modeInstructions,
-    "",
-    "Active page context:",
-    JSON.stringify(contextForPrompt, null, 2),
-    "",
-    "Active local JSON-backed data:",
-    editSession?.jsonPath
-      ? `The active JSON-backed file is available as ${path.basename(editSession.jsonPath)} in the current working folder. Read and edit that file instead of returning replacement JSON.`
+    MODE_INSTRUCTIONS: renderArcBotPromptTemplate(modeSection, {
+      EDITABLE_JSON_BASENAME: activeJsonName,
+      EDITABLE_JSON_NOTE: editSession?.jsonPath
+        ? `Editable active JSON-backed copy: ${activeJsonName}.`
+        : "No editable active JSON-backed copy is available for this request.",
+    }),
+    PYTHON_API_SRC,
+    PYTHON_API_WHEEL_DIR,
+    PYTHON_API_WHEEL_PATH: pythonApiWheelPath || "No bundled arcrho-api wheel was found.",
+    PYTHON_API_INSTALL_COMMAND: pythonApiWheelPath ? `${PYTHON_EXE} -m pip install ${quoteWindowsCmdArg(pythonApiWheelPath)}` : "",
+    PYTHON_API_COMMAND: `${PYTHON_EXE} -m arcrho_api.agent --file ${activeJsonName}`,
+    ACTIVE_CONTEXT_JSON: JSON.stringify(contextForPrompt, null, 2),
+    ACTIVE_JSON_DATA: editSession?.jsonPath
+      ? `The active JSON-backed file is available as ${activeJsonName} in the current working folder. Use the ArcRho Python API helper for DFM reads and edits before falling back to raw JSON inspection.`
       : (activeJson ? JSON.stringify(activeJson, null, 2) : "No active JSON-backed data was loaded."),
-    "",
-    "Attached file context:",
-    attachmentText,
-    "",
-    "Conversation:",
-    transcript || "User: Hello",
-  ].join("\n");
+    ATTACHMENT_TEXT: attachmentText,
+    TRANSCRIPT: transcript || "User: Hello",
+  });
 }
 
 function clampCodexPrompt(prompt) {
@@ -1401,6 +1475,8 @@ function clampCodexPrompt(prompt) {
 function estimateArcBotContextUsage(prompt, messages, activeContext, activeJson, clampedPrompt, attachments = []) {
   const promptText = String(prompt || "");
   const clampedText = String(clampedPrompt || promptText);
+  const estimatedTokens = Math.ceil(clampedText.length / 4);
+  const contextPercentUsed = Math.min(100, Math.max(0, (estimatedTokens / CODEX_ASSISTANT_CONTEXT_WINDOW_TOKENS) * 100));
   const activeJsonText = activeJson ? JSON.stringify(activeJson) : "";
   const contextText = activeContext ? JSON.stringify(activeContext) : "";
   const attachmentText = Array.isArray(attachments)
@@ -1411,8 +1487,11 @@ function estimateArcBotContextUsage(prompt, messages, activeContext, activeJson,
     : "";
   return {
     promptChars: clampedText.length,
-    estimatedTokens: Math.ceil(clampedText.length / 4),
+    estimatedTokens,
+    contextWindowTokens: CODEX_ASSISTANT_CONTEXT_WINDOW_TOKENS,
+    contextPercentUsed,
     maxPromptChars: 200000,
+    maxPromptTokens: Math.ceil(200000 / 4),
     truncated: clampedText.length < promptText.length,
     includedMessages: Array.isArray(messages) ? Math.min(messages.length, 12) : 0,
     chatChars: chatText.length,
@@ -1441,6 +1520,15 @@ function sendArcBotActivity(event, requestId, type, text, extra = {}) {
 function summarizeCodexTurnNotification(message) {
   const method = String(message?.method || "").toLowerCase();
   if (!method || method === "item/agentmessage/delta" || method === "turn/completed") return "";
+  const paramsText = (() => {
+    try {
+      return JSON.stringify(message?.params || {});
+    } catch {
+      return "";
+    }
+  })();
+  const apiMatch = paramsText.match(/arcrho_api\.agent[^"'`]*?\s(summary|component|ratio-row|exclude-ratio|include-ratio|select-average|set-user-entry|validate)\b/iu);
+  if (apiMatch) return `ArcBot is using the ArcRho Python API: ${apiMatch[1]}.`;
   if (method.includes("command") || method.includes("exec") || method.includes("shell")) return "Codex is running a command.";
   if (method.includes("web") || method.includes("search")) return "Codex is searching for context.";
   if (method.includes("tool")) return "Codex is using a tool.";
@@ -2272,7 +2360,8 @@ ipcMain.handle("codex-assistant-session-create", async (_event, payload) => {
     const session = writeArcBotChatSession({
       title: String(payload?.title || "New ArcBot Chat"),
       mode: String(payload?.mode || "edit"),
-      model: String(payload?.model || "codex"),
+      model: normalizeArcBotModel(payload?.model),
+      reasoningEffort: normalizeArcBotReasoningEffort(payload?.reasoningEffort),
       messages: [],
       activities: [],
     });
@@ -2321,19 +2410,13 @@ ipcMain.handle("codex-assistant-session-delete", async (_event, payload) => {
 ipcMain.handle("codex-assistant-send", async (event, payload) => {
   const requestId = String(payload?.requestId || "");
   const mode = String(payload?.mode || "edit").trim().toLowerCase();
-  const model = String(payload?.model || "codex").trim().toLowerCase();
+  const model = normalizeArcBotModel(payload?.model);
+  const reasoningEffort = normalizeArcBotReasoningEffort(payload?.reasoningEffort);
   if (mode !== "edit" && mode !== "review") {
     return {
       ok: false,
       needsAuth: false,
       error: "Unsupported ArcBot mode.",
-    };
-  }
-  if (model !== "codex") {
-    return {
-      ok: false,
-      needsAuth: false,
-      error: "Only Codex is available for ArcBot right now.",
     };
   }
   if (mode === "edit" && isRevertLatestRequest(payload?.messages)) {
@@ -2429,8 +2512,14 @@ ipcMain.handle("codex-assistant-send", async (event, payload) => {
     activeCodexAssistantRequests.delete(requestId);
     return canceledResponse(usage);
   }
-  sendArcBotActivity(event, requestId, "usage", `Context estimate: ~${usage.estimatedTokens.toLocaleString()} tokens from ${usage.promptChars.toLocaleString()} chars.`, { usage });
-  sendArcBotActivity(event, requestId, "activity", `Starting warm Codex session in ${mode === "edit" ? "Edit Mode" : "Review Mode"}...`);
+  sendArcBotActivity(
+    event,
+    requestId,
+    "usage",
+    `Context estimate: ~${usage.estimatedTokens.toLocaleString()} of ${usage.contextWindowTokens.toLocaleString()} tokens (${usage.contextPercentUsed.toFixed(usage.contextPercentUsed < 10 ? 1 : 0)}%).`,
+    { usage }
+  );
+  sendArcBotActivity(event, requestId, "activity", `Starting warm Codex session with ${model === "codex" ? "the Codex default model" : model} at ${reasoningEffort} reasoning in ${mode === "edit" ? "Edit Mode" : "Review Mode"}...`);
   let result = null;
   try {
     result = await runCodexWarmTurn({
@@ -2439,6 +2528,8 @@ ipcMain.handle("codex-assistant-send", async (event, payload) => {
       requestState,
       payload,
       mode,
+      model,
+      reasoningEffort,
       codexCwd,
       codexSandbox,
       prompt,
@@ -2450,7 +2541,7 @@ ipcMain.handle("codex-assistant-send", async (event, payload) => {
       const warmError = String(err?.message || err || "Codex warm session failed.");
       sendArcBotActivity(event, requestId, "stderr", `${warmError}\n`);
       sendArcBotActivity(event, requestId, "activity", "Warm Codex session unavailable; using one-shot Codex CLI.");
-      result = await runCodexCommand([
+      const execArgs = [
         "exec",
         "--ephemeral",
         "--color",
@@ -2460,7 +2551,12 @@ ipcMain.handle("codex-assistant-send", async (event, payload) => {
         "--skip-git-repo-check",
         "--cd",
         codexCwd,
-      ], {
+        "--config",
+        `model_reasoning_effort="${reasoningEffort}"`,
+      ];
+      const runtimeModel = getArcBotRuntimeModel(model);
+      if (runtimeModel) execArgs.push("--model", runtimeModel);
+      result = await runCodexCommand(execArgs, {
         input: prompt,
         timeoutMs: CODEX_ASSISTANT_TIMEOUT_MS,
         cancelKey: requestId,

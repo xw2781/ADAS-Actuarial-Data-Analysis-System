@@ -1,6 +1,7 @@
 import { openContextMenu } from "/ui/shared/menu_utils.js";
 import { openLazyReservingClassPicker } from "/ui/shared/reserving_class_lazy_picker.js";
 import { openProjectNameTreePicker } from "/ui/shared/project_name_tree_picker.js";
+import { loadProjectUserPreferences } from "/ui/shared/project_user_preferences.js";
 
 const stepsEl = document.getElementById("steps");
 const inspectorEl = document.getElementById("inspector");
@@ -15,10 +16,13 @@ const TRI_INPUTS_KEY = "arcrho_tri_inputs";
 const GLOBAL_VAR_TYPE_PROJECT = "project";
 const GLOBAL_VAR_TYPE_RESERVING_CLASS = "reservingClass";
 const GLOBAL_VAR_TYPE_STRING = "string";
+const DEFAULT_TOKEN = "__DEFAULT__";
+const WORKFLOW_ITEM_FOLDER = "folder";
+const MAX_FOLDER_DEPTH = 3;
 const GLOBAL_VAR_TYPE_OPTIONS = [
   { value: GLOBAL_VAR_TYPE_PROJECT, label: "Project" },
   { value: GLOBAL_VAR_TYPE_RESERVING_CLASS, label: "Reserving Class" },
-  { value: GLOBAL_VAR_TYPE_STRING, label: "String" },
+  { value: GLOBAL_VAR_TYPE_STRING, label: "Other" },
 ];
 
 function getDefaultGlobalVarTypeForKey(key) {
@@ -33,13 +37,13 @@ function normalizeGlobalVarType(type, key = "") {
   if (raw === "reservingclass" || raw === "reserving_class" || raw === "reserving class") {
     return GLOBAL_VAR_TYPE_RESERVING_CLASS;
   }
-  if (raw === "string") return GLOBAL_VAR_TYPE_STRING;
+  if (raw === "string" || raw === "other") return GLOBAL_VAR_TYPE_STRING;
   return getDefaultGlobalVarTypeForKey(key);
 }
 
 const DEFAULT_GLOBAL_VARS = [
-  { key: "project", name: "Project", type: GLOBAL_VAR_TYPE_PROJECT, value: "" },
-  { key: "reservingClass", name: "Reserving Class", type: GLOBAL_VAR_TYPE_RESERVING_CLASS, value: "" },
+  { key: "project", name: "<Default Project>", type: GLOBAL_VAR_TYPE_PROJECT, value: "" },
+  { key: "reservingClass", name: "Default Path", type: GLOBAL_VAR_TYPE_RESERVING_CLASS, value: "" },
 ];
 
 const state = {
@@ -64,6 +68,7 @@ const ZOOM_MODE_KEY = "arcrho_zoom_mode";
 const STATUSBAR_H_KEY = "arcrho_statusbar_h";
 const AUTOSAVE_KEY = "arcrho_autosave_enabled";
 const FONT_STORAGE_KEY = "arcrho_app_font";
+const LOCAL_PROJECT_PREFS_ENDPOINT = "/local-project/preferences";
 
 let workflowDirty = false;
 let saveInFlight = false;
@@ -280,6 +285,25 @@ function cloneDefaultGlobalVars() {
   }));
 }
 
+function getDefaultGlobalVarName(key) {
+  if (key === "project") return "<Default Project>";
+  if (key === "reservingClass") return "Default Path";
+  return "";
+}
+
+function isWorkflowDefaultReference(value) {
+  const raw = String(value == null ? "" : value).trim();
+  const lower = raw.toLowerCase();
+  return lower === DEFAULT_TOKEN.toLowerCase()
+    || lower === "default"
+    || lower === "default project"
+    || lower === "<default project>"
+    || lower === "default path"
+    || (lower.startsWith("default project (") && lower.endsWith(")"))
+    || (lower.startsWith("<default project> (") && lower.endsWith(")"))
+    || (lower.startsWith("default path (") && lower.endsWith(")"));
+}
+
 function normalizeGlobalControl(input) {
   const obj = input && typeof input === "object" ? input : {};
   let vars = null;
@@ -304,7 +328,7 @@ function normalizeGlobalControl(input) {
     const key = typeof v.key === "string" ? v.key.trim() : "";
     const name = typeof v.name === "string"
       ? v.name.trim()
-      : (key === "project" ? "Project" : key === "reservingClass" ? "Reserving Class" : "");
+      : getDefaultGlobalVarName(key);
     const type = normalizeGlobalVarType(v.type, key);
     const value = v.value == null ? "" : String(v.value);
     if (!key && !name && !value) continue;
@@ -312,8 +336,8 @@ function normalizeGlobalControl(input) {
   }
 
   const required = [
-    { key: "project", name: "Project", type: GLOBAL_VAR_TYPE_PROJECT },
-    { key: "reservingClass", name: "Reserving Class", type: GLOBAL_VAR_TYPE_RESERVING_CLASS },
+    { key: "project", name: "<Default Project>", type: GLOBAL_VAR_TYPE_PROJECT },
+    { key: "reservingClass", name: "Default Path", type: GLOBAL_VAR_TYPE_RESERVING_CLASS },
   ];
 
   const ordered = [];
@@ -322,7 +346,7 @@ function normalizeGlobalControl(input) {
     if (found) {
       ordered.push({
         ...found,
-        name: found.name || req.name,
+        name: req.name,
         type: normalizeGlobalVarType(found.type, req.key),
       });
     } else {
@@ -348,6 +372,49 @@ function loadGlobalControlFromStorage() {
   }
 }
 
+function normalizeLocalProjectPreference(raw) {
+  const prefs = raw && typeof raw === "object" ? raw : {};
+  return String(
+    prefs.projectName
+    || prefs.project_name
+    || prefs.project
+    || "",
+  ).trim();
+}
+
+async function loadLastProjectNameFromUserPrefs() {
+  try {
+    const response = await fetch(LOCAL_PROJECT_PREFS_ENDPOINT, { cache: "no-store" });
+    if (!response.ok) return "";
+    const payload = await response.json().catch(() => ({}));
+    return normalizeLocalProjectPreference(payload?.preferences || payload);
+  } catch {
+    return "";
+  }
+}
+
+async function loadLastPathForProjectFromUserPrefs(projectName) {
+  const project = String(projectName || "").trim();
+  if (!project) return "";
+  try {
+    const prefs = await loadProjectUserPreferences(project, { forceReload: false });
+    return String(prefs?.lastReservingClassPath || prefs?.last_reserving_class_path || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+async function buildInitialGlobalControlFromUserPrefs() {
+  const project = await loadLastProjectNameFromUserPrefs();
+  const reservingClass = await loadLastPathForProjectFromUserPrefs(project);
+  const control = normalizeGlobalControl(null);
+  for (const variable of control.vars || []) {
+    if (variable.key === "project") variable.value = project;
+    if (variable.key === "reservingClass") variable.value = reservingClass;
+  }
+  return normalizeGlobalControl(control);
+}
+
 function saveGlobalControlToStorage(value) {
   try {
     const payload = normalizeGlobalControl(value);
@@ -360,19 +427,16 @@ function saveGlobalControlToStorage(value) {
 function broadcastGlobalControlChange() {
   const payload = normalizeGlobalControl(state.globalControl);
   const msg = { type: "arcrho:workflow-global-changed", globalControl: payload, wf: instanceId };
-  for (const [, frame] of dfmEmbedCache) {
-    if (!frame || !frame.contentWindow) continue;
-    try { frame.contentWindow.postMessage(msg, "*"); } catch { /* ignore */ }
-  }
-  for (const [, frame] of datasetEmbedCache) {
-    if (!frame || !frame.contentWindow) continue;
-    try { frame.contentWindow.postMessage(msg, "*"); } catch { /* ignore */ }
+  const activeFrame = dfmEmbedCache.get(state.activeId) || datasetEmbedCache.get(state.activeId);
+  if (activeFrame?.contentWindow) {
+    try { activeFrame.contentWindow.postMessage(msg, "*"); } catch { /* ignore */ }
   }
 }
 
 function saveState() {
   try {
     enforceSingleGlobalControlStep(state.activeId || "");
+    sanitizeFolderParents();
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       steps: state.steps,
       activeId: state.activeId,
@@ -535,10 +599,22 @@ async function collectDfmSettings(step) {
 
 async function buildWorkflowSnapshot() {
   const steps = await Promise.all(state.steps.map(async (s) => {
+    if (isWorkflowFolder(s)) {
+      return {
+        id: s.id,
+        itemType: WORKFLOW_ITEM_FOLDER,
+        name: s.name || "New Folder",
+        displayName: s.displayName || "",
+        parentId: s.parentId || "",
+        collapsed: !!s.collapsed,
+      };
+    }
     const datasetSettings = s.mode === "dataset" ? await collectDatasetSettings(s) : null;
     const dfmSettings = s.mode === "dfm" ? await collectDfmSettings(s) : null;
     return {
       id: s.id,
+      itemType: "step",
+      parentId: s.parentId || "",
       name: s.name,
       displayName: s.displayName || "",
       datasetTitle: s.datasetTitle || "",
@@ -692,10 +768,25 @@ async function saveWorkflowAs() {
 
 function normalizeLoadedStep(step, index) {
   const id = step?.id || `step_${index + 1}`;
+  const itemType = step?.itemType === WORKFLOW_ITEM_FOLDER || step?.type === WORKFLOW_ITEM_FOLDER
+    ? WORKFLOW_ITEM_FOLDER
+    : "step";
+  if (itemType === WORKFLOW_ITEM_FOLDER) {
+    return {
+      id,
+      itemType: WORKFLOW_ITEM_FOLDER,
+      name: step?.name || step?.displayName || "New Folder",
+      displayName: step?.displayName || step?.name || "New Folder",
+      parentId: step?.parentId || "",
+      collapsed: !!step?.collapsed,
+    };
+  }
   const rawMode = step?.mode || "picker";
   const mode = rawMode === "new_method" ? "dfm" : rawMode;
   return {
     id,
+    itemType: "step",
+    parentId: step?.parentId || "",
     name: step?.name || `Step ${index + 1}`,
     displayName: step?.displayName || "",
     datasetTitle: step?.datasetTitle || "",
@@ -716,6 +807,219 @@ function computeNextId(steps) {
     if (m) maxId = Math.max(maxId, parseInt(m[1], 10));
   }
   return Math.max(maxId + 1, steps.length + 1);
+}
+
+function isWorkflowFolder(item) {
+  return item?.itemType === WORKFLOW_ITEM_FOLDER;
+}
+
+function getWorkflowItem(itemId) {
+  return state.steps.find((s) => s?.id === itemId) || null;
+}
+
+function getItemParentId(item) {
+  const parentId = String(item?.parentId || "");
+  if (!parentId) return "";
+  const parent = getWorkflowItem(parentId);
+  return isWorkflowFolder(parent) ? parentId : "";
+}
+
+function getChildren(parentId = "") {
+  const normalized = String(parentId || "");
+  return state.steps.filter((item) => getItemParentId(item) === normalized);
+}
+
+function isDescendantOf(itemId, ancestorId) {
+  let current = getWorkflowItem(itemId);
+  const target = String(ancestorId || "");
+  while (current) {
+    const parentId = getItemParentId(current);
+    if (!parentId) return false;
+    if (parentId === target) return true;
+    current = getWorkflowItem(parentId);
+  }
+  return false;
+}
+
+function getFolderDepth(folderId) {
+  const folder = getWorkflowItem(folderId);
+  if (!isWorkflowFolder(folder)) return 0;
+  let depth = 1;
+  let current = folder;
+  const seen = new Set([folderId]);
+  while (current) {
+    const parentId = getItemParentId(current);
+    if (!parentId || seen.has(parentId)) break;
+    const parent = getWorkflowItem(parentId);
+    if (!isWorkflowFolder(parent)) break;
+    seen.add(parentId);
+    depth += 1;
+    current = parent;
+  }
+  return depth;
+}
+
+function getRelativeFolderDepth(itemId) {
+  const item = getWorkflowItem(itemId);
+  if (!item) return 0;
+  const ownDepth = isWorkflowFolder(item) ? 1 : 0;
+  let maxChildDepth = 0;
+  for (const child of getChildren(itemId)) {
+    maxChildDepth = Math.max(maxChildDepth, getRelativeFolderDepth(child.id));
+  }
+  return Math.max(ownDepth, ownDepth + maxChildDepth, maxChildDepth);
+}
+
+function sanitizeFolderParents() {
+  const folderIds = new Set(state.steps.filter(isWorkflowFolder).map((item) => item.id));
+  for (const item of state.steps) {
+    if (item.parentId && !folderIds.has(item.parentId)) item.parentId = "";
+    if (isWorkflowFolder(item) && item.parentId && isDescendantOf(item.parentId, item.id)) {
+      item.parentId = "";
+    }
+  }
+  for (const folder of state.steps.filter(isWorkflowFolder)) {
+    while (getFolderDepth(folder.id) > MAX_FOLDER_DEPTH) {
+      folder.parentId = getItemParentId(getWorkflowItem(folder.parentId)) || "";
+      if (!folder.parentId) break;
+    }
+  }
+}
+
+function getVisibleWorkflowItems(parentId = "", depth = 0, out = []) {
+  const children = getChildren(parentId);
+  for (const item of children) {
+    out.push({ item, depth });
+    if (isWorkflowFolder(item) && !item.collapsed) {
+      getVisibleWorkflowItems(item.id, depth + 1, out);
+    }
+  }
+  return out;
+}
+
+function getWorkflowItemsInTree(parentId = "", depth = 0, out = []) {
+  const children = getChildren(parentId);
+  for (const item of children) {
+    out.push({ item, depth });
+    if (isWorkflowFolder(item)) {
+      getWorkflowItemsInTree(item.id, depth + 1, out);
+    }
+  }
+  return out;
+}
+
+function getStepOrdinalMap() {
+  const map = new Map();
+  let ordinal = 1;
+  for (const entry of getWorkflowItemsInTree()) {
+    if (isWorkflowFolder(entry.item)) continue;
+    map.set(entry.item.id, ordinal++);
+  }
+  return map;
+}
+
+function getFolderLabel(folder) {
+  return folder?.displayName || folder?.name || "New Folder";
+}
+
+function getStepLabelText(step) {
+  return step?.displayName || step?.datasetTitle || step?.name || "Step";
+}
+
+function renumberStepNames() {
+  let ordinal = 1;
+  for (const entry of getWorkflowItemsInTree()) {
+    const item = entry.item;
+    if (isWorkflowFolder(item)) continue;
+    item.name = `Step ${ordinal++}`;
+  }
+}
+
+function canPlaceItemInParent(itemId, parentId) {
+  const item = getWorkflowItem(itemId);
+  const parent = parentId ? getWorkflowItem(parentId) : null;
+  if (!item) return false;
+  if (parentId && !isWorkflowFolder(parent)) return false;
+  if (parentId === itemId) return false;
+  if (parentId && isDescendantOf(parentId, itemId)) return false;
+  if (!isWorkflowFolder(item)) return true;
+  const parentDepth = parentId ? getFolderDepth(parentId) : 0;
+  return parentDepth + getRelativeFolderDepth(itemId) <= MAX_FOLDER_DEPTH;
+}
+
+function moveWorkflowItem(itemId, parentId = "", targetId = "", position = "end") {
+  const item = getWorkflowItem(itemId);
+  if (!item) return false;
+  const nextParentId = String(parentId || "");
+  if (!canPlaceItemInParent(itemId, nextParentId)) return false;
+
+  item.parentId = nextParentId;
+
+  const without = state.steps.filter((s) => s.id !== itemId);
+  let insertIndex = without.length;
+  const targetIndex = targetId ? without.findIndex((s) => s.id === targetId) : -1;
+  if (targetIndex >= 0) {
+    insertIndex = position === "after" ? targetIndex + 1 : targetIndex;
+  } else if (position === "start") {
+    insertIndex = without.findIndex((s) => getItemParentId(s) === nextParentId);
+    if (insertIndex < 0) insertIndex = without.length;
+  }
+  without.splice(insertIndex, 0, item);
+  state.steps = without;
+  renumberStepNames();
+  return true;
+}
+
+function getNextFolderName(parentId = "") {
+  const existing = new Set(getChildren(parentId).filter(isWorkflowFolder).map((item) => getFolderLabel(item)));
+  let i = 1;
+  while (existing.has(`New Folder ${i}`)) i += 1;
+  return `New Folder ${i}`;
+}
+
+function addWorkflowFolder(parentId = "") {
+  const normalizedParentId = String(parentId || "");
+  const parent = normalizedParentId ? getWorkflowItem(normalizedParentId) : null;
+  if (normalizedParentId && !isWorkflowFolder(parent)) return null;
+  if (normalizedParentId && getFolderDepth(normalizedParentId) >= MAX_FOLDER_DEPTH) {
+    setHint("Workflow folders support up to 3 nested levels.");
+    return null;
+  }
+  const id = `folder_${state.nextId++}`;
+  const name = getNextFolderName(normalizedParentId);
+  const folder = {
+    id,
+    itemType: WORKFLOW_ITEM_FOLDER,
+    name,
+    displayName: name,
+    parentId: normalizedParentId,
+    collapsed: false,
+  };
+  state.steps.push(folder);
+  return folder;
+}
+
+function deleteWorkflowItem(itemId) {
+  const item = getWorkflowItem(itemId);
+  if (!item) return;
+  if (isWorkflowFolder(item)) {
+    const parentId = getItemParentId(item);
+    for (const child of getChildren(item.id)) {
+      child.parentId = parentId;
+    }
+  }
+  const idx = state.steps.findIndex((s) => s.id === itemId);
+  if (idx >= 0) state.steps.splice(idx, 1);
+  if (state.activeId === itemId || !getWorkflowItem(state.activeId)) {
+    state.activeId = state.steps.find((s) => !isWorkflowFolder(s))?.id || null;
+  }
+  renumberStepNames();
+}
+
+function normalizeActiveWorkflowItem() {
+  const active = getWorkflowItem(state.activeId);
+  if (active && !isWorkflowFolder(active)) return;
+  state.activeId = state.steps.find((s) => !isWorkflowFolder(s))?.id || null;
 }
 
 function applyDatasetSettingsToStorage(stepId, settings) {
@@ -756,6 +1060,8 @@ async function loadWorkflowSnapshot(data) {
     state.steps = steps;
     state.activeId = data.activeId || (steps[0]?.id ?? null);
     state.nextId = data.nextId || computeNextId(steps);
+    sanitizeFolderParents();
+    normalizeActiveWorkflowItem();
     enforceSingleGlobalControlStep(state.activeId || "");
     state.globalControl = normalizeGlobalControl(data.globalControl);
     saveGlobalControlToStorage(state.globalControl);
@@ -815,24 +1121,32 @@ function beginWorkflowTitleEdit() {
   input.select();
 }
 
-function loadState() {
+async function loadState() {
   if (isFresh) {
     state.steps = [];
     state.activeId = null;
     state.nextId = 1;
-    state.globalControl = normalizeGlobalControl(null);
+    state.globalControl = await buildInitialGlobalControlFromUserPrefs();
     saveGlobalControlToStorage(state.globalControl);
     saveState();
     return;
   }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
+    if (!raw) {
+      state.globalControl = await buildInitialGlobalControlFromUserPrefs();
+      saveGlobalControlToStorage(state.globalControl);
+      saveState();
+      return;
+    }
     const s = JSON.parse(raw);
     if (!s || !Array.isArray(s.steps)) return;
     state.steps = s.steps;
     state.activeId = s.activeId || (s.steps[0]?.id ?? null);
     state.nextId = s.nextId || (s.steps.length + 1);
+    state.steps = state.steps.map((step, i) => normalizeLoadedStep(step, i));
+    sanitizeFolderParents();
+    normalizeActiveWorkflowItem();
     enforceSingleGlobalControlStep(state.activeId || "");
     state.globalControl = normalizeGlobalControl(s.globalControl || loadGlobalControlFromStorage());
     saveGlobalControlToStorage(state.globalControl);
@@ -840,7 +1154,8 @@ function loadState() {
 }
 
 function getActiveStep() {
-  return state.steps.find(s => s.id === state.activeId) || null;
+  const item = state.steps.find(s => s.id === state.activeId) || null;
+  return item && !isWorkflowFolder(item) ? item : null;
 }
 
 function setHint(txt) {
@@ -848,8 +1163,8 @@ function setHint(txt) {
 }
 
 function getStepLabel(step) {
-  const idx = state.steps.indexOf(step);
-  return `Step (${idx + 1})`;
+  const ordinal = getStepOrdinalMap().get(step?.id) || "";
+  return ordinal ? `Step (${ordinal})` : "Step";
 }
 
 function findGlobalControlStep(excludeStepId = "") {
@@ -951,6 +1266,7 @@ function renderPickerCards(step) {
       () => {
         step.mode = "dfm";
         renderWorkspaceForStep(step);
+        saveState();
       }
     )
   );
@@ -1009,9 +1325,11 @@ function renderEmbeddedDataset(step) {
   if (!iframe) {
     iframe = document.createElement("iframe");
     iframe.className = "embedFrame";
-    const ds = encodeURIComponent(step.datasetId || "paid_demo");
-    const inst = encodeURIComponent(step.id || "step");
-    iframe.src = `/ui/dataset/dataset_viewer.html?ds=${ds}&inst=${inst}`;
+    const params = new URLSearchParams();
+    params.set("ds", step.datasetId || "paid_demo");
+    params.set("inst", step.id || "step");
+    params.set("wf", instanceId);
+    iframe.src = `/ui/dataset/dataset_viewer.html?${params.toString()}`;
     iframe.addEventListener("load", () => {
       try {
         iframe.contentWindow?.postMessage(
@@ -1021,9 +1339,26 @@ function renderEmbeddedDataset(step) {
       } catch {
         // ignore
       }
+      try {
+        iframe.contentWindow?.postMessage(
+          { type: "arcrho:workflow-global-changed", globalControl: normalizeGlobalControl(state.globalControl), wf: instanceId },
+          "*"
+        );
+      } catch {
+        // ignore
+      }
     });
     datasetEmbedCache.set(step.id, iframe);
     host.appendChild(iframe);
+  } else {
+    try {
+      iframe.contentWindow?.postMessage(
+        { type: "arcrho:workflow-global-changed", globalControl: normalizeGlobalControl(state.globalControl), wf: instanceId },
+        "*"
+      );
+    } catch {
+      // ignore
+    }
   }
 
   for (const [id, frame] of datasetEmbedCache) {
@@ -1051,12 +1386,11 @@ function renderEmbeddedDfm(step) {
     params.set("wf", instanceId);
     if (step.datasetId) params.set("ds", step.datasetId);
     if (step.dfmTab) params.set("tab", step.dfmTab);
-    const gc = state.globalControl?.vars || [];
-    const proj = step.dfmSettings?.project || gc.find(v => v.key === "project")?.value || "";
-    const rc = step.dfmSettings?.reservingClass || gc.find(v => v.key === "reservingClass")?.value || "";
+    const proj = step.dfmSettings?.project || "";
+    const rc = step.dfmSettings?.reservingClass || "";
     const outputType = step.dfmSettings?.outputType || "";
-    if (proj) params.set("project", proj);
-    if (rc) params.set("class", rc);
+    if (proj && !isWorkflowDefaultReference(proj)) params.set("project", proj);
+    if (rc && !isWorkflowDefaultReference(rc)) params.set("class", rc);
     if (outputType) params.set("output_type", outputType);
     iframe.src = `/ui/dfm/dfm.html?${params.toString()}`;
     iframe.addEventListener("load", () => {
@@ -1076,9 +1410,26 @@ function renderEmbeddedDfm(step) {
       } catch {
         // ignore
       }
+      try {
+        iframe.contentWindow?.postMessage(
+          { type: "arcrho:workflow-global-changed", globalControl: normalizeGlobalControl(state.globalControl), wf: instanceId },
+          "*"
+        );
+      } catch {
+        // ignore
+      }
     });
     dfmEmbedCache.set(step.id, iframe);
     host.appendChild(iframe);
+  } else {
+    try {
+      iframe.contentWindow?.postMessage(
+        { type: "arcrho:workflow-global-changed", globalControl: normalizeGlobalControl(state.globalControl), wf: instanceId },
+        "*"
+      );
+    } catch {
+      // ignore
+    }
   }
 
   for (const [id, frame] of dfmEmbedCache) {
@@ -1118,6 +1469,7 @@ function renderPlaceholder(step, title) {
 async function openReservingClassTree(projectName, targetInput, anchorElement = null) {
   await openLazyReservingClassPicker({
     projectName,
+    workflowId: instanceId,
     initialPath: targetInput?.value || "",
     anchorElement: anchorElement || targetInput || null,
     setStatus: setHint,
@@ -1127,13 +1479,18 @@ async function openReservingClassTree(projectName, targetInput, anchorElement = 
       setHint("Error loading reserving class paths.");
     },
     onSelect: (path) => {
-      if (targetInput) targetInput.value = path;
+      if (targetInput) {
+        targetInput.value = path;
+        targetInput.dispatchEvent(new Event("input", { bubbles: true }));
+        targetInput.dispatchEvent(new Event("change", { bubbles: true }));
+      }
     },
   });
 }
 
 async function openProjectNameTree(targetInput, anchorElement = null) {
   await openProjectNameTreePicker({
+    workflowId: instanceId,
     initialProject: targetInput?.value || "",
     anchorElement: anchorElement || targetInput || null,
     setStatus: setHint,
@@ -1145,6 +1502,8 @@ async function openProjectNameTree(targetInput, anchorElement = null) {
     onSelect: (projectName) => {
       if (!targetInput) return;
       targetInput.value = String(projectName || "").trim();
+      targetInput.dispatchEvent(new Event("input", { bubbles: true }));
+      targetInput.dispatchEvent(new Event("change", { bubbles: true }));
     },
   });
 }
@@ -1157,25 +1516,22 @@ function renderGlobalControl(step) {
   box.className = "card wide";
   box.innerHTML = `
     <h3>Global Control</h3>
-    <div class="muted">Set defaults for new DFM steps in this workflow.</div>
+    <div class="muted">Set defaults for workflow Dataset and DFM objects.</div>
     <table class="gc-table">
       <thead>
         <tr>
           <th style="width: 30%;">Variable</th>
           <th style="width: 22%;">Type</th>
           <th>Value</th>
-          <th style="width: 70px;"></th>
         </tr>
       </thead>
       <tbody id="gcTableBody"></tbody>
     </table>
-    <div class="gc-actions">
-      <button id="gcAddRowBtn">Add Row</button>
-      <button id="gcSaveBtn">Save Defaults</button>
-      <button id="gcClearBtn">Clear Values</button>
-      <button id="gcBackBtn">Back</button>
+    <div id="gcTableCtxMenu" class="gcCtxMenu">
+      <div class="gcCtxItem" data-action="add">Add Row</div>
+      <div class="gcCtxItem" data-action="delete">Delete Row</div>
     </div>
-    <div class="gc-hint">These defaults apply to new DFM steps in this workflow.</div>
+    <div class="gc-hint">Right-click the table to add or delete rows. Changes save automatically.</div>
   `;
   workspaceEl.appendChild(box);
 
@@ -1183,11 +1539,9 @@ function renderGlobalControl(step) {
   const defaults = normalizeGlobalControl(state.globalControl);
   const rows = Array.isArray(defaults.vars) ? defaults.vars : [];
 
-  const defaultNameForKey = (key) => {
-    if (key === "project") return "Project";
-    if (key === "reservingClass") return "Reserving Class";
-    return "";
-  };
+  const defaultNameForKey = (key) => getDefaultGlobalVarName(key);
+  let pendingApplyTimer = null;
+  let contextRow = null;
 
   /* ---- fetch project names for dropdown ---- */
   let _projectNames = [];
@@ -1207,10 +1561,6 @@ function renderGlobalControl(step) {
     inp.autocomplete = "off";
     inp.placeholder = "Loading...";
 
-    const arrow = document.createElement("span");
-    arrow.className = "gc-combo-arrow";
-    arrow.textContent = "\u25BC";
-
     const ul = document.createElement("ul");
     ul.className = "gc-combo-list";
 
@@ -1221,7 +1571,6 @@ function renderGlobalControl(step) {
     pickerBtn.textContent = "...";
 
     wrap.appendChild(inp);
-    wrap.appendChild(arrow);
     wrap.appendChild(ul);
     wrap.appendChild(pickerBtn);
 
@@ -1240,6 +1589,8 @@ function renderGlobalControl(step) {
         li.addEventListener("mousedown", (e) => {
           e.preventDefault();
           inp.value = p;
+          inp.dispatchEvent(new Event("input", { bubbles: true }));
+          inp.dispatchEvent(new Event("change", { bubbles: true }));
           wrap.classList.remove("open");
         });
         ul.appendChild(li);
@@ -1269,6 +1620,8 @@ function renderGlobalControl(step) {
         e.preventDefault();
         if (activeIdx >= 0 && items[activeIdx]) {
           inp.value = items[activeIdx].textContent;
+          inp.dispatchEvent(new Event("input", { bubbles: true }));
+          inp.dispatchEvent(new Event("change", { bubbles: true }));
         }
         close();
       } else if (e.key === "Escape") {
@@ -1276,13 +1629,6 @@ function renderGlobalControl(step) {
       }
     });
 
-    /* clicking the arrow toggles */
-    arrow.style.pointerEvents = "auto";
-    arrow.style.cursor = "pointer";
-    arrow.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      if (wrap.classList.contains("open")) close(); else { inp.focus(); open(); }
-    });
     pickerBtn.addEventListener("mousedown", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -1292,11 +1638,7 @@ function renderGlobalControl(step) {
 
     _projectNamesReady.then(() => {
       inp.placeholder = "";
-      if (initialValue && _projectNames.includes(initialValue)) {
-        inp.value = initialValue;
-      } else if (_projectNames.length) {
-        inp.value = _projectNames[0];
-      }
+      if (initialValue) inp.value = initialValue;
     });
 
     return wrap;
@@ -1314,13 +1656,11 @@ function renderGlobalControl(step) {
       <td><input class="gc-name" type="text" /></td>
       <td><select class="gc-type">${typeOptionsHtml}</select></td>
       <td class="gc-value-cell"></td>
-      <td><button class="gc-remove" type="button">Remove</button></td>
     `;
 
     const nameInput = tr.querySelector(".gc-name");
     const typeSelect = tr.querySelector(".gc-type");
     const valueCell = tr.querySelector(".gc-value-cell");
-    const removeBtn = tr.querySelector(".gc-remove");
 
     if (nameInput) nameInput.value = row.name || defaultNameForKey(row.key);
     if (typeSelect) {
@@ -1382,19 +1722,16 @@ function renderGlobalControl(step) {
     };
 
     renderValueInput();
-    typeSelect?.addEventListener("change", renderValueInput);
+    typeSelect?.addEventListener("change", () => {
+      renderValueInput();
+      scheduleApply();
+    });
 
     if (row.key) {
       if (nameInput) {
         nameInput.disabled = true;
         nameInput.title = "System variable";
       }
-      if (removeBtn) {
-        removeBtn.disabled = true;
-        removeBtn.style.visibility = "hidden";
-      }
-    } else if (removeBtn) {
-      removeBtn.addEventListener("click", () => tr.remove());
     }
 
     tbody?.appendChild(tr);
@@ -1417,31 +1754,70 @@ function renderGlobalControl(step) {
   };
 
   const apply = () => {
+    if (pendingApplyTimer) {
+      clearTimeout(pendingApplyTimer);
+      pendingApplyTimer = null;
+    }
     const next = { vars: collectRows() };
     state.globalControl = normalizeGlobalControl(next);
     saveState();
     broadcastGlobalControlChange();
   };
 
-  box.querySelector("#gcAddRowBtn")?.addEventListener("click", () => {
-    renderRow({ key: "", name: "", type: GLOBAL_VAR_TYPE_STRING, value: "" });
-  });
+  const scheduleApply = () => {
+    if (pendingApplyTimer) clearTimeout(pendingApplyTimer);
+    pendingApplyTimer = setTimeout(() => {
+      apply();
+      setHint("Global Control - defaults saved");
+    }, 120);
+  };
 
-  box.querySelector("#gcSaveBtn")?.addEventListener("click", () => {
+  const addRow = () => {
+    renderRow({ key: "", name: "", type: GLOBAL_VAR_TYPE_STRING, value: "" });
     apply();
     setHint("Global Control - defaults saved");
-  });
+  };
 
-  box.querySelector("#gcClearBtn")?.addEventListener("click", () => {
-    const inputs = tbody ? Array.from(tbody.querySelectorAll(".gc-value")) : [];
-    inputs.forEach((el) => { el.value = ""; });
+  const deleteRow = (rowEl) => {
+    if (!rowEl) return;
+    if (rowEl.dataset.key) {
+      setHint("<Default Project> and Default Path rows cannot be deleted.");
+      return;
+    }
+    rowEl.remove();
     apply();
+    setHint("Global Control - defaults saved");
+  };
+
+  tbody?.addEventListener("input", scheduleApply);
+  tbody?.addEventListener("change", scheduleApply);
+
+  const ctxMenu = box.querySelector("#gcTableCtxMenu");
+  box.querySelector(".gc-table")?.addEventListener("contextmenu", (event) => {
+    if (!ctxMenu) return;
+    event.preventDefault();
+    contextRow = event.target?.closest?.("tr") || null;
+    openContextMenu(ctxMenu, {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      openClass: "open",
+      align: "top-left",
+    });
   });
 
-  box.querySelector("#gcBackBtn")?.addEventListener("click", () => {
-    step.mode = "picker";
-    renderWorkspaceForStep(step);
-    saveState();
+  ctxMenu?.addEventListener("click", (event) => {
+    const item = event.target?.closest?.(".gcCtxItem");
+    const action = item?.dataset?.action || "";
+    ctxMenu.classList.remove("open");
+    ctxMenu.style.display = "none";
+    if (action === "add") addRow();
+    if (action === "delete") deleteRow(contextRow);
+  });
+
+  window.addEventListener("mousedown", (event) => {
+    if (ctxMenu?.contains(event.target)) return;
+    ctxMenu?.classList.remove("open");
+    if (ctxMenu) ctxMenu.style.display = "none";
   });
 }
 
@@ -1639,6 +2015,21 @@ function openStepCtxMenu(stepId, anchorEl, x, y) {
   if (!menu) return;
   __stepCtx.open = true;
   __stepCtx.stepId = stepId;
+  const item = getWorkflowItem(stepId);
+  const canNestFolder = !item
+    ? true
+    : isWorkflowFolder(item)
+      ? getFolderDepth(item.id) < MAX_FOLDER_DEPTH
+      : true;
+  menu.querySelectorAll(".stepCtxItem").forEach((menuItem) => {
+    const action = menuItem.dataset.action || "";
+    if (action === "new_folder") {
+      menuItem.classList.toggle("disabled", !canNestFolder);
+      return;
+    }
+    const disabled = !item || (action === "duplicate" && isWorkflowFolder(item));
+    menuItem.classList.toggle("disabled", disabled);
+  });
 
   openContextMenu(menu, {
     anchorEl,
@@ -1651,7 +2042,21 @@ function openStepCtxMenu(stepId, anchorEl, x, y) {
 }
 
 function runStepCtxAction(action) {
-  const step = state.steps.find(s => s.id === __stepCtx.stepId);
+  const step = getWorkflowItem(__stepCtx.stepId);
+  const contextParentId = step
+    ? (isWorkflowFolder(step) ? step.id : getItemParentId(step))
+    : "";
+
+  if (action === "new_folder") {
+    const folder = addWorkflowFolder(contextParentId);
+    closeStepCtxMenu();
+    if (!folder) return;
+    render();
+    saveState();
+    beginInlineRename(folder.id);
+    return;
+  }
+
   if (!step) { closeStepCtxMenu(); return; }
 
   if (action === "rename") {
@@ -1659,6 +2064,10 @@ function runStepCtxAction(action) {
     beginInlineRename(step.id);
     return;
   } else if (action === "duplicate") {
+    if (isWorkflowFolder(step)) {
+      closeStepCtxMenu();
+      return;
+    }
     const id = `step_${state.nextId++}`;
     const clone = JSON.parse(JSON.stringify(step));
     clone.id = id;
@@ -1668,14 +2077,11 @@ function runStepCtxAction(action) {
     const base = (step.displayName || step.datasetTitle || step.name || "Step");
     clone.displayName = `${base} Copy`;
     clone.isCustomName = true;
+    clone.parentId = getItemParentId(step);
     state.steps.push(clone);
     state.activeId = id;
   } else if (action === "delete") {
-    const idx = state.steps.findIndex(s => s.id === step.id);
-    if (idx >= 0) state.steps.splice(idx, 1);
-    if (state.activeId === step.id) {
-      state.activeId = state.steps[0]?.id || null;
-    }
+    deleteWorkflowItem(step.id);
   }
 
   closeStepCtxMenu();
@@ -1687,9 +2093,11 @@ function wireStepContextMenu() {
   const menu = document.getElementById("stepCtxMenu");
   if (!menu || menu.dataset.wired === "1") return;
   menu.dataset.wired = "1";
+  const sidebar = document.getElementById("workflowSidebar");
 
   menu.addEventListener("click", (event) => {
     const item = event.target?.closest?.(".stepCtxItem");
+    if (item?.classList?.contains("disabled")) return;
     const action = item?.dataset?.action;
     if (!action) return;
     runStepCtxAction(action);
@@ -1697,10 +2105,18 @@ function wireStepContextMenu() {
 
   window.addEventListener("click", () => closeStepCtxMenu());
   window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeStepCtxMenu(); });
+  sidebar?.addEventListener("contextmenu", (event) => {
+    if (event.target?.closest?.(".stepBtn")) return;
+    if (event.target?.closest?.("#stepCtxMenu")) return;
+    if (event.target?.closest?.("#sidebarHeader, #addStepTile, #importWorkflowTile")) return;
+    event.preventDefault();
+    openStepCtxMenu(null, sidebar, event.clientX, event.clientY);
+  });
   const stepCtxHotkeys = {
     r: "rename",
     d: "delete",
     b: "duplicate",
+    f: "new_folder",
   };
   window.addEventListener("keydown", (e) => {
     if (!__stepCtx.open) return;
@@ -1714,23 +2130,28 @@ function wireStepContextMenu() {
 
 
 function beginInlineRename(stepId) {
-  const btn = stepsEl.querySelector(`button[data-step-id="${stepId}"]`);
+  const btn = stepsEl.querySelector(`[data-step-id="${stepId}"]`);
   if (!btn) return;
 
-  const step = state.steps.find(s => s.id === stepId);
+  const step = getWorkflowItem(stepId);
   if (!step) return;
 
-  const current = (step.displayName || step.datasetTitle || step.name || "");
+  const current = isWorkflowFolder(step) ? getFolderLabel(step) : getStepLabelText(step);
   const input = document.createElement("input");
   input.type = "text";
   input.className = "stepRenameInput";
   input.value = current;
   input.dataset.stepId = stepId;
+  input.style.marginLeft = `${Number(btn.dataset.depth || 0) * 16}px`;
 
   const finish = (commit) => {
     const val = input.value.trim();
     if (commit) {
-      if (val === "") {
+      if (isWorkflowFolder(step)) {
+        const next = val || "New Folder";
+        step.displayName = next;
+        step.name = next;
+      } else if (val === "") {
         step.displayName = "";
         step.isCustomName = false;
       } else {
@@ -1759,59 +2180,68 @@ function beginInlineRename(stepId) {
   input.select();
 }
 
-let __dragStepId = null;
-let __dragPlaceholderId = null;
+let __dragItemId = null;
+let __dropHint = null;
 
-function captureStepReflowAnimation() {
-  if (!stepsEl) return () => {};
-  const items = Array.from(
-    stepsEl.querySelectorAll(".stepBtn:not(.dragging):not(.placeholder)")
-  );
-  const firstRects = new Map();
-  items.forEach((el) => {
-    firstRects.set(el, el.getBoundingClientRect());
+function clearDropIndicators() {
+  stepsEl?.querySelectorAll(".drop-before,.drop-after,.drop-into").forEach((el) => {
+    el.classList.remove("drop-before", "drop-after", "drop-into");
   });
-  return () => {
-    items.forEach((el) => {
-      const first = firstRects.get(el);
-      if (!first) return;
-      const last = el.getBoundingClientRect();
-      const dx = first.left - last.left;
-      const dy = first.top - last.top;
-      if (!dx && !dy) return;
-      if (el.animate) {
-        el.animate(
-          [
-            { transform: `translate(${dx}px, ${dy}px)` },
-            { transform: "translate(0, 0)" },
-          ],
-          { duration: 160, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" }
-        );
-      } else {
-        el.style.transform = `translate(${dx}px, ${dy}px)`;
-        el.getBoundingClientRect();
-        el.style.transform = "";
-      }
-    });
-  };
 }
 
-function reorderStepsByIds(ids) {
-  const map = new Map(state.steps.map(s => [s.id, s]));
-  const next = [];
-  for (const id of ids) {
-    const s = map.get(id);
-    if (s) next.push(s);
+function computeDropHint(event) {
+  if (!__dragItemId) return null;
+  const targetEl = event.target?.closest?.(".stepBtn");
+  if (!targetEl || !stepsEl.contains(targetEl)) {
+    return { mode: "root-end", targetId: "" };
   }
-  // Append any missing (safety)
-  for (const s of state.steps) {
-    if (!next.some(x => x.id === s.id)) next.push(s);
+  const targetId = targetEl.dataset.stepId || "";
+  if (!targetId || targetId === __dragItemId) return null;
+  const targetItem = getWorkflowItem(targetId);
+  if (!targetItem) return null;
+  const rect = targetEl.getBoundingClientRect();
+  const offset = event.clientY - rect.top;
+  const topZone = rect.height * 0.28;
+  const bottomZone = rect.height * 0.72;
+  if (isWorkflowFolder(targetItem) && offset >= topZone && offset <= bottomZone) {
+    return { mode: "inside", targetId };
   }
-  state.steps = next;
-  // Renumber step names to match new positions
-  for (let i = 0; i < state.steps.length; i++) {
-    state.steps[i].name = `Step ${i + 1}`;
+  return { mode: offset < rect.height / 2 ? "before" : "after", targetId };
+}
+
+function applyDropHintClass(hint) {
+  clearDropIndicators();
+  if (!hint?.targetId) return;
+  const targetEl = stepsEl?.querySelector(`[data-step-id="${hint.targetId}"]`);
+  if (!targetEl) return;
+  if (hint.mode === "inside") targetEl.classList.add("drop-into");
+  if (hint.mode === "before") targetEl.classList.add("drop-before");
+  if (hint.mode === "after") targetEl.classList.add("drop-after");
+}
+
+function applyDropHint(hint) {
+  if (!__dragItemId || !hint) return false;
+  if (hint.mode === "inside") {
+    const target = getWorkflowItem(hint.targetId);
+    if (!isWorkflowFolder(target)) return false;
+    if (!canPlaceItemInParent(__dragItemId, target.id)) {
+      setHint("Workflow folders support up to 3 nested levels.");
+      return false;
+    }
+    target.collapsed = false;
+    return moveWorkflowItem(__dragItemId, target.id, "", "end");
   }
+  if (hint.mode === "before" || hint.mode === "after") {
+    const target = getWorkflowItem(hint.targetId);
+    if (!target) return false;
+    const parentId = getItemParentId(target);
+    if (!canPlaceItemInParent(__dragItemId, parentId)) {
+      setHint("Workflow folders support up to 3 nested levels.");
+      return false;
+    }
+    return moveWorkflowItem(__dragItemId, parentId, target.id, hint.mode);
+  }
+  return moveWorkflowItem(__dragItemId, "", "", "end");
 }
 
 function wireStepDnD() {
@@ -1819,67 +2249,72 @@ function wireStepDnD() {
   stepsEl.dataset.dndWired = "1";
 
   stepsEl.addEventListener("dragover", (e) => {
-    if (!__dragStepId) return;
+    if (!__dragItemId) return;
     e.preventDefault();
-
-    const overBtn = e.target.closest(".stepBtn");
-    if (!overBtn || overBtn.dataset.stepId === __dragStepId) return;
-
-    const rect = overBtn.getBoundingClientRect();
-    const before = (e.clientY - rect.top) < (rect.height / 2);
-    const placeholder = stepsEl.querySelector(`.stepBtn.placeholder`);
-    if (!placeholder) return;
-
-    const animate = captureStepReflowAnimation();
-    if (before) {
-      stepsEl.insertBefore(placeholder, overBtn);
-    } else {
-      stepsEl.insertBefore(placeholder, overBtn.nextSibling);
-    }
-    animate();
+    __dropHint = computeDropHint(e);
+    applyDropHintClass(__dropHint);
+    e.dataTransfer.dropEffect = "move";
   });
 
   stepsEl.addEventListener("drop", (e) => {
-    if (!__dragStepId) return;
+    if (!__dragItemId) return;
     e.preventDefault();
-
-    const placeholder = stepsEl.querySelector(`.stepBtn.placeholder`);
-    if (!placeholder) return;
-
-    // Build order from DOM, placing dragged id at placeholder position
-    const ordered = [];
-    for (const child of stepsEl.children) {
-      if (child === placeholder) {
-        ordered.push(__dragStepId);
-      } else if (child.classList.contains('stepBtn') && !child.classList.contains('placeholder')) {
-        const id = child.dataset.stepId;
-        if (id && id !== __dragStepId) ordered.push(id);
-      }
+    const moved = applyDropHint(__dropHint || computeDropHint(e));
+    __dragItemId = null;
+    __dropHint = null;
+    clearDropIndicators();
+    if (!moved) {
+      renderStepsList();
+      return;
     }
-
-    reorderStepsByIds(ordered);
-    __dragStepId = null;
     render();
     saveState();
+  });
+
+  stepsEl.addEventListener("dragleave", (e) => {
+    if (stepsEl.contains(e.relatedTarget)) return;
+    clearDropIndicators();
+    __dropHint = null;
+  });
+
+  stepsEl.addEventListener("contextmenu", (e) => {
+    if (e.target?.closest?.(".stepBtn")) return;
+    e.preventDefault();
+    openStepCtxMenu(null, stepsEl, e.clientX, e.clientY);
   });
 }
 
 function renderStepsList() {
   stepsEl.innerHTML = "";
+  sanitizeFolderParents();
+  const visibleItems = getVisibleWorkflowItems();
+  const stepOrdinals = getStepOrdinalMap();
 
-  for (let i = 0; i < state.steps.length; i++) {
-    const s = state.steps[i];
+  for (const { item: s, depth } of visibleItems) {
+    const isFolder = isWorkflowFolder(s);
     const btn = document.createElement("button");
-    btn.className = "stepBtn";
+    btn.className = isFolder ? "stepBtn folderBtn" : "stepBtn";
     btn.dataset.stepId = s.id;
-    btn.dataset.stepIndex = String(i + 1);
+    btn.dataset.depth = String(depth);
+    btn.dataset.itemType = isFolder ? WORKFLOW_ITEM_FOLDER : "step";
+    const stepIndex = stepOrdinals.get(s.id) || "";
+    btn.dataset.stepIndex = String(stepIndex || "");
     btn.setAttribute("draggable", "true");
-    btn.classList.toggle("active", s.id === state.activeId);
-    const label = (s.displayName || s.datasetTitle || s.name || "Step");
+    btn.style.paddingLeft = `${10 + depth * 16}px`;
+    btn.classList.toggle("active", !isFolder && s.id === state.activeId);
+    btn.classList.toggle("collapsed", isFolder && !!s.collapsed);
+    const label = isFolder ? getFolderLabel(s) : getStepLabelText(s);
 
     const indexEl = document.createElement("span");
     indexEl.className = "stepIndex";
-    indexEl.textContent = String(i + 1);
+    indexEl.textContent = isFolder ? "F" : String(stepIndex || "");
+
+    if (isFolder) {
+      const folderChevron = document.createElement("span");
+      folderChevron.className = "folderChevron";
+      folderChevron.textContent = s.collapsed ? "\u203a" : "\u2304";
+      btn.appendChild(folderChevron);
+    }
 
     const labelEl = document.createElement("span");
     labelEl.className = "stepLabel";
@@ -1888,6 +2323,12 @@ function renderStepsList() {
     btn.appendChild(indexEl);
     btn.appendChild(labelEl);
     btn.addEventListener("click", () => {
+      if (isFolder) {
+        s.collapsed = !s.collapsed;
+        renderStepsList();
+        saveState();
+        return;
+      }
       state.activeId = s.id;
       render();
       saveState();
@@ -1924,40 +2365,22 @@ function renderStepsList() {
 
     btn.addEventListener("contextmenu", (e) => {
       e.preventDefault();
+      e.stopPropagation();
       openStepCtxMenu(s.id, btn, e.clientX, e.clientY);
     });
 
     btn.addEventListener("dragstart", (e) => {
-      __dragStepId = s.id;
+      __dragItemId = s.id;
       btn.classList.add("dragging");
       e.dataTransfer.effectAllowed = "move";
-
-      // create placeholder after dragged item
-      const ph = document.createElement("button");
-      ph.className = "stepBtn placeholder";
-      ph.dataset.stepId = "__placeholder__";
-      const phIndex = document.createElement("span");
-      phIndex.className = "stepIndex";
-      phIndex.textContent = btn.dataset.stepIndex || "";
-      const phLabel = document.createElement("span");
-      phLabel.className = "stepLabel";
-      phLabel.textContent = label;
-      const phHover = document.createElement("span");
-      phHover.className = "stepHoverLabel";
-      phHover.textContent = label;
-      ph.appendChild(phIndex);
-      ph.appendChild(phLabel);
-      ph.appendChild(phHover);
-      __dragPlaceholderId = ph.dataset.stepId;
-      stepsEl.insertBefore(ph, btn.nextSibling);
+      try { e.dataTransfer.setData("text/plain", s.id); } catch {}
     });
 
     btn.addEventListener("dragend", () => {
-      const placeholder = stepsEl.querySelector(`.stepBtn.placeholder`);
-      if (placeholder && placeholder.parentNode) placeholder.parentNode.removeChild(placeholder);
+      clearDropIndicators();
       btn.classList.remove("dragging");
-      __dragStepId = null;
-      __dragPlaceholderId = null;
+      __dragItemId = null;
+      __dropHint = null;
     });
     stepsEl.appendChild(btn);
   }
@@ -2072,6 +2495,12 @@ const toggleSidebarBtn = document.getElementById("toggleSidebarBtn");
 
 const sidebarTitle = document.getElementById("sidebarTitle");
 sidebarTitle?.addEventListener("click", () => beginWorkflowTitleEdit());
+const workflowTitleRenameBtn = document.getElementById("workflowTitleRenameBtn");
+workflowTitleRenameBtn?.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  beginWorkflowTitleEdit();
+});
 
 toggleSidebarBtn?.addEventListener("click", () => {
   const collapsed = !document.body.classList.contains("sidebar-collapsed");
@@ -2079,7 +2508,7 @@ toggleSidebarBtn?.addEventListener("click", () => {
 });
 
 lastSavedPath = loadLastSavedPath();
-loadState();
+await loadState();
 bindDatasetTitleUpdates();
 wireWorkflowCommands();
 wireWorkflowHotkeys();

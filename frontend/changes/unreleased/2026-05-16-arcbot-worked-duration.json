@@ -1,0 +1,9 @@
+{
+  "type": "improvement",
+  "scope": "ui",
+  "audience": "user",
+  "summary": "Show ArcBot completed work duration in the progress-card title.",
+  "details": [
+    "ArcBot's completed progress card now says \"Worked for Xm Ys\" instead of only \"Worked\", while the right-side meta keeps the completed step count."
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "type": "improvement",
+  "scope": "ui",
+  "audience": "user",
+  "summary": "Animate ArcBot progress card collapse and expand.",
+  "details": [
+    "The ArcBot work summary card now smoothly animates its step list when it opens, collapses after completion, or is expanded again."
+  ]
+}

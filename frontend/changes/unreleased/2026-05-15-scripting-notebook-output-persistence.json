@@ -1,0 +1,10 @@
+{
+  "type": "improvement",
+  "scope": "ui",
+  "audience": "user",
+  "summary": "Persist scripting notebook outputs in saved `.ipynb` files.",
+  "details": [
+    "Code-cell stdout/stderr output and execution counts now save to `.ipynb` output fields and restore when the notebook is reopened.",
+    "Imported rich outputs remain preserved in the notebook JSON where possible, while the current UI shows unsupported rich output as a note."
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "type": "improvement",
+  "scope": "ui",
+  "audience": "user",
+  "summary": "Refine ArcBot chat history panel styling.",
+  "details": [
+    "Changed chat history actions to compact icon-only buttons and switched the panel to a flatter minimalist row style.",
+    "Long chat titles now clip with ellipsis so action buttons stay inside the history panel frame.",
+    "Removed the separate open-chat icon; clicking the session title/meta area now opens that chat."
+  ]
+}

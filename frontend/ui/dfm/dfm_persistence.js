@@ -24,6 +24,7 @@ import {
   getDfmIsDirty,
   sanitizeFileNamePart,
   getRatioSaveProjectName,
+  getResolvedProjectName,
   getResolvedReservingClass,
   getDfmDecimalPlaces,
   getEffectiveDevLabelsForModel,
@@ -137,8 +138,8 @@ function postDfmLookupDebugStatus(text, options = {}) {
 }
 
 function hasRequiredDfmInputs() {
-  const project = getTrimmedInputValue("projectSelect");
-  const reservingClass = getTrimmedInputValue("pathInput");
+  const project = getResolvedProjectName();
+  const reservingClass = getResolvedReservingClass();
   const tri = getTrimmedInputValue("triInput");
   const outputVector = getTrimmedInputValue("dfmOutputVector");
   const methodName = getTrimmedInputValue("dfmMethodName");
@@ -148,8 +149,8 @@ function hasRequiredDfmInputs() {
 }
 
 function hasRequiredDfmLookupInputs() {
-  const project = getTrimmedInputValue("projectSelect");
-  const reservingClass = getTrimmedInputValue("pathInput");
+  const project = getResolvedProjectName();
+  const reservingClass = getResolvedReservingClass();
   const methodName = getTrimmedInputValue("dfmMethodName");
   return !!(project && reservingClass && methodName);
 }
@@ -500,25 +501,6 @@ function isUserEntrySummaryRow(cfg) {
   return String(cfg?.averageType || "").trim().toLowerCase() === "user_entry";
 }
 
-function buildInputDataTriangleValues() {
-  const model = state.model;
-  if (!model || !Array.isArray(model.values) || !Array.isArray(model.mask)) return [];
-  const values = model.values;
-  const mask = model.mask;
-  const rowCount = Array.isArray(model.origin_labels) ? model.origin_labels.length : values.length;
-  const devs = getEffectiveDevLabelsForModel(model);
-  const colCount = devs.length || values.reduce((max, row) => Math.max(max, Array.isArray(row) ? row.length : 0), 0);
-  const out = [];
-  for (let r = 0; r < rowCount; r++) {
-    const row = [];
-    for (let c = 0; c < colCount; c++) {
-      row.push(mask?.[r]?.[c] ? roundAnalysisValue(values?.[r]?.[c]) : null);
-    }
-    out.push(trimTrailingNulls(row));
-  }
-  return out;
-}
-
 function buildCalculatedRatioTriangleValues() {
   const model = state.model;
   if (!model || !Array.isArray(model.values) || !Array.isArray(model.mask)) return [];
@@ -623,9 +605,19 @@ export async function buildDfmMethodPayloadWithPaths(options = {}) {
       inputTriangleCsvPath = "";
     }
   }
+  let ultimateVectorCsvPath = String(options?.ultimateVectorCsvPath || "").trim();
+  if (!ultimateVectorCsvPath) {
+    try {
+      const dataDir = await getRatioDataDir();
+      ultimateVectorCsvPath = `${dataDir}\\${getResultsCsvSuggestedName()}`;
+    } catch {
+      ultimateVectorCsvPath = "";
+    }
+  }
   return buildDfmMethodPayload({
     ...options,
     inputTriangleCsvPath,
+    ultimateVectorCsvPath,
   });
 }
 
@@ -650,7 +642,6 @@ function buildDfmGroupedMethodPayload(methodPayload) {
   const dataTab = {};
   copyExistingField(data, "origin labels", dataTab);
   copyExistingField(data, "data development labels", dataTab, "development labels");
-  copyExistingField(data, "input data triangle values", dataTab);
   copyExistingField(data, "input data triangle csv path", dataTab);
   const ratiosTab = {};
   const ratioTriangle = {};
@@ -676,7 +667,7 @@ function buildDfmGroupedMethodPayload(methodPayload) {
     "results tab": copyExistingFields(data, [
       "ratio basis dataset",
       "ultimate ratio decimal places",
-      "ultimate vector",
+      "ultimate vector csv path",
     ]),
     "notes tab": copyExistingFields(data, [
       "notes",
@@ -850,11 +841,9 @@ export function buildDfmMethodPayload(options = {}) {
   const dataDevelopmentLabels = devs.map((label) => String(label ?? ""));
   const ratioDevelopmentLabels = buildRatioDisplayHeaderLabels(devs);
   const avgSelection = buildAverageSelectionPayload();
-  const inputDataTriangleValues = buildInputDataTriangleValues();
   const calculatedRatioTriangleValues = buildCalculatedRatioTriangleValues();
   const pattern = trimMatrixToReferenceRowShape(buildRatioSelectionPattern(), calculatedRatioTriangleValues);
   const averageFormulaValues = buildAverageFormulaValues();
-  const resultVector = buildResultsVector();
   const notesText = getDfmNotesText();
   const ratioBasisDataset = getResultsRatioBasisSelection();
   const outputVector = getTrimmedInputValue("dfmOutputVector");
@@ -872,12 +861,11 @@ export function buildDfmMethodPayload(options = {}) {
     "origin labels": originLabels,
     "data development labels": dataDevelopmentLabels,
     "ratio development labels": ratioDevelopmentLabels,
-    "input data triangle values": inputDataTriangleValues,
     "input data triangle csv path": String(options?.inputTriangleCsvPath || ""),
     "ratio values": calculatedRatioTriangleValues,
     "average formulas": buildDfmAverageFormulaObject(summaryRows, avgSelection.matrix, averageFormulaValues),
     "percent developed curve": percentDevelopedCurve,
-    "ultimate vector": resultVector,
+    "ultimate vector csv path": String(options?.ultimateVectorCsvPath || ""),
     notes: notesText,
     name: methodName,
     "output type": outputVector,

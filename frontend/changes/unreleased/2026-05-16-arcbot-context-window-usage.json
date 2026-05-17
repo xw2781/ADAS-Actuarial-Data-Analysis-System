@@ -1,0 +1,10 @@
+{
+  "type": "improvement",
+  "scope": "ui",
+  "audience": "user",
+  "summary": "Show ArcBot context window usage in the chat UI.",
+  "details": [
+    "ArcBot's context panel now displays estimated tokens used, the configured context window, and percent used with a compact meter.",
+    "The Electron host includes context-window usage in ArcBot usage events; the default window is 200,000 tokens and can be overridden with `ARCRHO_CODEX_ASSISTANT_CONTEXT_WINDOW_TOKENS`."
+  ]
+}

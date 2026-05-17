@@ -68,7 +68,8 @@
       justify-content: center !important;
     }
 
-    body.sidebar-collapsed #sidebarTitle{
+    body.sidebar-collapsed #sidebarTitle,
+    body.sidebar-collapsed #workflowTitleRenameBtn{
       display: none !important;
     }
 
@@ -120,6 +121,37 @@
       max-width: 100%;
       box-sizing: border-box;
     }
+    #workflowTitleWrap {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+    }
+    #sidebarTitle {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #workflowTitleRenameBtn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      color: #888;
+      display: inline-flex;
+      align-items: center;
+      border-radius: 4px;
+      transition: color 0.15s, background 0.15s;
+      flex: 0 0 auto;
+    }
+    #workflowTitleRenameBtn:hover {
+      color: #0d6efd;
+      background: #e9ecef;
+    }
+    #workflowTitleRenameBtn svg {
+      display: block;
+    }
     #sidebarResizer {
       width: 8px;
       cursor: col-resize;
@@ -170,6 +202,24 @@
       transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease;
       will-change: transform;
     }
+    .stepBtn.folderBtn {
+      font-weight: 600;
+      background: rgba(248, 250, 252, 0.95);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .folderChevron {
+      display: inline-flex;
+      width: 14px;
+      height: 18px;
+      align-items: center;
+      justify-content: center;
+      color: #5d6878;
+      font-size: 14px;
+      line-height: 1;
+      flex: 0 0 14px;
+    }
     .stepBtn .stepIndex {
       display: none;
       min-width: 22px;
@@ -219,10 +269,27 @@
     .stepBtn.dragging {
       opacity: 0.6;
     }
-    .stepBtn.placeholder {
-      border: 1px dashed #9aa3af;
-      background: #f8fafc;
-      color: transparent;
+    .stepBtn.drop-before::before,
+    .stepBtn.drop-after::after {
+      content: "";
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      height: 2px;
+      background: #2563eb;
+      border-radius: 999px;
+      pointer-events: none;
+    }
+    .stepBtn.drop-before::before {
+      top: -4px;
+    }
+    .stepBtn.drop-after::after {
+      bottom: -4px;
+    }
+    .stepBtn.drop-into {
+      border-color: #2563eb;
+      box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.45);
+      background: #eef5ff;
     }
     .stepAddTile {
       margin-top: 6px;
@@ -281,6 +348,13 @@
       text-align: center;
       background: transparent;
       border-color: transparent;
+    }
+    body.sidebar-collapsed .stepBtn {
+      padding-left: 6px !important;
+      padding-right: 6px !important;
+    }
+    body.sidebar-collapsed .folderChevron {
+      display: none;
     }
     body.sidebar-collapsed .stepBtn .stepIndex {
       display: inline-block;
@@ -369,28 +443,43 @@
     }
     .gc-table .gc-type {
       cursor: pointer;
+      height: 30px;
+      padding: 0 28px 0 10px;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      background-color: #fff;
+      background-image:
+        linear-gradient(45deg, transparent 50%, #6b7280 50%),
+        linear-gradient(135deg, #6b7280 50%, transparent 50%);
+      background-position:
+        calc(100% - 15px) 12px,
+        calc(100% - 10px) 12px;
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+      color: #1f2937;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .gc-table .gc-type:hover {
+      border-color: #cbd5e1;
+      background-color: #f8fafc;
+    }
+    .gc-table .gc-type:focus {
+      border-color: #6b9dfb;
+      box-shadow: 0 0 0 2px rgba(107, 157, 251, 0.18);
     }
     /* custom project combo-box */
     .gc-combo { position: relative; width: 100%; }
     .gc-combo input {
       width: 100%;
       height: 28px;
-      padding: 0 52px 0 8px;
+      padding: 0 34px 0 8px;
       border: none;
       border-radius: 0;
       box-sizing: border-box;
       background: transparent;
       outline: none;
       cursor: text;
-    }
-    .gc-combo .gc-combo-arrow {
-      position: absolute;
-      right: 30px;
-      top: 50%;
-      transform: translateY(-50%);
-      pointer-events: none;
-      font-size: 10px;
-      color: #888;
     }
     .gc-combo-list {
       display: none;
@@ -531,17 +620,26 @@
     }
     .rc-tree-leaf:hover { background: #e8f0fe; }
 
-    .gc-remove {
-      padding: 4px 8px;
-      border: 1px solid #cfcfcf;
-      border-radius: 6px;
-      background: #f4f4f4;
-      cursor: pointer;
-      font-size: 12px;
-    }
-    .gc-remove:hover { background: #ececec; }
-    .gc-actions { display: flex; gap: 8px; margin-top: 12px; }
     .gc-hint { margin-top: 8px; font-size: 12px; color: #666; }
+    .gcCtxMenu {
+      position: fixed;
+      z-index: 9999;
+      min-width: 130px;
+      display: none;
+      background: #fff;
+      border: 1px solid #cfcfcf;
+      border-radius: 8px;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.12);
+      padding: 6px;
+    }
+    .gcCtxMenu.open { display: block; }
+    .gcCtxItem {
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .gcCtxItem:hover { background: rgba(0,0,0,0.06); }
 
     /* embedded iframe */
 
@@ -565,6 +663,13 @@
       font-size: 13px;
     }
     .stepCtxItem:hover { background: rgba(0,0,0,0.06); }
+    .stepCtxItem.disabled {
+      color: #aaa;
+      cursor: default;
+    }
+    .stepCtxItem.disabled:hover {
+      background: transparent;
+    }
     .stepCtxSep {
       height: 1px;
       background: #e7e7e7;
@@ -583,8 +688,13 @@
   <div class="row">
     <div class="left" id="workflowSidebar">
 
-      <div id="sidebarHeader" style="display:flex; align-items:center; justify-content:space-between;">
-        <b id="sidebarTitle" title="Click to rename">Workflow Designer</b>
+      <div id="sidebarHeader" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <div id="workflowTitleWrap">
+          <b id="sidebarTitle" title="Click to rename">Workflow Designer</b>
+          <button id="workflowTitleRenameBtn" type="button" title="Rename workflow" aria-label="Rename workflow">
+            <svg viewBox="0 0 32 32" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 4 L28 10 L12 26 L4 28 L6 20 Z"/><line x1="19" y1="7" x2="25" y2="13"/></svg>
+          </button>
+        </div>
         <button id="toggleSidebarBtn" title="Collapse sidebar"><</button>
       </div>
 
@@ -612,6 +722,8 @@
 
 
   <div id="stepCtxMenu">
+    <div class="stepCtxItem" data-action="new_folder">New Folder (F)</div>
+    <div class="stepCtxSep"></div>
     <div class="stepCtxItem" data-action="rename">Rename (R)</div>
     <div class="stepCtxItem" data-action="duplicate">Duplicate (B)</div>
     <div class="stepCtxSep"></div>

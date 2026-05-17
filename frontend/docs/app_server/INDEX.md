@@ -50,13 +50,14 @@ High-risk files that must follow contracts:
 <!-- MANUAL:BEGIN -->
 - Public interface is HTTP routes mounted by `app_server/main.py`; the frontend shell is served under `/ui` and shared icon assets under `/icons`.
 - Internal interface is router -> service -> filesystem/state helpers.
+- Packaged builds include the `arcrho_api` Python package in the frozen app server for scripting-console imports, and ship a pip-installable wheel under app resources `python_packages/` for external notebook environments.
 <!-- MANUAL:END -->
 
 ## Data/State/Caches
 <!-- MANUAL:BEGIN -->
 - Path and cache constants are centralized in `app_server/config.py`.
 - Several domains persist JSON caches under project folders or AppData.
-- Scripting notebook persistence is file-based under `~/Documents/ArcRho/scripts`; save writes `.ipynb` and load accepts `.ipynb` plus legacy `.arcnb`.
+- Scripting notebook persistence is file-based under `~/Documents/ArcRho/scripts`; save writes `.ipynb` with code-cell outputs/execution counts and load accepts `.ipynb` plus legacy `.arcnb`.
 - Scripting execution interrupt uses per-session cancellation with trace checks and an interruptible `time.sleep(...)` import hook so `/scripting/interrupt` can stop active cells promptly; `/scripting/run-stream` emits NDJSON stdout/stderr events for live output during long-running cells.
 <!-- MANUAL:END -->
 

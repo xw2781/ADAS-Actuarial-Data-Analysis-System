@@ -1,4 +1,5 @@
 import { openFloatingPathTreePicker } from "/ui/shared/path_tree_picker.js";
+import { buildWorkflowProjectRootNode } from "/ui/shared/workflow_global_picker_options.js";
 
 const DEFAULT_SOURCE = "project_map";
 const LOCAL_PROJECT_PREFS_ENDPOINT = "/local-project/preferences";
@@ -40,6 +41,16 @@ function splitProjectTreePath(fullPath) {
   const projectName = parts[parts.length - 1] || "";
   const folderPath = parts.length > 1 ? parts.slice(0, -1).join("\\") : "";
   return { folderPath, projectName };
+}
+
+function resolveProjectNameFromNode(path, node) {
+  return toText(node?.selectValue)
+    || toText(node?.select_value)
+    || toText(node?.projectName)
+    || toText(node?.project_name)
+    || toText(node?.value)
+    || toText(node?.name)
+    || toText(splitProjectTreePath(path).projectName);
 }
 
 function positionPickerBelowAnchor(doc, pickerEl, anchorEl) {
@@ -520,7 +531,9 @@ export async function openProjectNameTreePicker(options = {}) {
 
   try {
     const data = await loadProjectTreeData({ source, forceReload });
-    const rootNodes = Array.isArray(data?.rootNodes) ? data.rootNodes : [];
+    const baseRootNodes = Array.isArray(data?.rootNodes) ? data.rootNodes : [];
+    const workflowRootNode = buildWorkflowProjectRootNode(options, data?.fullPathByProject);
+    const rootNodes = workflowRootNode ? [workflowRootNode, ...baseRootNodes] : baseRootNodes;
     if (!rootNodes.length) {
       setStatus("No projects available.");
       return { ok: false, reason: "empty" };
@@ -546,7 +559,7 @@ export async function openProjectNameTreePicker(options = {}) {
           || Boolean(node?.has_children);
         if (hasChildren) return;
 
-        const projectName = toText(node?.name) || toText(splitProjectTreePath(node?.path).projectName);
+        const projectName = resolveProjectNameFromNode(node?.path, node);
         if (!projectName) return;
         const event = ctx?.event;
         openProjectNodeMenu({
@@ -568,7 +581,7 @@ export async function openProjectNameTreePicker(options = {}) {
       },
       onSelect: async (path, node) => {
         closeProjectNodeMenu("selected");
-        const projectName = toText(node?.name) || toText(splitProjectTreePath(path).projectName);
+        const projectName = resolveProjectNameFromNode(path, node);
         if (!projectName || !onSelect) return;
         try {
           const savedPreference = await saveLocalProjectPreference(projectName, data?.preference);

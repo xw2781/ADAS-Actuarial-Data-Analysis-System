@@ -1,0 +1,11 @@
+{
+  "type": "feature",
+  "scope": "project-instance",
+  "audience": "user",
+  "summary": "Added project instance tabs from Project Explorer for browsing reserving-class paths and project dataset types.",
+  "details": [
+    "Project tree rows now include a View datasets icon that opens a top-level project instance tab titled with the project name.",
+    "Project instance tabs show a reserving-class path selector, a dataset type table, and floating in-tab dataset windows that reuse the existing Dataset Viewer page with project/path prefilled.",
+    "The reserving-class path selector preserves the server-provided hierarchy and level labels, uses the same node icon language as the shared path picker, and scrolls independently from the dataset table."
+  ]
+}

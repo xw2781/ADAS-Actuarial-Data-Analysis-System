@@ -133,6 +133,12 @@ window.addEventListener("message", (e) => {
 window.addEventListener("storage", (e) => {
   if (!workflowId) return;
   if (e.key === `${WF_GLOBAL_CTRL_PREFIX}${workflowId}`) {
+    try {
+      const frameEl = window.frameElement;
+      if (frameEl && frameEl.offsetParent === null) return;
+    } catch {
+      // ignore
+    }
     handleWorkflowGlobalChange();
   }
 });
@@ -215,7 +221,8 @@ const stepId = instanceId.startsWith("step_") ? instanceId : null;
 const scopedKey = (k) => `${k}::${instanceId}`;
 const workflowId = qs.get("wf") || "";
 const WF_GLOBAL_CTRL_PREFIX = "arcrho_workflow_global_ctrl_v1::";
-const DEFAULT_DISPLAY = "Default";
+const DEFAULT_PROJECT_DISPLAY = "Default Project";
+const DEFAULT_PATH_DISPLAY = "Default Path";
 const DEFAULT_TOKEN = "__DEFAULT__";
 const BROWSING_HISTORY_MAX_ENTRIES = 15;
 const LEN_DROPDOWN_CONFIG = {
@@ -413,9 +420,16 @@ function saveDatasetProjectPrefs(raw) {
   });
 }
 
-function buildDefaultDisplayValue(raw) {
+function getDefaultDisplayLabelForInput(input) {
+  if (input?.id === "projectSelect") return DEFAULT_PROJECT_DISPLAY;
+  if (input?.id === "pathInput") return DEFAULT_PATH_DISPLAY;
+  return "Default";
+}
+
+function buildDefaultDisplayValue(input, raw) {
   const resolved = String(raw || "").trim();
-  return resolved ? `${DEFAULT_DISPLAY} (${resolved})` : DEFAULT_DISPLAY;
+  const label = getDefaultDisplayLabelForInput(input);
+  return resolved ? `${label} (${resolved})` : label;
 }
 
 function getDefaultValueForInput(input) {
@@ -430,9 +444,12 @@ function isDefaultTokenValue(value) {
   const v = String(value || "").trim();
   if (!v) return false;
   const lower = v.toLowerCase();
-  if (lower === DEFAULT_DISPLAY.toLowerCase() || lower === DEFAULT_TOKEN.toLowerCase()) return true;
-  const prefix = `${DEFAULT_DISPLAY.toLowerCase()} (`;
-  return lower.startsWith(prefix) && lower.endsWith(")");
+  if (lower === DEFAULT_TOKEN.toLowerCase() || lower === "default") return true;
+  const defaultLabels = [DEFAULT_PROJECT_DISPLAY, DEFAULT_PATH_DISPLAY];
+  return defaultLabels.some((label) => {
+    const labelLower = label.toLowerCase();
+    return lower === labelLower || (lower.startsWith(`${labelLower} (`) && lower.endsWith(")"));
+  });
 }
 
 function isInputDefaultBound(input) {
@@ -445,7 +462,7 @@ function setInputDefaultBound(input, bound) {
   if (!input) return;
   if (bound) {
     input.dataset.globalDefault = "1";
-    input.value = buildDefaultDisplayValue(getDefaultValueForInput(input));
+    input.value = buildDefaultDisplayValue(input, getDefaultValueForInput(input));
   } else {
     delete input.dataset.globalDefault;
   }
@@ -490,9 +507,9 @@ function renderProjectOptions(projects, activeValue = "") {
   const defaults = loadWorkflowDefaults();
   const defaultProject = (defaults?.project || "").trim();
   const options = [];
-  if (window.ADA_DFM_CONTEXT && defaultProject) {
+  if (workflowId && defaultProject) {
     options.push({
-      label: buildDefaultDisplayValue(defaultProject),
+      label: buildDefaultDisplayValue(document.getElementById("projectSelect"), defaultProject),
       value: DEFAULT_TOKEN,
     });
   }
@@ -952,7 +969,7 @@ function validateAndNormalizeProjectInput(options = {}) {
       if (strict && showMessage) {
         reportInputInvalid(
           input,
-          "Default Project Name is not in the valid list.",
+          "Default Project is not in the valid list.",
           "Invalid Project Name. Please select a valid project.",
         );
       }
@@ -1024,7 +1041,7 @@ async function validateAndNormalizeReservingClassInput(projectName, options = {}
       if (strict && showMessage) {
         reportInputInvalid(
           input,
-          "Default Reserving Class is empty.",
+          "Default Path is empty.",
           "Invalid Reserving Class. Please select a value from the valid list.",
         );
       }
@@ -1035,7 +1052,7 @@ async function validateAndNormalizeReservingClassInput(projectName, options = {}
       if (strict && showMessage) {
         reportInputInvalid(
           input,
-          "Default Reserving Class is not in the valid list for this project.",
+          "Default Path is not in the valid list for this project.",
           "Invalid Reserving Class. Please select a value from the valid list.",
         );
       }
@@ -1508,7 +1525,9 @@ async function restoreTriInputsFromStorage() {
     }
   }
   if (s && typeof s === "object") {
-    const project = String(s.project || "").trim();
+    const project = isDefaultTokenValue(s.project)
+      ? String(loadWorkflowDefaults()?.project || "").trim()
+      : String(s.project || "").trim();
     const prefs = await loadDatasetProjectPrefs(project);
     if (prefs) {
       s = {
@@ -1610,10 +1629,10 @@ function loadWorkflowDefaults() {
     if (!parsed || typeof parsed !== "object") return null;
     const vars = Array.isArray(parsed.vars) ? parsed.vars : null;
     const project = vars
-      ? getWorkflowVarValue(vars, "project", "Project")
+      ? (getWorkflowVarValue(vars, "project", "Default Project") || getWorkflowVarValue(vars, "project", "Project"))
       : (typeof parsed.project === "string" ? parsed.project : "");
     const reservingClass = vars
-      ? getWorkflowVarValue(vars, "reservingClass", "Reserving Class")
+      ? (getWorkflowVarValue(vars, "reservingClass", "Default Path") || getWorkflowVarValue(vars, "reservingClass", "Reserving Class"))
       : (typeof parsed.reservingClass === "string" ? parsed.reservingClass : "");
     return { project, reservingClass, vars: vars || [] };
   } catch {
@@ -1623,7 +1642,6 @@ function loadWorkflowDefaults() {
 
 function applyWorkflowDefaultsIfNew() {
   if (!workflowId) return;
-  if (!window.ADA_DFM_CONTEXT) return;
   if (hasScopedTriInputs()) return;
 
   const defaults = loadWorkflowDefaults();
@@ -1684,16 +1702,16 @@ function extractDefaultsFromControl(control) {
   if (!control || typeof control !== "object") return null;
   const vars = Array.isArray(control.vars) ? control.vars : null;
   const project = vars
-    ? getWorkflowVarValue(vars, "project", "Project")
+    ? (getWorkflowVarValue(vars, "project", "Default Project") || getWorkflowVarValue(vars, "project", "Project"))
     : (typeof control.project === "string" ? control.project : "");
   const reservingClass = vars
-    ? getWorkflowVarValue(vars, "reservingClass", "Reserving Class")
+    ? (getWorkflowVarValue(vars, "reservingClass", "Default Path") || getWorkflowVarValue(vars, "reservingClass", "Reserving Class"))
     : (typeof control.reservingClass === "string" ? control.reservingClass : "");
   return { project, reservingClass };
 }
 
 function handleWorkflowGlobalChange(control = null) {
-  if (!workflowId || !window.ADA_DFM_CONTEXT) return;
+  if (!workflowId) return;
   const projectInput = document.getElementById("projectSelect");
   const pathInput = document.getElementById("pathInput");
   const projectDefault = isInputDefaultBound(projectInput);

@@ -148,6 +148,32 @@ export function openProjectSettingsTab() {
   shell.saveState?.();
 }
 
+export function openProjectInstanceTab(project = {}) {
+  const projectName = String(project?.name || project?.projectName || "").trim();
+  if (!projectName) return null;
+  const existing = shell.state.tabs.find(t => t.type === "project_instance" && String(t.projectName || "").trim().toLowerCase() === projectName.toLowerCase());
+  if (existing) {
+    setActive(existing.id);
+    return existing;
+  }
+  const id = `pi_${shell.state.nextId++}`;
+  const tab = {
+    id,
+    title: projectName,
+    type: "project_instance",
+    projectName,
+    projectFolder: String(project?.folder || "").trim(),
+    projectTablePath: String(project?.tablePath || "").trim(),
+    iframe: null,
+    layout: "docked",
+  };
+  shell.state.tabs.push(tab);
+  setDockedActive(id);
+  shell.render?.();
+  shell.saveState?.();
+  return tab;
+}
+
 export function openBrowsingHistoryTab() {
   const existing = shell.state.tabs.find(t => t.type === "browsing_history");
   if (existing) {

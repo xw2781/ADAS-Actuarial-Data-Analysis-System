@@ -1,0 +1,6 @@
+{
+  "type": "fix",
+  "scope": "scripting",
+  "audience": "user",
+  "summary": "Fixed scripting console TOC jumps so they no longer shift the shell content or floating tab hosts."
+}

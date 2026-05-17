@@ -1,0 +1,9 @@
+{
+  "type": "improvement",
+  "scope": "ui",
+  "audience": "user",
+  "summary": "Match the ArcBot App Context tooltip styling.",
+  "details": [
+    "Updated the App Context hover tooltip to use the same rounded, softly animated style as the context-window token tooltip."
+  ]
+}

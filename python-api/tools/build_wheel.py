@@ -1,0 +1,111 @@
+"""Build a pure-Python arcrho-api wheel with only the standard library."""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import csv
+import hashlib
+import io
+import sys
+import tomllib
+import zipfile
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+PYPROJECT = ROOT / "pyproject.toml"
+SRC = ROOT / "src"
+
+
+def _wheel_escape(value: str) -> str:
+    return value.replace("-", "_").replace(".", "_")
+
+
+def _hash(data: bytes) -> str:
+    digest = hashlib.sha256(data).digest()
+    return "sha256=" + base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+
+
+def _metadata(project: dict) -> str:
+    lines = [
+        "Metadata-Version: 2.3",
+        f"Name: {project['name']}",
+        f"Version: {project['version']}",
+        f"Summary: {project.get('description', '')}",
+        f"Requires-Python: {project.get('requires-python', '>=3.10')}",
+    ]
+    license_value = project.get("license", {})
+    if isinstance(license_value, dict) and license_value.get("text"):
+        lines.append(f"License: {license_value['text']}")
+    for author in project.get("authors", []):
+        if author.get("name"):
+            lines.append(f"Author: {author['name']}")
+    for dependency in project.get("dependencies", []):
+        lines.append(f"Requires-Dist: {dependency}")
+    lines.append("")
+    readme = ROOT / str(project.get("readme", "README.md"))
+    if readme.exists():
+        lines.append(readme.read_text(encoding="utf-8"))
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _wheel_file() -> str:
+    return "\n".join(
+        [
+            "Wheel-Version: 1.0",
+            "Generator: arcrho-api standard-library wheel builder",
+            "Root-Is-Purelib: true",
+            "Tag: py3-none-any",
+            "",
+        ]
+    )
+
+
+def build_wheel(out_dir: Path) -> Path:
+    config = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
+    project = config["project"]
+    name = str(project["name"])
+    version = str(project["version"])
+    dist = _wheel_escape(name)
+    dist_info = f"{dist}-{version}.dist-info"
+    wheel_name = f"{dist}-{version}-py3-none-any.whl"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    wheel_path = out_dir / wheel_name
+
+    files: dict[str, bytes] = {}
+    package_root = SRC / "arcrho_api"
+    for path in sorted(package_root.rglob("*")):
+        if path.is_file() and path.suffix in {".py", ".pyi"}:
+            files[path.relative_to(SRC).as_posix()] = path.read_bytes()
+
+    files[f"{dist_info}/METADATA"] = _metadata(project).encode("utf-8")
+    files[f"{dist_info}/WHEEL"] = _wheel_file().encode("utf-8")
+
+    record_rows: list[list[str]] = []
+    for name_in_wheel, data in files.items():
+        record_rows.append([name_in_wheel, _hash(data), str(len(data))])
+    record_path = f"{dist_info}/RECORD"
+    record_rows.append([record_path, "", ""])
+    record_io = io.StringIO()
+    writer = csv.writer(record_io, lineterminator="\n")
+    writer.writerows(record_rows)
+    files[record_path] = record_io.getvalue().encode("utf-8")
+
+    with zipfile.ZipFile(wheel_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for name_in_wheel, data in files.items():
+            zf.writestr(name_in_wheel, data)
+    return wheel_path
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Build the arcrho-api wheel.")
+    parser.add_argument("--out-dir", default=str(ROOT / "dist"), help="Directory where the wheel is written.")
+    args = parser.parse_args(argv)
+    wheel_path = build_wheel(Path(args.out_dir).resolve())
+    print(wheel_path)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -37,3 +37,17 @@ dfm.set_selected_estimate("Simple - 3")
 dfm.save()
 ```
 
+## Installing From ArcRho
+
+ArcRho release builds ship a pip-installable wheel in the app resources folder:
+
+```powershell
+python -m pip install "<ArcRho install folder>\resources\python_packages\arcrho_api-0.1.0-py3-none-any.whl"
+```
+
+Development builds can create the same wheel without network access:
+
+```powershell
+python python-api\tools\build_wheel.py --out-dir python-api\dist
+python -m pip install python-api\dist\arcrho_api-0.1.0-py3-none-any.whl
+```

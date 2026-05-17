@@ -1,0 +1,6 @@
+{
+  "type": "improvement",
+  "scope": "ui",
+  "audience": "user",
+  "summary": "Reduced the shared app scrollbar width by about 15%."
+}

@@ -58,6 +58,7 @@ FRONTEND_ENTRY_HTMLS = [
     "ui/dfm/dfm.html",
     "ui/workflow/workflow.html",
     "ui/project_settings/project_settings.html",
+    "ui/project_instance/project_instance.html",
     "ui/scripting_console/scripting_console.html",
 ]
 
@@ -510,6 +511,17 @@ FRONTEND_DOC_META: Mapping[str, Dict[str, object]] = {
             ("ui/project_settings/project_settings_audit.js", "Audit log UI helper."),
         ],
     },
+    "project_instance": {
+        "doc": "docs/ui/project_instance.md",
+        "html": ["ui/project_instance/project_instance.html"],
+        "files": [
+            ("ui/project_instance/project_instance.html", "Project instance tab layout."),
+            ("ui/project_instance/project_instance.js", "Project instance path selector, dataset table, and in-tab dataset viewer windows."),
+            ("ui/dataset/dataset_viewer.html", "Reused dataset viewer page for floating dataset windows."),
+            ("ui/dataset/dataset_types_source.js", "Shared dataset type payload loader and normalizer."),
+            ("ui/shared/path_tree_picker.js", "Shared path tree data builder used for reserving-class hierarchy rendering."),
+        ],
+    },
     "scripting_console": {
         "doc": "docs/ui/scripting_console.md",
         "html": ["ui/scripting_console/scripting_console.html"],
@@ -835,6 +847,13 @@ def module_specs() -> Dict[str, ModuleDocSpec]:
             "data": "- Reads/writes settings payloads and folder structures.\n- Coordinates feature modules for mapping/type editors.",
             "tasks": "1. Add settings source behavior: update source key logic + endpoint calls.\n2. Update one feature pane: modify corresponding `project_settings_*` module.",
             "risks": "- Folder rename/duplicate/delete flows have rollback branches.\n- Large settings payload edits can impact response timing.",
+        },
+        "project_instance": {
+            "purpose": "Project instance workspace for browsing one project's reserving-class paths and dataset types.",
+            "external": "- Opened by shell as a `project_instance` iframe tab.\n- Calls shared dataset-types and reserving-class path endpoints through existing frontend helpers.\n- Embeds the existing Dataset Viewer page in draggable in-tab windows.",
+            "data": "- Uses the shell-persisted project name/folder/table path as tab inputs.\n- Keeps the selected reserving-class path in page memory and passes it into new dataset viewer windows.",
+            "tasks": "1. Change project instance launch behavior: update Project Settings sender and shell message/tab routing together.\n2. Change dataset-window behavior: update `project_instance.js` while preserving the reused Dataset Viewer page contract.",
+            "risks": "- Nested dataset iframes post messages to the project instance page before reaching the shell.\n- Dataset viewer query parameters must remain compatible with normal top-level dataset tabs.",
         },
         "scripting_console": {
             "purpose": "Notebook-style scripting workspace for code, markdown, raw cells, execution output, and sidebar panels.",

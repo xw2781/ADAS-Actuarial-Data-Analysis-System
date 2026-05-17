@@ -1,0 +1,10 @@
+{
+  "type": "improvement",
+  "scope": "ui",
+  "audience": "user",
+  "summary": "Show ArcBot task activity as live assistant-style updates.",
+  "details": [
+    "ArcBot now presents meaningful Codex activity as individual assistant-style update bubbles during a request instead of a fixed-stage progress card.",
+    "When a request completes, fails, or is canceled, the intermediate work updates collapse into a compact work archive above the final response."
+  ]
+}

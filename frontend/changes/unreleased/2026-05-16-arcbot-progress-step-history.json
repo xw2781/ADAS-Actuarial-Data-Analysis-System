@@ -1,0 +1,9 @@
+{
+  "type": "improvement",
+  "scope": "ui",
+  "audience": "user",
+  "summary": "Show DFM-focused ArcBot progress step history.",
+  "details": [
+    "For DFM-related requests, the ArcBot work summary card now keeps concise user-facing progress bullets under Codex work and Result while hiding generic request/app-context setup rows."
+  ]
+}

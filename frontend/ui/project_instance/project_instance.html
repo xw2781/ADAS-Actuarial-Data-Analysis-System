@@ -1,0 +1,407 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Project Instance</title>
+  <link rel="stylesheet" href="/ui/shared/scrollbars.css?v=20260516a"/>
+  <style>
+    :root {
+      --border: #d9dee8;
+      --text: #20242a;
+      --muted: #667085;
+      --panel-bg: #fff;
+      --header-bg: #f5f7fb;
+      --hover: #eef3ff;
+      --active: #dce9ff;
+      --shadow: 0 12px 30px rgba(20, 31, 51, 0.18);
+    }
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      color: var(--text);
+      background: #fff;
+      overflow: hidden;
+      user-select: none;
+    }
+    input, iframe {
+      user-select: text;
+    }
+    .pi-root {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      position: relative;
+      overflow: hidden;
+    }
+    .pi-toolbar {
+      height: 38px;
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--header-bg);
+      min-width: 0;
+    }
+    .pi-title {
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pi-subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .pi-status {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 38%;
+    }
+    .pi-status.error {
+      color: #b42318;
+    }
+    .pi-layout {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(260px, 30%) minmax(420px, 1fr);
+      overflow: hidden;
+    }
+    .pi-left {
+      border-right: 1px solid var(--border);
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #fcfcfd;
+    }
+    .pi-panel-title {
+      height: 34px;
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      font-size: 12px;
+      font-weight: 700;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel-bg);
+    }
+    .pi-selected-path {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      background: #fff;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-height: 16px;
+    }
+    .pi-path-tree {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      padding: 8px 0;
+      scrollbar-gutter: stable both-edges;
+    }
+    .ptree-empty {
+      padding: 12px;
+      color: #8a94a6;
+      font-size: 12px;
+    }
+    .ptree-node {
+      user-select: none;
+    }
+    .ptree-folder,
+    .ptree-leaf {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 26px;
+      min-width: 100%;
+      width: max-content;
+      padding: 3px 10px;
+      box-sizing: border-box;
+      cursor: pointer;
+      font-size: 12px;
+      color: #2f3846;
+    }
+    .ptree-folder:hover,
+    .ptree-leaf:hover {
+      background: var(--hover);
+    }
+    .ptree-leaf.active-path {
+      background: var(--active);
+    }
+    .ptree-arrow {
+      width: 14px;
+      height: 14px;
+      color: #7c8798;
+      flex: 0 0 auto;
+      transition: transform 0.12s ease;
+    }
+    .ptree-arrow.expanded {
+      transform: rotate(90deg);
+    }
+    .ptree-arrow svg {
+      width: 100%;
+      height: 100%;
+    }
+    .ptree-type-icon {
+      width: 13px;
+      height: 13px;
+      flex: 0 0 auto;
+      color: #6b7280;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .ptree-type-icon.calculated {
+      color: #2563eb;
+    }
+    .ptree-type-icon.calculated-muted,
+    .ptree-type-icon.imported,
+    .ptree-type-icon.source {
+      color: #6b7280;
+    }
+    .ptree-type-icon.folder {
+      color: #f0ad4e;
+    }
+    .ptree-type-icon.folder.open {
+      color: #ec971f;
+    }
+    .ptree-type-icon svg {
+      width: 100%;
+      height: 100%;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.9;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .ptree-type-icon.folder svg {
+      fill: currentColor;
+      stroke: none;
+    }
+    .ptree-label {
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+    .ptree-level {
+      margin-left: auto;
+      padding-left: 12px;
+      font-size: 11px;
+      color: #999;
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+    .ptree-children {
+      display: none;
+    }
+    .ptree-children.expanded {
+      display: block;
+    }
+    .pi-right {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #fff;
+    }
+    .pi-table-wrap {
+      flex: 1 1 auto;
+      min-height: 0;
+      min-width: 0;
+      overflow: auto;
+      position: relative;
+      background: #fff;
+      scrollbar-gutter: stable both-edges;
+    }
+    .pi-table {
+      width: 100%;
+      min-width: 1120px;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .pi-table th,
+    .pi-table td {
+      border: 1px solid var(--border);
+      padding: 6px 9px;
+      text-align: left;
+      vertical-align: middle;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 260px;
+    }
+    .pi-table th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #f5f5f5;
+      font-weight: 700;
+      color: #444c5a;
+    }
+    .pi-table tr {
+      cursor: default;
+    }
+    .pi-table tbody tr:hover {
+      background: #fff8df;
+    }
+    .pi-table-empty {
+      color: #8a94a6;
+      text-align: center;
+      padding: 18px;
+    }
+    .pi-window-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 20;
+    }
+    .pi-window {
+      position: absolute;
+      min-width: 420px;
+      min-height: 280px;
+      background: #fff;
+      border: 1px solid #aeb8ca;
+      box-shadow: var(--shadow);
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .pi-window-titlebar {
+      height: 30px;
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 8px 0 10px;
+      border-bottom: 1px solid #c9d1df;
+      background: #f0f3f8;
+      cursor: move;
+    }
+    .pi-window-title {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .pi-window-close {
+      width: 22px;
+      height: 22px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: #3f4652;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .pi-window-close:hover {
+      background: #e3e7ef;
+      border-color: #c4cad6;
+    }
+    .pi-window-close svg {
+      width: 13px;
+      height: 13px;
+      stroke: currentColor;
+    }
+    .pi-window-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      position: relative;
+    }
+    .pi-window-body iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #fff;
+    }
+    .pi-window-resize {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      width: 16px;
+      height: 16px;
+      cursor: nwse-resize;
+    }
+    .pi-window-resize::before {
+      content: "";
+      position: absolute;
+      right: 4px;
+      bottom: 4px;
+      width: 7px;
+      height: 7px;
+      border-right: 2px solid #9aa4b5;
+      border-bottom: 2px solid #9aa4b5;
+    }
+  </style>
+</head>
+<body>
+  <div class="pi-root" id="projectInstanceRoot">
+    <div class="pi-toolbar">
+      <div class="pi-title" id="projectTitle">Project</div>
+      <div class="pi-subtitle" id="projectSubtitle"></div>
+      <div class="pi-status" id="projectInstanceStatus"></div>
+    </div>
+    <div class="pi-layout">
+      <section class="pi-left" aria-label="Reserving class paths">
+        <div class="pi-panel-title">Reserving Class</div>
+        <div class="pi-selected-path" id="selectedPathText">Select a reserving class path.</div>
+        <div class="pi-path-tree" id="pathTree"></div>
+      </section>
+      <section class="pi-right" aria-label="Project datasets">
+        <div class="pi-panel-title">Datasets</div>
+        <div class="pi-table-wrap">
+          <table class="pi-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Dataset Type Name</th>
+                <th>Data Format</th>
+                <th>Formula</th>
+                <th>Category</th>
+                <th>Method Type</th>
+                <th>Last Modified</th>
+                <th>Created</th>
+                <th>User</th>
+              </tr>
+            </thead>
+            <tbody id="datasetTableBody">
+              <tr><td class="pi-table-empty" colspan="9">Loading dataset types...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+    <div class="pi-window-layer" id="datasetWindowLayer"></div>
+  </div>
+  <script type="module" src="/ui/project_instance/project_instance.js?v=20260517a"></script>
+</body>
+</html>

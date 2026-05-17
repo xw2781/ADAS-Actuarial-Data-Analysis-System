@@ -1,9 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
 from pathlib import Path
+from PyInstaller.utils.hooks import collect_submodules
 
 block_cipher = None
 build_dir = Path(SPECPATH)
 repo_root = build_dir.parent
+monorepo_root = repo_root.parent
+python_api_src = monorepo_root / 'python-api' / 'src'
 
 # Collect the served frontend tree.
 static_files = []
@@ -15,7 +18,7 @@ if ui_dir.exists():
 
 a = Analysis(
     [str(build_dir / 'server_entry.py')],
-    pathex=[str(repo_root)],
+    pathex=[str(repo_root), str(python_api_src)],
     binaries=[],
     datas=static_files,
     hiddenimports=[
@@ -48,7 +51,7 @@ a = Analysis(
         'app_server',
         'app_server.main',
         'app',
-    ],
+    ] + collect_submodules('arcrho_api'),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

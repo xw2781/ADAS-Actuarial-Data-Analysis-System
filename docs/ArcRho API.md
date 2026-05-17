@@ -179,6 +179,13 @@ reserving_class = project.reserving_class("Auto\\Private Passenger")
 dfm = reserving_class.dfm("Paid Loss Ultimate")
 ```
 
+Release packaging:
+
+- `python-api/tools/build_wheel.py` builds a standard pure-Python wheel with only the Python standard library.
+- `frontend/package.json` runs that wheel build before Electron packaging and ships the result under app resources as `python_packages/`.
+- `frontend/build/server.spec` includes `arcrho_api` in the frozen app server so the ArcRho scripting console can import it in packaged installs.
+- External user notebooks should install from the shipped wheel with `python -m pip install <wheel path>`; the ArcRho installer should not silently modify an arbitrary global Python environment.
+
 ## Core Object Model
 
 ### `ArcRhoClient`

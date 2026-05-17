@@ -106,6 +106,7 @@ async function runCell(id, options = {}) {
   renderToc();
 
   cell.outputEl.innerHTML = "";
+  cell.outputs = [];
   let stdoutEl = null;
   let stderrEl = null;
   let stdoutText = "";
@@ -222,6 +223,10 @@ async function runCell(id, options = {}) {
     if (Number.isInteger(nextExecutionCount)) {
       cell.executionCount = nextExecutionCount;
     }
+    cell.outputs = [
+      buildStreamIpynbOutput("stdout", stdoutText),
+      buildStreamIpynbOutput("stderr", stderrText),
+    ].filter(Boolean);
     cell.labelEl.className = "sc-cell-label";
     cell.labelEl.textContent = Number.isInteger(cell.executionCount)
       ? `[${cell.executionCount}]`
@@ -253,7 +258,13 @@ async function runCell(id, options = {}) {
     refreshVariables();
   } catch (err) {
     cell.labelEl.className = "sc-cell-label";
-    cell.outputEl.innerHTML = `<div class="out-error">Network error: ${escapeHtml(err.message)}</div>`;
+    cell.labelEl.textContent = Number.isInteger(cell.executionCount)
+      ? `[${cell.executionCount}]`
+      : "[ ]";
+    cell.labelEl.classList.toggle("empty", cell.labelEl.textContent === "[ ]");
+    const errorText = `Network error: ${err.message}`;
+    cell.outputEl.innerHTML = `<div class="out-error">${escapeHtml(errorText)}</div>`;
+    cell.outputs = [buildStreamIpynbOutput("stderr", errorText)].filter(Boolean);
     setCellOutputVisible(cell, true);
     cell.cellEl.classList.add("error");
     cell.labelEl.classList.add("err");
@@ -269,6 +280,7 @@ async function runCell(id, options = {}) {
     isRunning = false;
     setRunningUI(false);
     renderToc();
+    saveCellsToStorage();
     if (!skipQueueDrain) void drainPendingCellRuns();
   }
 }
@@ -305,6 +317,7 @@ function applyImportedCellState(cell, loadedCell) {
     updateCellExecTime(cell, loadedCell.execution_time_ms, startT, endT);
   }
 
+  cell.outputs = normalizeIpynbOutputs(loadedCell.outputs);
   const imported = loadedCell.import_output;
   if (!imported || typeof imported !== "object") {
     return { hasUnsupported: false };
@@ -484,10 +497,30 @@ function clearAllOutputs() {
       setMarkdownRenderedState(c, false);
     }
     c.outputEl.innerHTML = "";
+    c.outputs = [];
+    c.executionCount = null;
+    updateCellExecTime(c, null, null, null);
     setCellOutputVisible(c, false);
     updateCellIdleState(c);
   });
   refreshToc();
+  saveCellsToStorage();
+}
+
+function clearCellOutput(cell) {
+  if (!cell) return false;
+  if (normalizeCellType(cell.type) === CELL_TYPES.MARKDOWN) {
+    setMarkdownRenderedState(cell, false);
+  }
+  cell.outputEl.innerHTML = "";
+  cell.outputs = [];
+  cell.executionCount = null;
+  updateCellExecTime(cell, null, null, null);
+  setCellOutputVisible(cell, false);
+  updateCellIdleState(cell);
+  refreshToc();
+  saveCellsToStorage();
+  return true;
 }
 
 async function restartSession() {

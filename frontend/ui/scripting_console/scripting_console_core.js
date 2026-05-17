@@ -92,7 +92,7 @@ const shortcutInputs = Array.from(document.querySelectorAll(".sc-shortcuts-input
 // ---------------------------------------------------------------------------
 // Cell state
 // ---------------------------------------------------------------------------
-let cells = [];       // { id, type, editor, editorEl, topRowEl, inputFrameEl, bottomRowEl, outputSidePlaceholderEl, outputEl, outputFrameEl, labelEl, cellEl, runBtn, sectionToggleBtn, sectionCodeCountBadge, executionCount, markdownRendered, hiddenByControllers }
+let cells = [];       // { id, type, editor, editorEl, topRowEl, inputFrameEl, bottomRowEl, outputSidePlaceholderEl, outputEl, outputFrameEl, labelEl, cellEl, runBtn, sectionToggleBtn, sectionCodeCountBadge, executionCount, outputs, markdownRendered, hiddenByControllers }
 let nextCellId = 1;
 let focusedCellId = null;
 let editingCellId = null;
@@ -113,6 +113,7 @@ const SHORTCUT_ACTIONS = [
   { id: "runCellAlternate", label: "Run cell (alternate)" },
   { id: "runCellAdvance", label: "Run and advance to next cell" },
   { id: "toggleLineNumbers", label: "Toggle code cell line numbers" },
+  { id: "clearCellOutput", label: "Clear current cell output" },
   { id: "undoNotebook", label: "Undo notebook change" },
   { id: "redoNotebook", label: "Redo notebook change" },
   { id: "addCellBefore", label: "Add new cell before current" },
@@ -127,6 +128,7 @@ const SHORTCUT_DEFAULTS = Object.freeze({
   runCellAlternate: "Ctrl+Space",
   runCellAdvance: "Shift+Enter",
   toggleLineNumbers: "Ctrl+Shift+L",
+  clearCellOutput: "Alt+C",
   undoNotebook: "Z",
   redoNotebook: "Shift+Z",
   addCellBefore: "A",
@@ -218,7 +220,8 @@ require(["vs/editor/editor.main"], function () {
   const saved = forceFreshNotebook ? null : loadCellsFromStorage();
   if (saved && saved.length > 0) {
     saved.forEach((cellState) => {
-      addCell(cellState.source, null, "after", cellState.type, { recordUndo: false, persist: false });
+      const cell = addCell(cellState.source, null, "after", cellState.type, { recordUndo: false, persist: false });
+      if (typeof applyImportedCellState === "function") applyImportedCellState(cell, cellState);
     });
   } else {
     addCell(SAMPLE_CODE, null, "after", CELL_TYPES.CODE, { recordUndo: false });

@@ -8,7 +8,7 @@ Source Data tab derives origin/development date boundary inputs from table summa
 
 ## Entry Points
 <!-- AUTO-GEN:BEGIN frontend.project_settings.entry_points -->
-- `ui/project_settings/project_settings.html`: external scripts `/ui/project_settings/project_settings.js?v=2026050832`; inline imports _none_.
+- `ui/project_settings/project_settings.html`: external scripts `/ui/project_settings/project_settings.js?v=20260516a`; inline imports _none_.
 
 Detected `fetch(...)` targets in key JS files:
 - `/arcrho/headers/cache/clear`
@@ -32,6 +32,7 @@ Detected `arcrho:*` message types in key JS files:
 - `arcrho:close-shell-menus`
 - `arcrho:hotkey`
 - `arcrho:open-project`
+- `arcrho:open-project-instance`
 - `arcrho:project-settings-ribbon-changed`
 - `arcrho:status`
 - `arcrho:zoom`
@@ -51,6 +52,7 @@ Detected `arcrho:*` message types in key JS files:
 <!-- MANUAL:BEGIN -->
 - Calls `/project_settings/*`, `/table_summary*`, `/field_mapping`, `/general_settings`, `/arcrho/headers/cache/clear`, and related endpoints.
 - Uses `POST /project_settings/{source}/open_project_folder` from the detail header action to open the selected project's folder in the OS file explorer.
+- Posts `arcrho:open-project-instance` when the project tree's View datasets action is clicked for a project.
 - Folder tree "Create New Project" action calls `POST /project_settings/{source}/create_project_folder` before saving folder structure + settings JSON.
 - Dataset Types pane persists changes through `POST /dataset_types` (debounced auto-save).
 - Posts title/status events to shell.
@@ -59,6 +61,7 @@ Detected `arcrho:*` message types in key JS files:
 ## Data/State/Caches
 <!-- MANUAL:BEGIN -->
 - Reads/writes settings payloads and folder structures. Project map rows use `Project Name` and `Table Path`; folder placement is stored in `folder_structure.json`; obsolete `Folder`, `Preload`, `Project Settings`, and `Settings Profile` columns are stripped from in-memory data and saved payloads.
+- Project tree rows include a View datasets icon button that opens the selected project as a top-level project instance tab.
 - `Project Settings` ribbon page includes an `Open Folder` action button with folder icon styling and disabled-state feedback while the request is in flight.
 - Coordinates feature modules for mapping/type editors.
 - Dataset Types row mutations (add/edit/delete) update in-memory state and schedule per-project debounced save.
@@ -80,7 +83,7 @@ Detected `arcrho:*` message types in key JS files:
 - Reserving Class Types formula validation is scoped to the row currently being edited: `Apply` checks only that row's `Formula` / `EEX Formula`, and project save/autosave still proceeds even if untouched legacy rows contain invalid references; formulas may reference any existing reserving class type name in the current table, including user-defined rows, but any referenced name containing `+`, `-`, `*`, or `/` must be wrapped in double quotes. When the edited row references a missing name or leaves an operator-bearing name unquoted, the editor shows a floating tooltip above the relevant formula input with a check-spacing/check-spelling hint instead of opening a separate popup window.
 - Reserving Class Types editor shows a wider, resizable floating editor with auto-sizing Formula and EEX Formula frames that share the same review/edit token renderer and component drop handling; the EEX component tray starts hidden each time the editor opens. Each tray starts with selectable `+` and `-` operator chips styled like review-mode operators before available distinct names from the selected `Level`, uses light green for `+` and light yellow for `-` in both trays and formula review tokens, only one tray operator is active at a time per formula field, and the active operator remains selected for subsequent dragged/clicked components until the user chooses another operator or closes the editor. Calculated names with a non-empty Formula show the same stacked SVG marker used by the reserving-class picker, both formula fields have an edit mode for plain-text edits and a review mode that auto-fixes repeated/trailing operators before rendering, render known components as neutral no-fill pills, calculated components with the stacked SVG marker, unknown components with light red fill, and operators as larger SVG controls (`*` appears as `X`), components already present in the target formula are hidden from that field's tray, single-clicking a tray component appends it to the matching `Formula` or `EEX Formula` field while cleaning invalid adjacent operators and shows a short ghost-pill trajectory toward the formula review box, single-clicking a review-mode component pill removes that value with a short ghost-pill trajectory toward the matching component tray and rebalances operators, dragging a review-mode component pill outside its formula box also removes it, double-clicking either formula review box opens raw text editing, slash/dash-bearing names remain draggable/clickable as quoted tokens, component drags are blocked from dropping into non-matching editor fields, right-clicking either tray can replace the matching formula with either all selected-level components or only source-derived/imported components via `Select all Imported Items`, and `Escape` returns formula editing to review mode without closing the editor.
 - Reserving Class Types table right-click menu includes `Copy` before `Edit`; `Copy` copies the exact displayed text from the clicked cell to the clipboard.
-- Project Settings page imports the shared `ui/shared/scrollbars.css` WebKit scrollbar treatment used by Dataset/DFM, shell, and scripting pages.
+- Project Settings page imports the shared 20px `ui/shared/scrollbars.css` WebKit scrollbar treatment used by Dataset/DFM, shell, and scripting pages.
 - Project Settings right-click menus share a single `--project-settings-context-menu-font-size` control so project, folder, tree, Dataset Types, Reserving Class Types, and formula component context menus stay visually consistent.
 - Dataset Types header auto-fit measures full header content (label plus sort/filter controls); all Dataset Types headers are kept single-line.
 - Source Data date inputs are editable and saved per-project to `general_settings.json`.

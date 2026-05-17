@@ -1,0 +1,10 @@
+{
+  "type": "improvement",
+  "scope": "ui",
+  "audience": "user",
+  "summary": "Render ArcBot replies with richer formatting.",
+  "details": [
+    "ArcBot assistant replies now render a safe Markdown subset for bullets, bold emphasis, inline code, and code blocks.",
+    "Successful ArcBot responses reveal with a bounded typing animation instead of replacing the waiting bubble all at once."
+  ]
+}

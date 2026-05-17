@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import csv
+import re
+from collections.abc import Sequence
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,6 +40,25 @@ def _coerce_matrix(value: Any) -> list[list[Any]]:
     if not isinstance(value, list):
         return []
     return [row if isinstance(row, list) else [] for row in value]
+
+
+def _parse_csv_cell(value: str) -> Any:
+    text = str(value if value is not None else "").strip()
+    if text == "":
+        return None
+    try:
+        number = float(text.replace(",", ""))
+    except ValueError:
+        return text
+    return number
+
+
+def _read_csv_matrix(path: Path) -> list[list[Any]]:
+    try:
+        with path.open("r", encoding="utf-8-sig", newline="") as fh:
+            return [[_parse_csv_cell(cell) for cell in row] for row in csv.reader(fh)]
+    except OSError as err:
+        raise DfmDataError(f"Failed to read CSV file {path}: {err}") from err
 
 
 def _matrix_shape(reference: list[list[Any]]) -> tuple[int, int]:
@@ -112,6 +134,12 @@ def _number(value: Any) -> float | None:
     return number
 
 
+def _as_legacy_index(index: int) -> int:
+    """Resolve the public 1-based DFM index while tolerating 0 for first item."""
+    idx = int(index)
+    return idx - 1 if idx > 0 else idx
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat()
 
@@ -127,7 +155,15 @@ class DfmMethod:
         self.name = clean_text(name)
         self.file_path = file_path
         self.payload = payload
+        self._last_ratio_adjustment: dict[str, Any] | None = None
         self._ensure_grouped_payload()
+
+    def __len__(self) -> int:
+        labels = self._origin_labels()
+        if labels:
+            return len(labels)
+        rows, _cols = self._ratio_shape()
+        return rows
 
     @classmethod
     def load_existing(cls, reserving_class: "ReservingClass", name: str) -> "DfmMethod":
@@ -136,6 +172,42 @@ class DfmMethod:
             raise InvalidDfmJsonError(f"DFM method JSON not found: {file_path}")
         payload = read_json(file_path)
         return cls(reserving_class, name, payload, file_path)
+
+    @classmethod
+    def load_file(cls, file_path: str | Path, *, read_only: bool = False) -> "DfmMethod":
+        path = Path(file_path).expanduser().resolve()
+        if not path.exists():
+            raise InvalidDfmJsonError(f"DFM method JSON not found: {path}")
+        payload = read_json(path)
+        details = _get_tab(payload, "details tab")
+        name = clean_text(details.get("name")) or path.stem
+
+        class _StandaloneProject:
+            def __init__(self, method_path: Path, read_only_value: bool) -> None:
+                self.name = clean_text(_get_tab(payload, "method metadata").get("project")) or ""
+                self.path = method_path.parent.parent if method_path.parent.name.lower() == "methods" else method_path.parent
+                self.methods_dir = method_path.parent
+                self.data_dir = self.path / "data"
+                self.read_only = bool(read_only_value)
+
+            def dfm_path(self, _reserving_class: str, _name: str) -> Path:
+                return path
+
+            def rebuild_dfm_index(self) -> list[Any]:
+                return []
+
+        class _StandaloneReservingClass:
+            def __init__(self, project: _StandaloneProject) -> None:
+                self.project = project
+                self.path = clean_text(details.get("reserving class")) or ""
+
+            @property
+            def read_only(self) -> bool:
+                return self.project.read_only
+
+        project = _StandaloneProject(path, read_only)
+        reserving_class = _StandaloneReservingClass(project)
+        return cls(reserving_class, name, payload, path)
 
     @classmethod
     def new(
@@ -165,7 +237,6 @@ class DfmMethod:
             "data tab": {
                 "origin labels": [],
                 "development labels": [],
-                "input data triangle values": [],
                 "input data triangle csv path": "",
             },
             "ratios tab": {
@@ -184,7 +255,7 @@ class DfmMethod:
             "results tab": {
                 "ratio basis dataset": "",
                 "ultimate ratio decimal places": 2,
-                "ultimate vector": [],
+                "ultimate vector csv path": "",
             },
             "notes tab": {
                 "notes": str(notes or ""),
@@ -315,17 +386,113 @@ class DfmMethod:
     def selected_average_formulas(self) -> dict[str, Any]:
         return deepcopy(self.average_formulas)
 
+    def agent_summary(self) -> dict[str, Any]:
+        ratio_values = self.ratio_values()
+        input_data_path = clean_text(self.data_tab.get("input data triangle csv path"))
+        ultimate_path = clean_text(self.results_tab.get("ultimate vector csv path"))
+        labels = self._average_labels()
+        selected = _coerce_matrix(self.average_formulas.get("selected"))
+        selected_by_dev: list[dict[str, Any]] = []
+        col_count = self._average_col_count()
+        dev_labels = self.ratio_triangle.get("development labels") or []
+        for col in range(col_count):
+            row_index = None
+            for row, selected_row in enumerate(selected):
+                if col < len(selected_row) and bool(selected_row[col]):
+                    row_index = row
+                    break
+            selected_by_dev.append({
+                "development index": col + 1,
+                "development label": dev_labels[col] if col < len(dev_labels) else str(col + 1),
+                "formula": labels[row_index] if row_index is not None and row_index < len(labels) else "",
+            })
+        return {
+            "api method": "DfmMethod.agent_summary",
+            "project": self.project_name,
+            "reserving class": self.reserving_class,
+            "name": self.name,
+            "file path": str(self.file_path),
+            "details": self.info(),
+            "data tab": {
+                "origin labels": self.data_tab.get("origin labels") or [],
+                "development labels": self.data_tab.get("development labels") or [],
+                "input data triangle csv path": input_data_path,
+            },
+            "ratios tab": {
+                "origin labels": self.ratio_triangle.get("origin labels") or [],
+                "development labels": self.ratio_triangle.get("development labels") or [],
+                "ratio shape": list(_matrix_shape(ratio_values)),
+                "average formulas": labels,
+                "selected by development": selected_by_dev,
+            },
+            "results tab": {
+                "ratio basis dataset": self.results_tab.get("ratio basis dataset") or "",
+                "ultimate vector csv path": ultimate_path,
+            },
+            "notes preview": self.notes[:500],
+        }
+
+    def input_data_triangle(self) -> list[list[Any]]:
+        path = self._resolve_data_path(self.data_tab.get("input data triangle csv path"))
+        if not path:
+            return []
+        return _read_csv_matrix(path)
+
+    def ratio_values(self) -> list[list[Any]]:
+        return _coerce_matrix(self.ratio_triangle.get("ratio values"))
+
+    def ratio_row(self, row: int | str) -> dict[str, Any]:
+        row_index = self._resolve_row(row)
+        values = self.ratio_values()
+        excluded = _coerce_matrix(self.ratio_triangle.get("excluded"))
+        origin_labels = self._origin_labels()
+        dev_labels = self.ratio_triangle.get("development labels") or []
+        row_values = values[row_index] if row_index < len(values) else []
+        row_excluded = excluded[row_index] if row_index < len(excluded) else []
+        return {
+            "api method": "DfmMethod.ratio_row",
+            "origin index": row_index + 1,
+            "origin label": origin_labels[row_index] if row_index < len(origin_labels) else str(row_index + 1),
+            "development labels": dev_labels,
+            "values": row_values,
+            "excluded": row_excluded,
+        }
+
+    def average_formula_summary(self) -> dict[str, Any]:
+        return {
+            "api method": "DfmMethod.average_formula_summary",
+            "label": self.average_formulas.get("label") or [],
+            "custom average formula settings": self.average_formulas.get("custom average formula settings") or {},
+            "selected": self.average_formulas.get("selected") or [],
+            "values": self.average_formulas.get("values") or [],
+        }
+
     def set_ratio_exclusions(self, matrix: list[list[bool | int]]) -> "DfmMethod":
         self.ratio_triangle["excluded"] = [[1 if cell else 0 for cell in row] for row in matrix]
         return self
 
+    def set_ratio_exclusion(self, row: int | str, development: int | str, excluded: bool = True) -> "DfmMethod":
+        row_index = self._resolve_row(row)
+        col = self._resolve_development_col(development)
+        matrix = self._excluded_matrix()
+        self._set_excluded_cell(matrix, row_index, col, 1 if excluded else 0)
+        return self
+
+    def include_ratio(self, row: int | str, development: int | str) -> "DfmMethod":
+        return self.set_ratio_exclusion(row, development, False)
+
+    def exclude_ratio(self, row: int | str, development: int | str) -> "DfmMethod":
+        return self.set_ratio_exclusion(row, development, True)
+
     def clear(self) -> "DfmMethod":
+        self.clear_notes()
         rows, cols = self._ratio_shape()
         if rows and cols:
             self.ratio_triangle["excluded"] = [[0 for _ in range(cols)] for _ in range(rows)]
         selected = _coerce_matrix(self.average_formulas.get("selected"))
         if selected:
             self.average_formulas["selected"] = [[0 for _ in row] for row in selected]
+        self._last_ratio_adjustment = None
         return self
 
     def include_all_ratios(self) -> "DfmMethod":
@@ -333,17 +500,41 @@ class DfmMethod:
         self.ratio_triangle["excluded"] = [[0 for _ in range(cols)] for _ in range(rows)]
         return self
 
-    def exclude_high(self, dev_period: int, count: int = 1, reason: str = "") -> "DfmMethod":
-        return self._exclude_extreme(dev_period, count, high=True, reason=reason)
+    def exclude_high(
+        self,
+        dev_period: int,
+        count: int = 1,
+        reason: str = "",
+        add_notes: bool = True,
+    ) -> "DfmMethod":
+        return self._exclude_extreme(dev_period, count, high=True, reason=reason, add_notes=add_notes)
 
-    def exclude_low(self, dev_period: int, count: int = 1, reason: str = "") -> "DfmMethod":
-        return self._exclude_extreme(dev_period, count, high=False, reason=reason)
+    def exclude_low(
+        self,
+        dev_period: int,
+        count: int = 1,
+        reason: str = "",
+        add_notes: bool = True,
+    ) -> "DfmMethod":
+        return self._exclude_extreme(dev_period, count, high=False, reason=reason, add_notes=add_notes)
 
-    def select_high(self, dev_period: int, count: int = 1, reason: str = "") -> "DfmMethod":
-        return self._select_extreme(dev_period, count, high=True, reason=reason)
+    def select_high(
+        self,
+        dev_period: int = 1,
+        count: int = 1,
+        reason: str = "",
+        add_notes: bool = True,
+    ) -> "DfmMethod":
+        return self._select_extreme(dev_period, count, high=True, reason=reason, add_notes=add_notes)
 
-    def select_low(self, dev_period: int, count: int = 1, reason: str = "") -> "DfmMethod":
-        return self._select_extreme(dev_period, count, high=False, reason=reason)
+    def select_low(
+        self,
+        dev_period: int = 1,
+        count: int = 1,
+        reason: str = "",
+        add_notes: bool = True,
+    ) -> "DfmMethod":
+        return self._select_extreme(dev_period, count, high=False, reason=reason, add_notes=add_notes)
 
     def exclude_l_df(self, dev_period: int, row: int | str, reason: str = "", add_notes: bool = True) -> "DfmMethod":
         col = _as_col_index(dev_period)
@@ -366,13 +557,15 @@ class DfmMethod:
     def exclude_origin_year(self, origin_year: int | str, reason: str = "") -> "DfmMethod":
         return self.exclude_row(origin_year).add_notes(reason) if reason else self.exclude_row(origin_year)
 
-    def exclude_covid_years(self, years: Iterable[int] | None = None) -> "DfmMethod":
+    def exclude_covid_years(self, years: Iterable[int] | None = None, add_notes: bool = True) -> "DfmMethod":
         target_years = list(years if years is not None else (2020, 2021))
         labels = self._origin_labels()
         for year in target_years:
             for index, label in enumerate(labels):
                 if str(year) in str(label):
                     self.exclude_row(index + 1)
+        if add_notes and target_years:
+            self.add_notes(f"Excluded COVID accident years: {', '.join(str(year) for year in target_years)}.")
         return self
 
     def exclude_diagonal(
@@ -399,6 +592,9 @@ class DfmMethod:
         return self
 
     def set_selected_average(self, label: str, dev_periods: int | Iterable[int] | str = "all") -> "DfmMethod":
+        label_text = _normalize_label(label)
+        if label_text.lower() in {"high", "low"}:
+            return self._set_selected_extreme_average(label_text.lower() == "high", dev_periods)
         labels = self._average_labels()
         row_index = self._ensure_average_label(label)
         col_count = self._average_col_count()
@@ -412,10 +608,15 @@ class DfmMethod:
         _ = labels
         return self
 
+    def set_selected_average_by_label(self, label: str, development: int | str = "all") -> "DfmMethod":
+        if isinstance(development, str) and development.strip().lower() in {"", "all", "*"}:
+            return self.set_selected_average(label, "all")
+        return self.set_selected_average(label, self._resolve_development_col(development) + 1)
+
     def set_user_ratio(self, value: float, dev_period: int, row_index: int | None = None) -> "DfmMethod":
         target_row = self._ensure_average_label("User Entry")
         if row_index is not None:
-            target_row = max(0, int(row_index))
+            target_row = max(0, int(row_index) - 1)
             self._ensure_average_row_count(target_row + 1)
         col_count = self._average_col_count()
         values = _ensure_matrix(self.average_formulas, "values", len(self._average_labels()), col_count, None)
@@ -424,12 +625,48 @@ class DfmMethod:
         values[target_row][col] = float(value)
         return self.set_selected_average(self._average_labels()[target_row], dev_period)
 
-    def copy_average_formula_patterns(self, source: "DfmMethod") -> "DfmMethod":
-        self.ratios_tab["average formulas"] = deepcopy(source.average_formulas)
+    def copy_average_formula_patterns(
+        self,
+        source: "DfmMethod" | str | None = None,
+        col_index: int | Iterable[int] | str = "all",
+        skip_user_entry_values: bool = True,
+        *,
+        copy_values: bool = False,
+    ) -> "DfmMethod":
+        reference = self._resolve_source_dfm(source)
+        if copy_values:
+            self.ratios_tab["average formulas"] = deepcopy(reference.average_formulas)
+            return self
+        self._copy_average_selection(reference, col_index, skip_user_entry_values=skip_user_entry_values)
         return self
 
-    def copy_ratio_patterns(self, source: "DfmMethod") -> "DfmMethod":
-        self.ratio_triangle["excluded"] = deepcopy(source.ratio_triangle.get("excluded", []))
+    def copy_ratio_patterns(
+        self,
+        source: "DfmMethod" | str | None = None,
+        row_index: int | Iterable[int] | str = "all",
+        col_index: int | Iterable[int] | str = "all",
+        row_offset: int | str = "automatic",
+        col_offset: int = 0,
+    ) -> "DfmMethod":
+        reference = self._resolve_source_dfm(source)
+        source_excluded = _coerce_matrix(reference.ratio_triangle.get("excluded"))
+        if row_index == "all" and col_index == "all" and row_offset == "automatic" and int(col_offset or 0) == 0:
+            self.ratio_triangle["excluded"] = deepcopy(source_excluded)
+            return self
+        target = self._excluded_matrix()
+        rows = self._resolve_index_selection(row_index, len(target))
+        cols = self._resolve_index_selection(col_index, max((len(row) for row in target), default=0))
+        resolved_row_offset = reference._infer_row_offset(self) if row_offset == "automatic" else int(row_offset or 0)
+        resolved_col_offset = int(col_offset or 0)
+        for row in rows:
+            source_row = row - resolved_row_offset
+            if source_row < 0 or source_row >= len(source_excluded):
+                continue
+            for col in cols:
+                source_col = col - resolved_col_offset
+                if source_col < 0 or source_col >= len(source_excluded[source_row]):
+                    continue
+                target[row][col] = source_excluded[source_row][source_col]
         return self
 
     def set_tail_value(
@@ -446,15 +683,29 @@ class DfmMethod:
         source_values = list(values if values is not None else (value_list if value_list is not None else []))
         if not source_values:
             raise DfmDataError("set_tail_value requires values or value_list.")
-        start_col = _as_col_index(dev_period)
-        for offset, value in enumerate(source_values):
-            self.set_user_ratio(float(value), start_col + offset + 1)
-        note_bits = [f"Tail values set from development period {dev_period}"]
+        numeric_values = [float(value) for value in source_values if _number(value) is not None]
+        lookback = years if years is not None else n_year
+        if isinstance(lookback, int):
+            numeric_values = numeric_values[: max(0, lookback)]
+        if not numeric_values:
+            raise DfmDataError("set_tail_value did not receive any numeric values.")
+        selected_values = list(numeric_values)
+        excluded_label = ""
+        exclude_key = clean_text(exclude).lower()
+        if exclude_key == "low" and len(selected_values) > 1:
+            selected_values.remove(min(selected_values))
+            excluded_label = "ex low "
+        elif exclude_key == "high" and len(selected_values) > 1:
+            selected_values.remove(max(selected_values))
+            excluded_label = "ex high "
+        average = sum(selected_values) / len(selected_values)
+        self.set_user_ratio(round(average, 4), dev_period)
+        note_bits = [f"For development period {self.dev_period(dev_period, 1)}, selected a {len(numeric_values)}-year {excluded_label}average"]
         lookback = years if years is not None else n_year
         if lookback is not None:
             note_bits.append(f"years={lookback}")
-        if exclude:
-            note_bits.append(f"exclude={exclude}")
+        note_bits.append(f"values={', '.join(str(round(value, 4)) for value in selected_values)}")
+        note_bits.append(f"average={round(average, 4)}")
         if historical_ratio_data is not None:
             note_bits.append("historical ratio data supplied")
         self.add_notes("; ".join(note_bits))
@@ -485,7 +736,7 @@ class DfmMethod:
 
     def selected_cumulative_factor(self, dev_index: int) -> float | None:
         values = self._selected_ratio_values()
-        idx = int(dev_index)
+        idx = _as_legacy_index(dev_index)
         if idx < 0 or idx >= len(values):
             return None
         running = 1.0
@@ -495,12 +746,19 @@ class DfmMethod:
             running *= value
         return running
 
-    def dev_period(self, index: int, format: int = 0) -> str:
+    def dev_period(self, index: int | Sequence[int], format: int | str = 0) -> str:
         labels = self.ratio_triangle.get("development labels") or self.data_tab.get("development labels") or []
-        idx = int(index)
+        if not isinstance(index, (str, bytes)) and isinstance(index, Sequence):
+            items = list(index)
+            if not items:
+                return ""
+            start = self._dev_period_part(int(items[0]), "start")
+            end = self._dev_period_part(int(items[-1]), "end")
+            return f"{start}-{end}" if start and end else f"{items[0]}-{items[-1]}"
+        idx = _as_legacy_index(int(index))
         if 0 <= idx < len(labels):
-            return str(labels[idx])
-        return str(idx + 1)
+            return self._format_development_label(str(labels[idx]), format)
+        return str(idx + 1 if idx >= 0 else idx)
 
     def dev_month(self, index: int) -> float | None:
         label = self.dev_period(index)
@@ -519,14 +777,24 @@ class DfmMethod:
             raise DfmDataError(f"Ratio cell not found at row={row}, column={column}.") from err
 
     def ultimate(self, row: int) -> Any:
-        vector = self.results_tab.get("ultimate vector")
-        if not isinstance(vector, list):
-            return None
+        vector = self.ultimate_vector()
         row_index = self._resolve_row(row)
         try:
             return vector[row_index]
         except IndexError as err:
             raise DfmDataError(f"Ultimate value not found at row={row}.") from err
+
+    def ultimate_vector(self) -> list[Any]:
+        path = self._resolve_data_path(self.results_tab.get("ultimate vector csv path"))
+        if not path:
+            return []
+        matrix = _read_csv_matrix(path)
+        return [row[0] if row else None for row in matrix]
+
+    def ultimates(self, row: int | str | None = None) -> Any:
+        if row is None:
+            return self.ultimate_vector()
+        return self.ultimate(row)
 
     def selected_ratio(self, dev_period: int) -> float | None:
         values = self._selected_ratio_values()
@@ -539,9 +807,7 @@ class DfmMethod:
         except ImportError as err:
             raise DfmDataError("Install the pandas extra to use results_dataframe(): pip install arcrho-api[pandas]") from err
         origin_labels = self._origin_labels()
-        ultimate = self.results_tab.get("ultimate vector")
-        if not isinstance(ultimate, list):
-            ultimate = []
+        ultimate = self.ultimate_vector()
         row_count = max(len(origin_labels), len(ultimate))
         return pd.DataFrame(
             {
@@ -553,8 +819,6 @@ class DfmMethod:
     # Legacy aliases used by production notebooks.
     ex_hi = exclude_high
     ex_lo = exclude_low
-    select_high = select_high
-    select_low = select_low
     ex_LDF = exclude_l_df
     ex_row = exclude_row
     ex_AY = exclude_origin_year
@@ -564,6 +828,65 @@ class DfmMethod:
     set_user_value = set_user_ratio
     set_average_formula_patterns = copy_average_formula_patterns
     set_ratio_patterns = copy_ratio_patterns
+
+    def get_average_factors(self) -> list[str]:
+        return self._average_labels()
+
+    def selected_average_label(self, dev_period: int) -> str:
+        labels = self._average_labels()
+        selected = _coerce_matrix(self.average_formulas.get("selected"))
+        col = _as_col_index(dev_period)
+        for row, selected_row in enumerate(selected):
+            if col < len(selected_row) and bool(selected_row[col]):
+                return labels[row] if row < len(labels) else ""
+        return ""
+
+    def offset(self) -> "DfmMethod":
+        state = self._last_ratio_adjustment
+        if not state:
+            self.add_notes("No prior ratio adjustment is available for offset().")
+            return self
+        dev_period = int(state["dev_period"]) - 1
+        if dev_period < 1:
+            self.add_notes("Offset skipped because the adjusted development period has no prior period.")
+            return self
+        old_value = _number(state.get("old_selected"))
+        new_value = _number(state.get("new_selected"))
+        current_value = self.selected_ratio(dev_period)
+        if old_value is None or new_value in (None, 0) or current_value is None:
+            self.add_notes("Offset skipped because selected ratio values are unavailable.")
+            return self
+        adjusted = current_value * old_value / new_value
+        self.add_notes(
+            f"Adjusted the selected LDF for {self.dev_period(dev_period, 1)} to offset the selection for "
+            f"{self.dev_period(dev_period + 1, 1)}: {round(current_value, 4)} * "
+            f"{round(old_value, 4)} / {round(new_value, 4)} = {round(adjusted, 4)}."
+        )
+        self.set_user_ratio(round(adjusted, 4), dev_period)
+        self._last_ratio_adjustment = None
+        return self
+
+    def set_summary_ratio_basis(self, basis_object: Any, data_type: str = "Vector") -> "DfmMethod":
+        name = getattr(basis_object, "name", None) or getattr(basis_object, "Name", None) or str(basis_object)
+        self.results_tab["ratio basis dataset"] = clean_text(name)
+        self.results_tab["ratio basis dataset type"] = clean_text(data_type) or "Vector"
+        return self
+
+    def reset_ratio_basis(self, source: "DfmMethod" | str | None = None) -> "DfmMethod":
+        reference = self._resolve_source_dfm(source)
+        self.results_tab["ratio basis dataset"] = reference.results_tab.get("ratio basis dataset", "")
+        if "ratio basis dataset type" in reference.results_tab:
+            self.results_tab["ratio basis dataset type"] = reference.results_tab.get("ratio basis dataset type", "")
+        return self
+
+    def extended_ratio_data(self) -> dict[str, Any]:
+        return {
+            "api method": "DfmMethod.extended_ratio_data",
+            "values": self.ratio_values(),
+            "excluded": deepcopy(self.ratio_triangle.get("excluded") or []),
+            "origin labels": self._origin_labels(),
+            "development labels": self.ratio_triangle.get("development labels") or [],
+        }
 
     def view(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return self.to_dict()
@@ -577,8 +900,23 @@ class DfmMethod:
     def quick_preview(self) -> dict[str, Any]:
         return self.to_dict()
 
-    def prior(self, index: int = -1) -> "DfmMethod":
-        raise DfmDataError("Prior-version lookup is not implemented in phase one.")
+    def prior(self, index: int = -1, project_name: str | None = None) -> "DfmMethod":
+        target_project_name = clean_text(project_name)
+        if not target_project_name:
+            projects = self.project.client.list_projects()
+            current = self.project.name
+            try:
+                current_index = next(i for i, name in enumerate(projects) if name.lower() == current.lower())
+            except StopIteration as err:
+                raise DfmDataError(f"Current project is not listed by the client: {current!r}") from err
+            target_index = current_index + int(index)
+            if target_index < 0 or target_index >= len(projects):
+                raise DfmDataError(
+                    f"Cannot resolve prior project with index {index}; current project {current!r} is "
+                    f"at position {current_index + 1} of {len(projects)}."
+                )
+            target_project_name = projects[target_index]
+        return self.project.client.project(target_project_name).reserving_class(self.reserving_class).dfm(self.name)
 
     def view_prior(self, index: int = -1) -> "DfmMethod":
         return self.prior(index)
@@ -615,6 +953,8 @@ class DfmMethod:
         _tab(self.payload, "results tab")
         _tab(self.payload, "notes tab")
         _tab(self.payload, "method metadata")
+        self.data_tab.pop("input data triangle values", None)
+        self.results_tab.pop("ultimate vector", None)
         self._sync_details_identity()
 
     def _sync_details_identity(self) -> None:
@@ -623,10 +963,7 @@ class DfmMethod:
         self.name = clean_text(self.details.get("name"))
 
     def _ratio_values(self) -> list[list[Any]]:
-        values = _coerce_matrix(self.ratio_triangle.get("ratio values"))
-        if not values:
-            values = _coerce_matrix(self.data_tab.get("input data triangle values"))
-        return values
+        return self.ratio_values()
 
     def _ratio_shape(self) -> tuple[int, int]:
         return _matrix_shape(self._ratio_values() or _coerce_matrix(self.ratio_triangle.get("excluded")))
@@ -644,7 +981,16 @@ class DfmMethod:
             raise DfmDataError(f"Ratio development period out of range: {col + 1}")
         excluded[row][col] = value
 
-    def _exclude_extreme(self, dev_period: int, count: int, *, high: bool, reason: str = "") -> "DfmMethod":
+    def _exclude_extreme(
+        self,
+        dev_period: int,
+        count: int,
+        *,
+        high: bool,
+        reason: str = "",
+        add_notes: bool = True,
+    ) -> "DfmMethod":
+        old_selected = self.selected_ratio(dev_period)
         col = _as_col_index(dev_period)
         candidates = self._ratio_candidates(col)
         if not candidates:
@@ -653,11 +999,25 @@ class DfmMethod:
         excluded = self._excluded_matrix()
         for row, _value in ordered[: max(0, int(count))]:
             excluded[row][col] = 1
-        if reason:
+        self._last_ratio_adjustment = {
+            "dev_period": dev_period,
+            "old_selected": old_selected,
+            "new_selected": self.selected_ratio(dev_period),
+        }
+        if reason and add_notes:
             self.add_notes(reason)
         return self
 
-    def _select_extreme(self, dev_period: int, count: int, *, high: bool, reason: str = "") -> "DfmMethod":
+    def _select_extreme(
+        self,
+        dev_period: int,
+        count: int,
+        *,
+        high: bool,
+        reason: str = "",
+        add_notes: bool = True,
+    ) -> "DfmMethod":
+        old_selected = self.selected_ratio(dev_period)
         col = _as_col_index(dev_period)
         candidates = self._ratio_candidates(col)
         if not candidates:
@@ -666,7 +1026,12 @@ class DfmMethod:
         excluded = self._excluded_matrix()
         for row, _value in candidates:
             excluded[row][col] = 0 if row in keep else 1
-        if reason:
+        self._last_ratio_adjustment = {
+            "dev_period": dev_period,
+            "old_selected": old_selected,
+            "new_selected": self.selected_ratio(dev_period),
+        }
+        if reason and add_notes:
             self.add_notes(reason)
         return self
 
@@ -683,6 +1048,106 @@ class DfmMethod:
             if number is not None:
                 out.append((row_index, number))
         return out
+
+    def _set_selected_extreme_average(self, high: bool, dev_periods: int | Iterable[int] | str) -> "DfmMethod":
+        labels = self._average_labels()
+        col_count = self._average_col_count()
+        values = _ensure_matrix(self.average_formulas, "values", len(labels), col_count, None)
+        selected = _ensure_matrix(self.average_formulas, "selected", len(labels), col_count, 0)
+        for col in _dev_periods_to_cols(dev_periods, col_count):
+            self._require_col(col, col_count)
+            candidates: list[tuple[int, float]] = []
+            for row, row_values in enumerate(values):
+                if row >= len(labels) or "user entry" in labels[row].lower():
+                    continue
+                if col < len(row_values):
+                    value = _number(row_values[col])
+                    if value is not None:
+                        candidates.append((row, value))
+            if not candidates:
+                raise DfmDataError(f"No average formula values found for development period {col + 1}.")
+            row_index = sorted(candidates, key=lambda item: item[1], reverse=high)[0][0]
+            for row in selected:
+                row[col] = 0
+            selected[row_index][col] = 1
+        return self
+
+    def _copy_average_selection(
+        self,
+        source: "DfmMethod",
+        col_index: int | Iterable[int] | str,
+        *,
+        skip_user_entry_values: bool,
+    ) -> None:
+        source_labels = source._average_labels()
+        source_selected = _coerce_matrix(source.average_formulas.get("selected"))
+        target_col_count = self._average_col_count()
+        cols = self._resolve_index_selection(col_index, target_col_count)
+        for col in cols:
+            selected_row = None
+            for row, selected in enumerate(source_selected):
+                if col < len(selected) and bool(selected[col]):
+                    selected_row = row
+                    break
+            if selected_row is None or selected_row >= len(source_labels):
+                continue
+            label = source_labels[selected_row]
+            if skip_user_entry_values and "user entry" in label.lower():
+                continue
+            target_row = self._ensure_average_label(label)
+            target_labels = self._average_labels()
+            target_selected = _ensure_matrix(self.average_formulas, "selected", len(target_labels), target_col_count, 0)
+            for row in target_selected:
+                row[col] = 0
+            target_selected[target_row][col] = 1
+
+    def _resolve_source_dfm(self, source: "DfmMethod" | str | None) -> "DfmMethod":
+        if source is None or (isinstance(source, str) and source.strip().lower() in {"", "prior dfm"}):
+            return self.prior()
+        if isinstance(source, DfmMethod):
+            return source
+        if isinstance(source, str):
+            return self.reserving_class_obj.dfm(source)
+        raise DfmDataError(f"Expected DfmMethod, method name, or None; got {type(source).__name__}.")
+
+    def _resolve_index_selection(self, selection: int | Iterable[int] | str, length: int) -> list[int]:
+        if isinstance(selection, str):
+            if selection.strip().lower() in {"all", "*", ""}:
+                return list(range(length))
+            return [_as_col_index(int(selection))]
+        if isinstance(selection, int):
+            return [_as_col_index(selection)]
+        return [_as_col_index(value) for value in selection]
+
+    def _infer_row_offset(self, target: "DfmMethod") -> int:
+        try:
+            source_first_match = re.search(r"\d{4}", clean_text(self._origin_labels()[0]))
+            target_first_match = re.search(r"\d{4}", clean_text(target._origin_labels()[0]))
+            if source_first_match is None or target_first_match is None:
+                return 0
+            source_first = int(source_first_match.group(0))
+            target_first = int(target_first_match.group(0))
+        except (IndexError, ValueError):
+            return 0
+        multiplier = 4 if "q" in clean_text(target._origin_labels()[0]).lower() else 1
+        return (source_first - target_first) * multiplier
+
+    def _format_development_label(self, label: str, format: int | str) -> str:
+        if format == 0:
+            return label
+        label_without_index = re.sub(r"^\(?\s*\d+\s*\)?\s*", "", label).strip()
+        if format == 1:
+            return label_without_index or label
+        if format == "start":
+            text = label_without_index or label
+            return text.split("-", 1)[0].strip()
+        if format == "end":
+            text = label_without_index or label
+            return text.split("-", 1)[-1].strip()
+        return label_without_index or label
+
+    def _dev_period_part(self, index: int, part: str) -> str:
+        return self.dev_period(index, part)
 
     def _origin_labels(self) -> list[Any]:
         labels = self.data_tab.get("origin labels")
@@ -708,6 +1173,37 @@ class DfmMethod:
                     return index
             return int(text) - 1
         raise DfmDataError(f"Could not resolve origin row: {row!r}")
+
+    def _resolve_development_col(self, development: int | str) -> int:
+        if isinstance(development, int):
+            return _as_col_index(development)
+        text = clean_text(development)
+        if text.isdigit():
+            return _as_col_index(int(text))
+        wanted = _label_key(text)
+        labels = self.ratio_triangle.get("development labels") or self.data_tab.get("development labels") or []
+        for index, label in enumerate(labels if isinstance(labels, list) else []):
+            label_text = clean_text(label)
+            if _label_key(label_text) == wanted or wanted in _label_key(label_text):
+                return index
+        raise DfmDataError(f"Could not resolve development column: {development!r}")
+
+    def _resolve_data_path(self, value: Any) -> Path | None:
+        text = clean_text(value)
+        if not text:
+            return None
+        candidate = Path(text)
+        if candidate.is_absolute():
+            return candidate
+        project_data = getattr(self.project, "data_dir", None)
+        if project_data:
+            data_candidate = Path(project_data) / text
+            if data_candidate.exists():
+                return data_candidate
+        method_relative = self.file_path.parent / text
+        if method_relative.exists():
+            return method_relative
+        return candidate
 
     def _average_labels(self) -> list[str]:
         labels = self.average_formulas.get("label")
@@ -814,8 +1310,6 @@ def _default_average_formulas() -> dict[str, Any]:
 
 
 def _infer_average_settings(label: str) -> dict[str, Any] | None:
-    import re
-
     normalized = _normalize_label(label)
     match = re.match(r"^(volume|simple)\s*-\s*(all|[1-9]\d*)(?:\s+ex\s+hi/lo(?:\s*x\s*([1-9]\d*))?)?$", normalized, re.I)
     if not match:
@@ -836,4 +1330,3 @@ def _int_or_none(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
-
