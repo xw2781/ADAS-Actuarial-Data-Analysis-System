@@ -1,0 +1,11 @@
+{
+  "type": "feature",
+  "scope": "dataset",
+  "audience": "user",
+  "summary": "Added floating Dataset tab pop-out windows.",
+  "details": [
+    "Right-clicking a Dataset tab now temporarily moves the live tab page into a draggable, resizable floating window, matching the DFM tab pop-out behavior.",
+    "The Dataset pop-out uses the shared tab pop-out logic so controls, event handlers, and data state remain live in the floating tab.",
+    "The Dataset Chart tab redraws after pop-out, docking, focus, and resize so the canvas fits the floating window."
+  ]
+}

@@ -6,6 +6,7 @@ import { $, logLine } from "/ui/shared/dom.js";
 import { getDataset, loadDatasetNotes, patchDataset, saveDatasetNotes } from "/ui/shared/api.js";
 import { renderTable, renderActiveCellUI, renderChart, redrawChartSafely} from "/ui/dataset/dataset_render.js";
 import { createTabbedPage } from "/ui/shared/tabbed_page.js";
+import { wireTabPopoutWindows } from "/ui/shared/tab_popout_window.js";
 import { createDatasetDependencyGuard } from "/ui/dataset/dataset_dependency_guard.js";
 import { createDatasetHeadersService } from "/ui/dataset/dataset_headers_service.js";
 import { wireDatasetGridInteractions } from "/ui/dataset/dataset_grid_interactions.js";
@@ -225,6 +226,13 @@ const DEFAULT_PROJECT_DISPLAY = "Default Project";
 const DEFAULT_PATH_DISPLAY = "Default Path";
 const DEFAULT_TOKEN = "__DEFAULT__";
 const BROWSING_HISTORY_MAX_ENTRIES = 15;
+const DATASET_TABS = [
+  { id: "details", label: "Details" },
+  { id: "data", label: "Data" },
+  { id: "chart", label: "Chart" },
+  { id: "notes", label: "Notes" },
+  { id: "auditLog", label: "Audit Log" },
+];
 const LEN_DROPDOWN_CONFIG = {
   originLenSelect: {
     wrapId: "originLenWrap",
@@ -2613,14 +2621,14 @@ async function boot() {
   validateAndNormalizeDatasetInput({ strict: true, showMessage: false });
 
   // Initialize dataset tab system (Details / Data / Chart / Notes / Audit Log)
+  const redrawPoppedChart = (tabId) => {
+    if (tabId !== "chart") return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(redrawChartSafely);
+    });
+  };
   const dsTabSystem = createTabbedPage(document.body, {
-    tabs: [
-      { id: "details", label: "Details" },
-      { id: "data", label: "Data" },
-      { id: "chart", label: "Chart" },
-      { id: "notes", label: "Notes" },
-      { id: "auditLog", label: "Audit Log" },
-    ],
+    tabs: DATASET_TABS,
     cssPrefix: "ds",
     initialTab: "data",
     injectTabBar: false,
@@ -2634,6 +2642,15 @@ async function boot() {
     },
   });
   window.dsTabSystem = dsTabSystem;
+  wireTabPopoutWindows({
+    cssPrefix: "ds",
+    tabs: DATASET_TABS,
+    tabSystem: () => window.dsTabSystem,
+    onPopoutTab: redrawPoppedChart,
+    onDockTab: redrawPoppedChart,
+    onFocusTab: redrawPoppedChart,
+    onLayout: redrawPoppedChart,
+  });
 
   wireEvents();
 
